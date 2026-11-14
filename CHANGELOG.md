@@ -2,9 +2,21 @@
 
 Định dạng theo [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/), đánh phiên bản theo
 [SemVer](https://semver.org/lang/vi/). Mỗi mục trỏ tới commit thật trong lịch sử Git; từ
-0.2.0 trở đi mỗi thay đổi đi kèm issue/PR. So sánh chi tiết V1 → V2: [docs/V2_CHANGES.md](docs/V2_CHANGES.md).
+0.2.0 trở đi mỗi thay đổi đi kèm issue/PR. So sánh chi tiết V1 → V2: [docs/V2_CHANGES.md](docs/V2_CHANGES.md);
+V2 → V3: [docs/V3_CHANGES.md](docs/V3_CHANGES.md).
 
 ## [Unreleased]
+
+## [3.0.0] - 2026-11-15 — DXOS V3: gói ngành và plugin kết nối
+
+Bản này gồm gói ngành (PR #37, áp dụng lại sau khi bị revert ở PR #38) và nhánh `feat/plugin-ket-noi`
+(plugin kết nối, API bản 2, SDK `desktiny-plugin`). Plugin đóng gói `.zip` (`feat/plugin-dong-goi`) chưa nằm
+trong bản này.
+
+Số phiên bản nhảy từ 0.2.2 lên 3.0.0 để khớp tên gọi V3 của đợt dự thi (V1 = 0.1.0, V2 = 0.2.x). Theo SemVer,
+số chính đổi cũng hợp lệ vì so với 0.2.2 bản này thêm migration `core_0003`, `workspace_0014`–`workspace_0027`
+(có bước xóa cột `cases.assignee_id` ở `workspace_0014`) và contract `contracts/plugin.openapi.json` mới. Gói tách riêng (`dx-flowkit`, `desktiny-plugin`, `dx-piivn`) giữ số
+phiên bản của chính chúng.
 
 ### Changed
 - **Trang đăng nhập** làm lại: thẻ tiêu đề có khung viền trang trí trên nền xanh đậm, luôn vừa một màn hình, hiệu
@@ -261,6 +273,8 @@
 - Điện thoại: dòng "giờ · phạm vi" ở đầu bài viết bảng tin không còn xuống dòng từng chữ (cắt bằng dấu …,
   nhãn "Đã ghim" chỉ còn biểu tượng); nút trợ lý AI thu sang mép phải khi cuộn xuống và trang có thêm khoảng
   trống cuối, nên không còn che nút ở hàng cuối danh sách Việc hôm nay.
+- Image web build lỗi `vue-tsc` vì thiếu `examples/plugins` (test `flow/pluginNodes.test.ts` đọc manifest plugin
+  mẫu): `web.Dockerfile` copy thư mục này vào bước build — cherry-pick `1f57e43` từ `feat/plugin-dong-goi`.
 
 ## [0.2.2] - 2026-10-31
 
@@ -350,7 +364,9 @@ Trạng thái kho trước khi bước vào V2, tag hồi tố tại `f089bfb`.
 ### Fixed
 - Thứ tự import trong `auth.py` để CI backend qua ruff — `d495abb`.
 
-[Unreleased]: https://github.com/Raphael-Fug/DXOS_V2/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/Raphael-Fug/DXOS_V2/compare/v3.0.0...HEAD
+[3.0.0]: https://github.com/Raphael-Fug/DXOS_V2/compare/v0.2.2...v3.0.0
+[0.2.2]: https://github.com/Raphael-Fug/DXOS_V2/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/Raphael-Fug/DXOS_V2/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/Raphael-Fug/DXOS_V2/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Raphael-Fug/DXOS_V2/releases/tag/v0.1.0

@@ -179,7 +179,7 @@ def create_app(settings: Settings | None = None, engine=None):
     store = BlobStore(settings)
     app = FastAPI(
         title="DX Core",
-        version="0.2.2",
+        version="3.0.0",
         openapi_url="/core/v1/openapi.json",
         docs_url="/core/v1/docs",
         redoc_url=None,

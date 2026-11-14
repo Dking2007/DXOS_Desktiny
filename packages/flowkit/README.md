@@ -8,7 +8,7 @@ SPDX-FileCopyrightText: 2026 Desktiny contributors
 Validate small JSON workflow graphs and dry-run them in memory. No dependencies, no
 database, no network, no `eval`.
 
-Extracted from the workflow engine of [Desktiny (DXOS V2)](../../README.md). The logic is
+Extracted from the workflow engine of [Desktiny (DXOS V3)](../../README.md). The logic is
 the same code the platform uses to check and preview workflows before they run for real.
 
 *(Tiếng Việt: kiểm tra và chạy thử đồ thị quy trình dạng JSON ngay trong bộ nhớ, không cần

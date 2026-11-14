@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "DX Core",
-    "version": "0.2.2"
+    "version": "3.0.0"
   },
   "paths": {
     "/core/v1/auth/login": {

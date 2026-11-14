@@ -329,7 +329,8 @@ Mã nguồn do dự án tự viết phát hành theo **Apache License 2.0** (SPD
 ## Biên dịch, phát hành và đóng góp
 
 - Cài đặt/biên dịch từ mã nguồn: [BUILD.md](BUILD.md) (`make venv deps build test`, `make install PREFIX=...`).
-- Lịch sử phiên bản: [CHANGELOG.md](CHANGELOG.md); bản V2 khác V1 thế nào: [docs/V2_CHANGES.md](docs/V2_CHANGES.md).
+- Lịch sử phiên bản: [CHANGELOG.md](CHANGELOG.md); bản hiện tại là **V3 (3.0.0)**. V3 khác V2 thế nào:
+  [docs/V3_CHANGES.md](docs/V3_CHANGES.md); V2 khác V1: [docs/V2_CHANGES.md](docs/V2_CHANGES.md).
 - Báo lỗi / đề xuất: tab **Issues** của repo. Cách đóng góp: [CONTRIBUTING.md](CONTRIBUTING.md),
   [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), bảo mật: [SECURITY.md](SECURITY.md).
 - Tự rà soát tiêu chí PoF OLP PMNM 2026: [SELF_REVIEW.md](SELF_REVIEW.md).
