@@ -3,8 +3,11 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRoute, RouterLink, RouterView } from 'vue-router'
-import { useQueryClient } from '@tanstack/vue-query'
+import { useQuery, useQueryClient } from '@tanstack/vue-query'
+import { api } from './api'
+import type { PluginSlotItem } from './components/plugins/PluginFrames.vue'
 import {
+  AppWindow,
   LogOut,
   Menu,
   Moon,
@@ -17,8 +20,10 @@ import {
 import { errorText } from '@dx/web-shared/api.ts'
 import { useSession } from './stores/session'
 import { badgeText, visibleGroups } from './ui/nav'
+import type { NavGroup } from './ui/nav'
 import { useOverview } from './ui/overview'
 import { paletteRequest } from './ui/palette'
+import { brand, term } from './ui/appearance'
 import { cycleTheme, isDark, theme } from './ui/theme'
 import { roleLabel } from './ui/labels'
 import AvatarPhoto from './components/AvatarPhoto.vue'
@@ -38,7 +43,29 @@ const sidebarCollapsed = ref(readCollapsed())
 const sessionError = ref('')
 const palette = ref<InstanceType<typeof CommandPalette>>()
 watch(paletteRequest, (request) => request && palette.value?.show(request.text))
-const groups = computed(() => visibleGroups(session.can))
+// Pages of connected plugins get their own group in the sidebar.
+const pluginPages = useQuery({
+  queryKey: ['plugin-slots', 'page'],
+  queryFn: () => api.request<{ items: PluginSlotItem[] }>('/plugin-slots?slot=page').then((result) => result.items),
+  enabled: computed(() => !!session.user),
+  staleTime: 60_000,
+})
+const groups = computed(() => {
+  const base = visibleGroups(session.can)
+  const pages = pluginPages.data.value ?? []
+  if (!pages.length) return base
+  const apps: NavGroup = {
+    label: 'Ứng dụng',
+    links: pages.map((page) => ({
+      key: `app:${page.plugin_id}:${page.index}`,
+      to: `/apps/${page.plugin_id}/${page.index}`,
+      label: page.title,
+      icon: AppWindow,
+      hint: page.plugin_name,
+    })),
+  }
+  return [...base.slice(0, 1), apps, ...base.slice(1)]
+})
 const overview = useOverview()
 const counts = computed(() => overview.data.value?.counts)
 const queryClient = useQueryClient()
@@ -93,7 +120,13 @@ function toggleSidebarCollapsed() {
     <aside class="sidebar" :class="{ open: sidebar }">
       <div class="sidebar-head">
         <RouterLink to="/home" class="brand" aria-label="Trang chủ"
-          ><span class="brand-mark" aria-hidden="true">D</span><span>Desktiny</span></RouterLink
+          ><span class="brand-mark" :class="{ 'has-logo': !!brand.logo }" aria-hidden="true"
+            ><img v-if="brand.logo" :src="brand.logo" alt="" /><template v-else>{{
+              brand.name.charAt(0)
+            }}</template></span
+          ><span class="brand-text"
+            ><span>{{ brand.name }}</span><small v-if="brand.org">{{ brand.org }}</small></span
+          ></RouterLink
         >
         <button
           class="sidebar-collapse"
@@ -162,7 +195,7 @@ function toggleSidebarCollapsed() {
           >
             <Menu :size="21" /></button
           ><span class="topbar-crumb">Không gian nội bộ</span><span class="topbar-divider" aria-hidden="true">/</span
-          ><strong>{{ route.meta.title }}</strong><PageHelp />
+          ><strong>{{ term(String(route.meta.title ?? '')) }}</strong><PageHelp />
         </div>
         <button
           class="topbar-search"
@@ -205,7 +238,7 @@ function toggleSidebarCollapsed() {
         <RouterView :key="String(route.params.id ?? route.path)" />
       </main>
       <footer v-if="!route.meta.wide && !route.meta.bleed" class="app-footer">
-        <span>Desktiny</span
+        <span>{{ brand.org || brand.name }}</span
         ><span>Dữ liệu nghiệp vụ được kiểm soát theo quyền truy cập.</span>
       </footer>
     </div>

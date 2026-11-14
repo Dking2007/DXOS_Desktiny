@@ -24,6 +24,7 @@ import {
   Paperclip,
   Pencil,
   Plus,
+  Puzzle,
   RotateCcw,
   Save,
   Undo2,
@@ -64,6 +65,9 @@ import { askAboutCase, caseContext } from '../assistant/state'
 import { useAi } from '../ai/useAi'
 import { OPERATORS } from '../flow/nodes'
 import ProcessCanvas from '../flow/ProcessCanvas.vue'
+import PluginFrames from '../components/plugins/PluginFrames.vue'
+import PluginActions from '../components/plugins/PluginActions.vue'
+import type { PluginSlotItem } from '../components/plugins/PluginFrames.vue'
 import StepAnswerDialog from '../components/StepAnswerDialog.vue'
 import { toast } from '../ui/toast'
 import { isOfficeFile, previewKind } from '../ui/preview'
@@ -611,8 +615,26 @@ function eventLabel(event: HistoryEvent) {
     'case.rejected': 'Hồ sơ bị từ chối',
     'approval.decided': 'Đã ghi nhận quyết định',
     'case.workflow_started': 'Đã bắt đầu quy trình xử lý',
+    'plugin.write.comment': 'Ý kiến',
+    'plugin.write.fields': 'Cập nhật trường của hồ sơ',
+    'plugin.write.attach': 'Gắn tài liệu vào hồ sơ',
   }
   return actions[event.action] || event.action
+}
+// A plugin writes as itself ("plugin:<id>"), or as the viewer of its frame; history says which.
+function eventActor(event: HistoryEvent) {
+  const detail = typeof event.detail === 'object' && event.detail ? event.detail : {}
+  const plugin = typeof detail.plugin_name === 'string' ? detail.plugin_name : ''
+  if (event.actor_id?.startsWith('plugin:')) return `Plugin ${plugin || event.actor_id.slice(7)}`
+  return plugin ? `${userName(event.actor_id)} qua plugin ${plugin}` : userName(event.actor_id)
+}
+function eventNote(event: HistoryEvent) {
+  if (typeof event.detail === 'string') return event.detail
+  const detail = event.detail || {}
+  if (typeof detail.body === 'string') return detail.body
+  if (Array.isArray(detail.fields)) return 'Trường: ' + detail.fields.join(', ')
+  if (typeof detail.name === 'string') return detail.name
+  return typeof detail.reason === 'string' ? detail.reason : ''
 }
 function taskState(task: ApprovalTask) {
   return task.state || task.status || 'pending'
@@ -660,9 +682,22 @@ function fieldLabel(key: string) {
   const name = key.replace(/^payload\./, '')
   return detail.data.value?.form.fields.find((field) => field.key === name)?.label ?? name
 }
-type CaseTab = 'info' | 'process' | 'files' | 'history' | 'route'
+// Plugin tabs are keyed "plugin:<plugin id>:<index>".
+type CaseTab = 'info' | 'process' | 'files' | 'history' | 'route' | `plugin:${string}`
 const TAB_KEYS: CaseTab[] = ['info', 'process', 'files', 'history', 'route']
-const tab = ref<CaseTab>(TAB_KEYS.includes(route.query.tab as CaseTab) ? (route.query.tab as CaseTab) : 'info')
+const queryTab = String(route.query.tab ?? '')
+const tab = ref<CaseTab>(
+  TAB_KEYS.includes(queryTab as CaseTab) || queryTab.startsWith('plugin:') ? (queryTab as CaseTab) : 'info',
+)
+const pluginTabs = useQuery({
+  queryKey: ['plugin-slots', 'case.tab'],
+  queryFn: () => api.request<{ items: PluginSlotItem[] }>('/plugin-slots?slot=case.tab').then((r) => r.items),
+  staleTime: 60_000,
+})
+const pluginTab = computed(() => {
+  const [, pluginId, index] = tab.value.startsWith('plugin:') ? tab.value.split(':') : []
+  return pluginId ? { plugin_id: pluginId, index: Number(index) } : null
+})
 const tabs = computed(() => {
   const data = detail.data.value
   const items: { key: CaseTab; label: string; icon: typeof Info; count?: number }[] = [
@@ -672,6 +707,8 @@ const tabs = computed(() => {
     { key: 'history', label: 'Lịch sử & bản đã trình', icon: History, count: data?.submissions.length },
   ]
   if (data?.submissions.length) items.push({ key: 'route', label: 'Vì sao đi đường này', icon: GitBranch })
+  for (const item of pluginTabs.data.value ?? [])
+    items.push({ key: `plugin:${item.plugin_id}:${item.index}`, label: item.title, icon: Puzzle })
   return items
 })
 function moveTab(step: number) {
@@ -720,7 +757,11 @@ function moveTab(step: number) {
           @click="showTask = true"
         >
           <ListPlus :size="16" />Tạo việc</button
-        ><button v-if="canWithdraw" class="button secondary" @click="ask('withdraw')">
+        ><PluginActions place="case.action" :context="{ case_id: id }" /><button
+          v-if="canWithdraw"
+          class="button secondary"
+          @click="ask('withdraw')"
+        >
           <Undo2 :size="16" />Thu hồi</button
         ><button v-if="canDelete" class="button secondary" @click="askClosing('delete')">
           <Trash2 :size="16" />Xóa bản nháp</button
@@ -1083,22 +1124,11 @@ function moveTab(step: number) {
                 >
                   <p>{{ eventLabel(event) }}</p>
                   <small
-                    >{{ userName(event.actor_id) }} ·
+                    >{{ eventActor(event) }} ·
                     {{ formatDate(event.created_at, true) }}</small
                   >
-                  <p
-                    v-if="typeof event.detail === 'string'"
-                    class="muted"
-                    style="font-size: 14px; margin-top: 5px"
-                  >
-                    {{ event.detail }}
-                  </p>
-                  <p
-                    v-else-if="event.detail?.reason"
-                    class="muted"
-                    style="font-size: 14px; margin-top: 5px"
-                  >
-                    {{ event.detail.reason }}
+                  <p v-if="eventNote(event)" class="muted prewrap" style="font-size: 14px; margin-top: 5px">
+                    {{ eventNote(event) }}
                   </p>
                 </li>
               </ul>
@@ -1116,6 +1146,15 @@ function moveTab(step: number) {
           :form-name="detail.data.value.form.name"
           @open="openStepFile"
         />
+        <section v-if="pluginTab" class="card plugin-tab">
+          <PluginFrames
+            :key="tab"
+            place="case.tab"
+            :context="{ case_id: id }"
+            :only="pluginTab"
+            bare
+          />
+        </section>
         <section v-if="tab === 'route'" class="card">
           <header class="card-header"><h2>Vì sao hồ sơ được chuyển đến những người này?</h2></header>
           <div class="card-body">
@@ -1148,6 +1187,7 @@ function moveTab(step: number) {
         </section>
       </div>
       <aside v-if="tab !== 'process'" class="stack" style="align-content: start">
+        <PluginFrames place="case.side" :context="{ case_id: id }" />
         <section v-if="ai.on('case_qa')" class="card case-ask-card" aria-label="Hỏi đáp về hồ sơ">
           <header class="card-header">
             <h3><Sparkles :size="16" /> Hỏi đáp về hồ sơ</h3>

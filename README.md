@@ -307,6 +307,8 @@ audit không thay chữ ký số. Không cam kết hiệu năng/RPO/RTO khi chư
 - [Inventory bên thứ ba](docs/third-party-inventory.md)
 - [Kịch bản demo](docs/demo.md)
 - [Quy trình nghiệp vụ, chạy thử và truy vết](docs/process-packages.md)
+- [Gói ngành: giao diện và nghiệp vụ đóng gói, cài/gỡ được](docs/packs.md)
+- [Plugin kết nối: sự kiện, API có phạm vi, bước quy trình, khung giao diện](docs/plugins.md)
 
 Code tự viết: [Apache-2.0](LICENSE), xem [NOTICE](NOTICE). ONLYOFFICE, RustFS và các
 service/dependency giữ giấy phép của họ. Cần rà soát artifact, notice, source offer
@@ -327,7 +329,8 @@ Mã nguồn do dự án tự viết phát hành theo **Apache License 2.0** (SPD
 ## Biên dịch, phát hành và đóng góp
 
 - Cài đặt/biên dịch từ mã nguồn: [BUILD.md](BUILD.md) (`make venv deps build test`, `make install PREFIX=...`).
-- Lịch sử phiên bản: [CHANGELOG.md](CHANGELOG.md); bản V2 khác V1 thế nào: [docs/V2_CHANGES.md](docs/V2_CHANGES.md).
+- Lịch sử phiên bản: [CHANGELOG.md](CHANGELOG.md); bản hiện tại là **V3 (3.0.0)**. V3 khác V2 thế nào:
+  [docs/V3_CHANGES.md](docs/V3_CHANGES.md); V2 khác V1: [docs/V2_CHANGES.md](docs/V2_CHANGES.md).
 - Báo lỗi / đề xuất: tab **Issues** của repo. Cách đóng góp: [CONTRIBUTING.md](CONTRIBUTING.md),
   [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), bảo mật: [SECURITY.md](SECURITY.md).
 - Tự rà soát tiêu chí PoF OLP PMNM 2026: [SELF_REVIEW.md](SELF_REVIEW.md).

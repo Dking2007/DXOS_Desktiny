@@ -26,6 +26,21 @@ class Settings(PlatformSettings):
     smtp_password: str = ""
     smtp_from: str = ""
     smtp_tls: bool = True
+    # Folder of the sector packs shipped with the release (`packs/` in the repository). Empty
+    # means: look next to the source tree, then in /app/packs (the API image).
+    packs_dir: str = ""
+    # Comma-separated hostnames connected plugins may run on. Empty means no plugin can be installed.
+    plugin_allowed_hosts: str = ""
+    # Calls each plugin may make per minute and channel; going over answers 429 with Retry-After.
+    plugin_reads_per_minute: int = 600
+    plugin_writes_per_minute: int = 120
+    plugin_notifications_per_minute: int = 30
+    plugin_events_per_minute: int = 60
+    # How often the worker looks for dossiers and tasks that just passed their due date.
+    overdue_sweep_seconds: int = 300
+    # Files a plugin attaches: per file, and in total per plugin over the last 24 hours.
+    plugin_upload_max_bytes: int = 25 * 1024 * 1024
+    plugin_upload_daily_bytes: int = 200 * 1024 * 1024
 
 
 @lru_cache

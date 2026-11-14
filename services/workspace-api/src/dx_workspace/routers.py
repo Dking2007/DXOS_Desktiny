@@ -859,7 +859,12 @@ def build_router(app):
     ):
         user = context(db, actor)
         require(db, user, "forms.manage")
-        key = idempotency_key or m.uid()
+        value = make_form(db, actor, user, body, idempotency_key or m.uid())
+        db.commit()
+        return serial(value)
+
+    def make_form(db, actor, user, body: s.FormCreate, key: str) -> m.Form:
+        """A published form with its Core schema; the caller commits. Shared with sector packs."""
         for step in body.approval_steps:
             if step.resolver == "user":
                 target = db.get(m.User, step.user_id)
@@ -887,8 +892,9 @@ def build_router(app):
         db.add(value)
         db.flush()
         audit(db, user, "form.published", value.id)
-        db.commit()
-        return serial(value)
+        return value
+
+    app.state.make_form = make_form
 
     @router.get("/cases", tags=["cases"])
     def cases(
@@ -1109,6 +1115,7 @@ def build_router(app):
             )
             changes["payload_revision"] = record["revision"]
         changes["updated_at"] = m.utcnow()
+        added = [file_id for file_id in body.file_ids or [] if file_id not in (value.file_ids or [])]
         cas(db, m.Case, case_id, body.expected_revision, changes)
         audit(
             db,
@@ -1117,6 +1124,8 @@ def build_router(app):
             case_id,
             {"payload_revision": changes.get("payload_revision", value.payload_revision)},
         )
+        if added:
+            emit(db, "case.file_added", case_id, {**case_event(db.get(m.Case, case_id)), "file_ids": added})
         db.commit()
         return case_data(db, db.get(m.Case, case_id))
 
@@ -1364,6 +1373,7 @@ def build_router(app):
             )
         cas(db, m.Case, case_id, body.expected_revision, {"status": "cancelled", "updated_at": m.utcnow()})
         audit(db, user, "case.cancelled", case_id, {"reason": body.reason})
+        emit(db, "case.closed", case_id, case_event(db.get(m.Case, case_id)))
         db.commit()
         return case_data(db, db.get(m.Case, case_id))
 
@@ -1471,7 +1481,10 @@ def build_router(app):
             item = get_file(db, user, file_id)
             files.append({"id": item.id, "name": item.name})
         if files and case:
+            added = [f["id"] for f in files if f["id"] not in case.file_ids]
             case.file_ids = list(dict.fromkeys([*case.file_ids, *body.file_ids]))
+            if added:
+                emit(db, "case.file_added", case.id, {**case_event(case), "file_ids": added})
         if corrections:
             # A correction changes the dossier's data; what was submitted stays in the snapshot.
             record = app.state.core_service.get(f"/records/{case.payload_record_id}")

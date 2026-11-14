@@ -31,6 +31,8 @@ import TaskCreateDialog from '../components/TaskCreateDialog.vue'
 import TaskBreakdown from '../ai/TaskBreakdown.vue'
 import { useAi } from '../ai/useAi'
 import TaskAutomations from '../components/TaskAutomations.vue'
+import PluginFrames from '../components/plugins/PluginFrames.vue'
+import PluginActions from '../components/plugins/PluginActions.vue'
 import TaskFiles from '../components/TaskFiles.vue'
 import { TASK_STAGES, dueText, nextStep, taskStage } from '../ui/taskGuide'
 const route = useRoute()
@@ -290,6 +292,7 @@ function localInput(value: string | null) {
         </div>
       </div>
       <div class="page-actions">
+        <PluginActions place="task.action" :context="{ task_id: task.id }" />
         <button
           v-for="action in primaryActions"
           :key="action"
@@ -467,7 +470,10 @@ function localInput(value: string | null) {
               <span class="avatar">{{ item.author_name.split(' ').slice(-1)[0]?.[0] }}</span>
               <div>
                 <strong>{{ item.author_name }}</strong>
-                <small class="muted"> · {{ formatDate(item.created_at, true) }}</small>
+                <small class="muted"
+                  ><template v-if="item.via"> qua plugin {{ item.via }}</template> ·
+                  {{ formatDate(item.created_at, true) }}</small
+                >
                 <p class="prewrap">{{ item.body }}</p>
               </div>
             </div>
@@ -515,6 +521,7 @@ function localInput(value: string | null) {
           </dl>
         </section>
         <TaskAutomations :task-id="task.id" :closed="['completed', 'cancelled'].includes(task.status)" />
+        <PluginFrames place="task.side" :context="{ task_id: task.id }" />
         <section class="card">
           <header class="card-header"><h3>Hoạt động</h3></header>
           <div class="card-body">

@@ -2,9 +2,21 @@
 
 Định dạng theo [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/), đánh phiên bản theo
 [SemVer](https://semver.org/lang/vi/). Mỗi mục trỏ tới commit thật trong lịch sử Git; từ
-0.2.0 trở đi mỗi thay đổi đi kèm issue/PR. So sánh chi tiết V1 → V2: [docs/V2_CHANGES.md](docs/V2_CHANGES.md).
+0.2.0 trở đi mỗi thay đổi đi kèm issue/PR. So sánh chi tiết V1 → V2: [docs/V2_CHANGES.md](docs/V2_CHANGES.md);
+V2 → V3: [docs/V3_CHANGES.md](docs/V3_CHANGES.md).
 
 ## [Unreleased]
+
+## [3.0.0] - 2026-11-15 — DXOS V3: gói ngành và plugin kết nối
+
+Bản này gồm gói ngành (PR #37, áp dụng lại sau khi bị revert ở PR #38) và nhánh `feat/plugin-ket-noi`
+(plugin kết nối, API bản 2, SDK `desktiny-plugin`). Plugin đóng gói `.zip` (`feat/plugin-dong-goi`) chưa nằm
+trong bản này.
+
+Số phiên bản nhảy từ 0.2.2 lên 3.0.0 để khớp tên gọi V3 của đợt dự thi (V1 = 0.1.0, V2 = 0.2.x). Theo SemVer,
+số chính đổi cũng hợp lệ vì so với 0.2.2 bản này thêm migration `core_0003`, `workspace_0014`–`workspace_0027`
+(có bước xóa cột `cases.assignee_id` ở `workspace_0014`) và contract `contracts/plugin.openapi.json` mới. Gói tách riêng (`dx-flowkit`, `desktiny-plugin`, `dx-piivn`) giữ số
+phiên bản của chính chúng.
 
 ### Changed
 - **Trang đăng nhập** làm lại: thẻ tiêu đề có khung viền trang trí trên nền xanh đậm, luôn vừa một màn hình, hiệu
@@ -32,6 +44,45 @@
   - Trình thiết kế quy trình: ô tìm bước, nhóm bước thu gọn được; nút Lưu chuyển “Đã lưu” khi không có thay đổi.
 
 ### Added
+- **Mở rộng plugin kết nối** (API bản 2, migration `workspace_0024`–`workspace_0027`, [docs/plugins.md](docs/plugins.md)):
+  - API ghi có phạm vi: `cases.comment`, `cases.fields.write` (chỉ trường khai trong `writes.fields` và được duyệt,
+    cần token phiên), `tasks.write` (cần token phiên), `notifications.send`; `Idempotency-Key` bắt buộc; lịch sử hồ sơ
+    hiện “Plugin X” hoặc “A qua plugin X”; nhật ký hoạt động `plugin.write.*`.
+  - Tệp: `files.read` (danh sách, nội dung qua Core kèm SHA-256), `cases.attach` (25 MB/tệp, 200 MB/ngày, gắn với
+    bước); bước `plugin_action` có thể nhận danh sách tệp.
+  - `cases.list` theo quy trình chọn lúc duyệt (phân trang con trỏ, `updated_since`), `departments.read`, `people.list`.
+  - Bước chạy lâu `mode: "async"` với `timeout_days`, `calls/{id}/complete` (ký HMAC) và `/progress`, nhánh
+    `timeout`; huỷ thì plugin nhận `plugin.call.cancelled`.
+  - Sự kiện của plugin (`emits`, `POST /plugin/v1/events`) làm điểm bắt đầu quy trình; sự kiện lõi mới
+    `case.step_entered`, `case.file_added`, `case.closed`, `case.overdue`, `task.overdue`.
+  - Khung giao diện: vị trí `case.tab`, `case.action`, `task.action`, `admin.page`; lệnh `toast`, `navigate`,
+    `refresh`, `close`, `confirm`; `frame_permissions` duyệt từng quyền, đặt vào `allow` của iframe.
+  - Công cụ cho trợ lý AI (`assistant_tools`, tính năng `assistant_plugins`), gọi bằng token phiên chỉ đọc của người hỏi.
+  - Cấu hình theo cơ quan (`settings_schema`, ô bí mật mã hoá, `GET /plugin/v1/settings`); `health_endpoint`, tỉ lệ
+    lỗi và độ trễ 24 giờ, báo người duyệt khi lỗi liên tiếp; giới hạn tần suất theo plugin và kênh (429 +
+    `Retry-After`); contract riêng `contracts/plugin.openapi.json`.
+  - SDK: `desktiny-plugin` 0.2.0 (client mới, CLI `init`/`check`/`pack`/`dev`), SDK khung JS có lệnh mới.
+- **Plugin kết nối (`desktiny-plugin/1`), tầng 2** (migration `workspace_0023`, [docs/plugins.md](docs/plugins.md)):
+  ứng dụng chạy ở máy chủ riêng (chỉ máy chủ trong `PLUGIN_ALLOWED_HOSTS`), mã không chạy trong Desktiny. Màn
+  **Quản trị › Plugin**: cài từ manifest (chờ duyệt), duyệt quyền và sự kiện, khoá ký và token chỉ hiện một lần, bật/tắt
+  (tắt là mọi token hết hiệu lực), đổi khoá, gỡ, nhật ký trao đổi và gửi lại sự kiện. Bốn kênh: sự kiện qua outbox ký
+  HMAC-SHA256 và thử lại; API `/workspace/v1/plugin/v1` với token cài đặt (chỉ đọc bản ghi đã được báo) hoặc token
+  phiên 10 phút (đọc theo quyền người xem); bước quy trình `plugin_action` với ô cấu hình tự dựng từ `config_schema`,
+  nhánh Thành công/Lỗi, giá trị trả về cho bước sau; khung giao diện iframe sandbox ở cột phải hồ sơ, công việc, trang
+  chủ và trang riêng (nhóm **Ứng dụng**), truyền ngữ cảnh và màu của gói qua `postMessage`. CSP `frame-src` lấy từ
+  `PLUGIN_FRAME_SOURCES` (gateway dùng template của nginx). Bộ công cụ: `packages/desktiny-plugin` (Python),
+  `packages/plugin-sdk` (JavaScript), plugin mẫu `examples/plugins/tra-cuu-mst`. 5 test backend, 2 test SDK, 3 test
+  plugin mẫu, 1 test frontend.
+- **Gói ngành (`desktiny-pack/1`), tầng 1 của hướng phát triển plugin/giao diện** (migration `workspace_0022`,
+  [docs/packs.md](docs/packs.md)). Màn **Quản trị › Gói ngành** (`organization.manage`): cài gói `.zip` hoặc gói có
+  sẵn trong `packs/` sau khi **xem trước**, nâng cấp cùng `id`, gỡ (quy trình đã có hồ sơ chỉ ngừng phát hành), xuất
+  `.zip`. Phần giao diện: tên ứng dụng và cơ quan, logo, favicon, màu sáng/tối (kiểm tương phản WCAG AA cả hai
+  giao diện), phông, mật độ, bo góc, trang đăng nhập (khung/phẳng/ảnh nền), từ ngữ, ẩn/sắp menu, khối trang chủ;
+  áp khi tải ứng dụng qua `GET /appearance` công khai. Phần nghiệp vụ: quy trình (biểu mẫu + đồ thị, phát hành
+  sẵn), biểu mẫu, mẫu quy trình, luồng tự động (cài ở trạng thái tắt), bài kiến thức. **Trình tạo gói** của cơ quan
+  (`local.*`) có xem trước trực tiếp. SVG được lọc bỏ mã; tài nguyên phục vụ với CSP riêng. 17 mẫu quy trình chuyển
+  từ mã sang gói mặc định `desktiny.core`; gói mẫu `packs/truong-hoc`. Gateway thêm Content-Security-Policy và
+  `frame-ancestors` cho ứng dụng web. 6 test backend, 5 test frontend.
 - **12 quy trình mẫu mới** trong Tạo luồng: hồ sơ khẩn trình thẳng ban giám đốc, nghỉ phép theo số ngày, mua sắm theo
   giá trị, công tác và tạm ứng, công văn đến, trình ký văn bản đi, rà soát hợp đồng song song, thanh toán theo chứng từ,
   sửa chữa tài sản, đề xuất tuyển dụng, ban hành quy định có xác nhận đã đọc, quá hạn thì chuyển cấp trên. Bước ban
@@ -222,6 +273,8 @@
 - Điện thoại: dòng "giờ · phạm vi" ở đầu bài viết bảng tin không còn xuống dòng từng chữ (cắt bằng dấu …,
   nhãn "Đã ghim" chỉ còn biểu tượng); nút trợ lý AI thu sang mép phải khi cuộn xuống và trang có thêm khoảng
   trống cuối, nên không còn che nút ở hàng cuối danh sách Việc hôm nay.
+- Image web build lỗi `vue-tsc` vì thiếu `examples/plugins` (test `flow/pluginNodes.test.ts` đọc manifest plugin
+  mẫu): `web.Dockerfile` copy thư mục này vào bước build — cherry-pick `1f57e43` từ `feat/plugin-dong-goi`.
 
 ## [0.2.2] - 2026-10-31
 
@@ -311,7 +364,9 @@ Trạng thái kho trước khi bước vào V2, tag hồi tố tại `f089bfb`.
 ### Fixed
 - Thứ tự import trong `auth.py` để CI backend qua ruff — `d495abb`.
 
-[Unreleased]: https://github.com/Raphael-Fug/DXOS_V2/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/Raphael-Fug/DXOS_V2/compare/v3.0.0...HEAD
+[3.0.0]: https://github.com/Raphael-Fug/DXOS_V2/compare/v0.2.2...v3.0.0
+[0.2.2]: https://github.com/Raphael-Fug/DXOS_V2/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/Raphael-Fug/DXOS_V2/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/Raphael-Fug/DXOS_V2/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Raphael-Fug/DXOS_V2/releases/tag/v0.1.0

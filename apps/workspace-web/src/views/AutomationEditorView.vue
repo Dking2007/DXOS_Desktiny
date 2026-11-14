@@ -49,7 +49,6 @@ import { FLOW_CONTEXT } from '../flow/context'
 import {
   KINDS,
   OUTCOMES,
-  PROCESS_TEMPLATES,
   nodeOutputs,
   plainCopy,
   TEMPLATES,
@@ -62,6 +61,9 @@ import {
   tone,
 } from '../flow/nodes'
 import { useAi } from '../ai/useAi'
+import { fetchPackTemplates } from '../flow/templates'
+import { pluginStepConfig, usePluginSteps } from '../flow/pluginNodes'
+import type { PluginStep } from '../flow/pluginNodes'
 import { fold } from '@dx/web-shared/text.ts'
 import type { ApiGraph, FlowKind, FlowNodeData, NodeKind, RunStep, TriggerInfo } from '../flow/nodes'
 type Step = RunStep & { error?: string; recipients?: string[] }
@@ -200,8 +202,16 @@ if (ruleId.value) {
     })
     .catch((cause) => (error.value = cause))
 } else {
-  const list = [...TEMPLATES, ...PROCESS_TEMPLATES]
-  const template = list.find((t) => t.key === route.query.template) ?? list[0]
+  const wanted = route.query.template ? String(route.query.template) : ''
+  const builtIn = TEMPLATES.find((t) => t.key === wanted)
+  // Process templates live in the installed sector packs; event flows ship with the app.
+  if (builtIn || !wanted) startFrom(builtIn ?? TEMPLATES[0]!)
+  else
+    fetchPackTemplates()
+      .then((items) => startFrom(items.find((t) => t.key === wanted) ?? TEMPLATES[0]!))
+      .catch((cause) => (error.value = cause))
+}
+function startFrom(template: { key: string; title: string; graph: ApiGraph }) {
   if (template.key !== 'blank') name.value = template.title
   const graph = plainCopy(template.graph)
   if (route.query.form) {
@@ -256,6 +266,22 @@ function newId(kind: NodeKind) {
   counter += 1
   return `${kind}_${Date.now().toString(36).slice(-4)}${counter}`
 }
+// Settings the next added node starts with instead of its kind's defaults (a plugin's step).
+let nextConfig: Record<string, unknown> | null = null
+const pluginSteps = usePluginSteps()
+const pluginQuery = computed(() =>
+  (pluginSteps.data.value ?? []).filter(
+    (step) => !paletteQuery.value || fold(`${step.title} ${step.plugin_name}`).includes(fold(paletteQuery.value)),
+  ),
+)
+function addPluginStep(step: PluginStep) {
+  nextConfig = pluginStepConfig(step)
+  addFromPalette('plugin_action')
+}
+function onPluginDragStart(event: DragEvent, step: PluginStep) {
+  event.dataTransfer?.setData('application/dx-plugin', JSON.stringify(pluginStepConfig(step)))
+  if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move'
+}
 function addNode(kind: NodeKind, position: { x: number; y: number }, after?: { id: string; handle?: string }) {
   if (kind === 'trigger' && triggerNode.value) {
     notice.value = 'Mỗi luồng chỉ có một node kích hoạt.'
@@ -272,10 +298,11 @@ function addNode(kind: NodeKind, position: { x: number; y: number }, after?: { i
       id,
       type: 'flow',
       position,
-      data: { kind, label: '', config: KINDS[kind].defaults() },
+      data: { kind, label: '', config: nextConfig ?? KINDS[kind].defaults() },
       deletable: kind !== 'trigger',
     },
   ]
+  nextConfig = null
   if (after) edges.value = [...edges.value, canvasEdge(after.id, id, after.handle)]
   selectedId.value = id
   clearOverlay()
@@ -296,6 +323,13 @@ function onDragStart(event: DragEvent, kind: NodeKind) {
   if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move'
 }
 function onDrop(event: DragEvent) {
+  const plugin = event.dataTransfer?.getData('application/dx-plugin')
+  if (plugin) {
+    nextConfig = JSON.parse(plugin) as Record<string, unknown>
+    const at = screenToFlowCoordinate({ x: event.clientX, y: event.clientY })
+    addNode('plugin_action', { x: at.x - 120, y: at.y - 36 })
+    return
+  }
   const kind = event.dataTransfer?.getData('application/dx-node') as NodeKind
   if (!kind || !(kind in KINDS)) return
   const point = screenToFlowCoordinate({ x: event.clientX, y: event.clientY })
@@ -754,7 +788,7 @@ function toggleGroup(group: string) {
             aria-label="Tìm loại bước"
         /></label>
         <p class="muted">Kéo thả vào canvas hoặc bấm để thêm sau bước đang chọn.</p>
-        <p v-if="!palette.length" class="muted">Không có bước nào khớp “{{ paletteQuery }}”.</p>
+        <p v-if="!palette.length && !pluginQuery.length" class="muted">Không có bước nào khớp “{{ paletteQuery }}”.</p>
         <div v-for="section in palette" :key="section.group" class="palette-group">
           <button
             type="button"
@@ -784,6 +818,35 @@ function toggleGroup(group: string) {
               ><strong>{{ KINDS[kind].title }}</strong><small>{{ KINDS[kind].hint }}</small></span
             >
           </button>
+          </template>
+        </div>
+        <div v-if="pluginQuery.length" class="palette-group">
+          <button
+            type="button"
+            class="palette-group-head"
+            :aria-expanded="!!paletteQuery || !foldedGroups.includes('Plugin')"
+            @click="toggleGroup('Plugin')"
+          >
+            <ChevronDown :size="14" :class="{ folded: !paletteQuery && foldedGroups.includes('Plugin') }" /><span
+              class="section-label"
+              >Plugin</span
+            ><small class="muted">{{ pluginQuery.length }}</small>
+          </button>
+          <template v-if="paletteQuery || !foldedGroups.includes('Plugin')">
+            <button
+              v-for="step in pluginQuery"
+              :key="`${step.plugin_id}:${step.kind}`"
+              class="palette-item"
+              draggable="true"
+              :style="{ '--node-color': KINDS.plugin_action.color }"
+              @dragstart="onPluginDragStart($event, step)"
+              @click="addPluginStep(step)"
+            >
+              <span class="flow-node-icon small"><component :is="KINDS.plugin_action.icon" :size="16" /></span>
+              <span class="grow"
+                ><strong>{{ step.title }}</strong><small>{{ step.plugin_name }}</small></span
+              >
+            </button>
           </template>
         </div>
       </aside>
