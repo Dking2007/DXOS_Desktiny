@@ -48,6 +48,7 @@ from .automations import (
 )
 from .core_client import CoreClient
 from .flow_values import condition_holds, render, value_of
+from .plugin_steps import cancel_call
 from .policies import active_delegators, approval_assignees, current_user, get_case, permissions, require
 from .services import case_event, emit, enqueue, notify
 
@@ -185,6 +186,7 @@ class ProcessExecution(Execution):
             self.steps[index] = dict(step, superseded=True)
 
     def withdraw(self, step: dict):
+        cancel_call(self.db, step.get("plugin_call_id"))
         for task_id, core_run in (step.get("core_runs") or {}).items():
             task = self.db.get(m.ApprovalTask, task_id)
             if task and task.state == "pending":
@@ -196,6 +198,11 @@ class ProcessExecution(Execution):
         # When the dossier reached the step, so its journey can be told in order.
         extra.setdefault("at", m.utcnow().isoformat())
         super().record(node, state, **({"attempt": attempt} if attempt > 1 else {}), **extra)
+        if state == "waiting" and self.case:
+            # A flow on this event cannot set itself off again: the chain names the rule that ran.
+            emit(self.db, "case.step_entered", self.case.id,
+                 {**case_event(self.case), "node_id": node["id"], "step": node.get("label") or node["type"]},
+                 {"rules": [*self.chain, self.rule.id] if self.rule else list(self.chain)})  # fmt: skip
 
     def step(self, node) -> list[str]:
         if node["id"] in self.ran:
@@ -207,6 +214,11 @@ class ProcessExecution(Execution):
             return []
         if node["type"] == "wait_until":
             return self.wait_until(node, node.get("data") or {})
+        if node["type"] == "plugin_action":
+            # The plugin is called from the worker; the answer picks the exit (see plugins.on_node).
+            enqueue(self.db, "plugin.node", self.run.id, {"run_id": self.run.id, "node_id": node["id"]})
+            self.record(node, "waiting")
+            return []
         if node["type"] == "http_request":
             enqueue(self.db, "automation.http", self.run.id, {"run_id": self.run.id, "node_id": node["id"]})
             self.record(node, "waiting")
@@ -378,6 +390,7 @@ def close_waiting(execution: ProcessExecution, state: str = "cancelled"):
         if step["state"] != "waiting":
             continue
         execution.steps[index] = dict(step, state=state)
+        cancel_call(db, step.get("plugin_call_id"))
         for task_id, core_run in (step.get("core_runs") or {}).items():
             task = db.get(m.ApprovalTask, task_id)
             if task and task.state == "pending":
@@ -398,6 +411,8 @@ def settle_dossier(execution: ProcessExecution, outcome: str, message: str):
     text = OWNER_MESSAGES[outcome] + ": " + case.title + (f". {message}" if message else "")
     notify(db, case.owner_id, f"process:{run.id}:{outcome}", text[:250], case.id)
     emit(db, "case." + outcome, case.id, case_event(case))
+    if outcome in {"approved", "rejected"}:
+        emit(db, "case.closed", case.id, case_event(case))
 
 
 def settle(execution: ProcessExecution):
@@ -829,6 +844,7 @@ def cancel(db: Session, core: CoreClient, submission: m.Submission):
     steps = []
     for step in run.steps or []:
         if step["state"] == "waiting":
+            cancel_call(db, step.get("plugin_call_id"))
             for core_run in (step.get("core_runs") or {}).values():
                 cancel_core_run(core, core_run)
             step = dict(step, state="cancelled")
@@ -1201,6 +1217,17 @@ def build_router(app):
                         )
                         if item
                     ]
+        # Files a plugin attached to a given step (cases.attach with node_id).
+        for entry in db.scalars(
+            select(m.Audit)
+            .where(m.Audit.resource_id == case.id, m.Audit.action == "plugin.write.attach")
+            .order_by(m.Audit.created_at)
+        ):
+            detail = entry.detail or {}
+            item = about(detail.get("file_id", ""), None, entry.created_at, "plugin", detail.get("name", ""))
+            if item and detail.get("node_id") in result:
+                item["by"] = f"Plugin {detail.get('plugin_name', '')}".strip()
+                result[detail["node_id"]]["attached"].append(item)
         return result
 
     @router.get("/automations/process-template", tags=["automations"])

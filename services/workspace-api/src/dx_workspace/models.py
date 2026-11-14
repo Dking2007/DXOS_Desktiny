@@ -416,6 +416,8 @@ class TaskComment(Base):
     task_id: Mapped[str] = mapped_column(ForeignKey("tasks.id"), index=True)
     author_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
     body: Mapped[str] = mapped_column(Text)
+    # The plugin that wrote the comment for its author, shown as "A qua plugin X".
+    via: Mapped[str | None] = mapped_column(String(120))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
@@ -547,7 +549,8 @@ class AutomationRule(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
     name: Mapped[str] = mapped_column(String(200))
     description: Mapped[str] = mapped_column(Text, default="")
-    trigger: Mapped[str] = mapped_column(String(60), index=True)
+    # Room for plugin events: "plugin.<plugin id>.<type>".
+    trigger: Mapped[str] = mapped_column(String(200), index=True)
     # "automation" reacts to events; "process" is the approval flow a form's dossiers follow.
     kind: Mapped[str] = mapped_column(String(20), default="automation", index=True)
     form_id: Mapped[str | None] = mapped_column(String(36), index=True)
@@ -632,7 +635,7 @@ class AutomationRun(Base):
     rule_id: Mapped[str] = mapped_column(ForeignKey("automation_rules.id"), index=True)
     rule_revision: Mapped[int] = mapped_column(Integer)
     event_id: Mapped[str] = mapped_column(String(36))
-    event_type: Mapped[str] = mapped_column(String(60))
+    event_type: Mapped[str] = mapped_column(String(200))
     state: Mapped[str] = mapped_column(String(20))
     steps: Mapped[list] = mapped_column(JSON, default=list)
     # The flow as it was when the run started, so later edits never change a run in progress.
@@ -860,4 +863,109 @@ class ActiveAppearance(Base):
     pack_id: Mapped[str | None] = mapped_column(String(80))
     revision: Mapped[int] = mapped_column(Integer, default=1)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Plugin(Base):
+    """A connected plugin (desktiny-plugin/1): a web application the organisation runs elsewhere.
+
+    It is installed as `pending` and does nothing until someone approves the permissions and events it
+    asked for (`granted`). Switching it off (`disabled`) stops deliveries and makes every token it holds
+    useless at once; its HMAC secret is stored encrypted and shown only when issued.
+    """
+
+    __tablename__ = "plugins"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    plugin_id: Mapped[str] = mapped_column(String(80), unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(120))
+    version: Mapped[str] = mapped_column(String(40))
+    manifest: Mapped[dict] = mapped_column(JSON)
+    base_url: Mapped[str] = mapped_column(String(300))
+    state: Mapped[str] = mapped_column(String(20), default="pending")
+    granted: Mapped[dict] = mapped_column(JSON, default=dict)
+    secret: Mapped[str] = mapped_column(Text, default="")
+    installed_by: Mapped[str | None] = mapped_column(String(36))
+    approved_by: Mapped[str | None] = mapped_column(String(36))
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revision: Mapped[int] = mapped_column(Integer, default=1)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class PluginToken(Base):
+    """A bearer token a plugin calls the plugin API with; only its SHA-256 is kept.
+
+    "install" tokens belong to the installation and read only records the plugin was told about;
+    "session" tokens are short-lived, issued to a plugin frame for the person looking at it, and read
+    with that person's rights.
+    """
+
+    __tablename__ = "plugin_tokens"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    plugin_id: Mapped[str] = mapped_column(String(80), index=True)
+    kind: Mapped[str] = mapped_column(String(20))
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    scopes: Mapped[list] = mapped_column(JSON, default=list)
+    user_id: Mapped[str | None] = mapped_column(String(36))
+    context: Mapped[dict] = mapped_column(JSON, default=dict)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class PluginSetting(Base):
+    """An organisation's values for a plugin's `settings_schema`; secret values are kept encrypted."""
+
+    __tablename__ = "plugin_settings"
+    plugin_id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    values: Mapped[dict] = mapped_column(JSON, default=dict)
+    secrets: Mapped[str] = mapped_column(Text, default="")
+    revision: Mapped[int] = mapped_column(Integer, default=1)
+    updated_by: Mapped[str | None] = mapped_column(String(36))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class PluginCall(Base):
+    """A long-running plugin step (`mode: async`): the flow waits until the plugin reports back.
+
+    `id` is the call id the plugin was given (also the id of the `node` exchange in its log).
+    """
+
+    __tablename__ = "plugin_calls"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    plugin_id: Mapped[str] = mapped_column(String(80), index=True)
+    run_id: Mapped[str] = mapped_column(String(36), index=True)
+    node_id: Mapped[str] = mapped_column(String(80))
+    # waiting, completed, timed_out, cancelled
+    state: Mapped[str] = mapped_column(String(20), default="waiting", index=True)
+    deadline: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    message: Mapped[str | None] = mapped_column(String(300))
+    result: Mapped[dict | None] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class PluginDelivery(Base):
+    """One exchange with a plugin, for its log: an event sent, a flow step called, an API read or write,
+    an event the plugin sent in, an assistant tool call or a health check (`kind`).
+
+    An event or a step call about a record is also what lets the installation token read that record.
+    """
+
+    __tablename__ = "plugin_deliveries"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    plugin_id: Mapped[str] = mapped_column(String(80), index=True)
+    kind: Mapped[str] = mapped_column(String(20))
+    event_type: Mapped[str] = mapped_column(String(80), default="")
+    event_id: Mapped[str | None] = mapped_column(String(36))
+    subject_type: Mapped[str | None] = mapped_column(String(20))
+    subject_id: Mapped[str | None] = mapped_column(String(36), index=True)
+    state: Mapped[str] = mapped_column(String(20), default="pending")
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    status_code: Mapped[int | None] = mapped_column(Integer)
+    error: Mapped[str | None] = mapped_column(String(300))
+    # Bytes a plugin uploaded (daily quota) and how long the plugin took to answer (health).
+    size: Mapped[int | None] = mapped_column(Integer)
+    duration_ms: Mapped[int | None] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 

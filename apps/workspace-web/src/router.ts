@@ -105,6 +105,22 @@ export const router = createRouter({
       meta: { title: 'Trợ lý AI', capability: 'assistant.manage' },
     },
     {
+      path: '/plugins',
+      component: () => import('./views/PluginsView.vue'),
+      meta: { title: 'Plugin', capability: 'organization.manage' },
+    },
+    {
+      path: '/plugins/:pluginId/admin/:index',
+      component: () => import('./views/PluginPageView.vue'),
+      props: { place: 'admin.page' },
+      meta: { title: 'Quản trị plugin', capability: 'organization.manage' },
+    },
+    {
+      path: '/apps/:pluginId/:index',
+      component: () => import('./views/PluginPageView.vue'),
+      meta: { title: 'Ứng dụng' },
+    },
+    {
       path: '/packs',
       component: () => import('./views/PacksView.vue'),
       meta: { title: 'Gói ngành', capability: 'organization.manage' },

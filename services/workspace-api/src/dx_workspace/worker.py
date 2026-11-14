@@ -12,7 +12,7 @@ from dx_platform.errors import AppError
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from . import ai_core, ai_index, flow_actions, processes
+from . import ai_core, ai_index, flow_actions, plugins, processes
 from .automations import deliver_webhook, dispatch, needs_engine, resume
 from .config import get_settings
 from .core_client import CoreClient
@@ -23,8 +23,10 @@ from .models import (
     Delegation,
     DriveFile,
     Folder,
+    Idempotency,
     Outbox,
     Submission,
+    Task,
     User,
     utcnow,
 )
@@ -205,6 +207,8 @@ def complete_approval(db: Session, core: CoreClient, task_id: str):
     notify(db, case.owner_id, "decision:" + task.id, "Hồ sơ đã được xử lý: " + case.title, case.id)
     if case.status in {"approved", "rejected", "needs_revision"}:
         emit(db, "case." + case.status, case.id, case_event(case))
+    if case.status in {"approved", "rejected"}:
+        emit(db, "case.closed", case.id, case_event(case))
 
 
 def withdraw_case(db: Session, core: CoreClient, submission_id: str):
@@ -271,6 +275,35 @@ def sync_folder_subtree(db: Session, core: CoreClient, settings, folder_id: str)
         folder.acl_state = "ready"
 
 
+def sweep_overdue(db: Session) -> int:
+    """Announce `case.overdue` / `task.overdue` once per due date for what just passed it."""
+    from .tasks import FINAL, event_data
+
+    now = utcnow()
+    found = 0
+
+    def first_time(kind: str, object_id: str, due) -> bool:
+        key = f"{object_id}:{due.isoformat()}"
+        if db.scalar(select(Idempotency.id).where(Idempotency.subject == "overdue-sweep",
+                                                  Idempotency.operation == kind, Idempotency.key == key)):  # fmt: skip
+            return False
+        db.add(Idempotency(subject="overdue-sweep", operation=kind, key=key, request_hash="-", response={}))
+        return True
+
+    for case in db.scalars(
+        select(Case).where(Case.due_at.is_not(None), Case.due_at < now, Case.deleted_at.is_(None),
+                           Case.archived_at.is_(None), Case.status.not_in(["approved", "rejected", "cancelled"]))
+    ):  # fmt: skip
+        if first_time("case.overdue", case.id, case.due_at):
+            emit(db, "case.overdue", case.id, {**case_event(case), "due_at": case.due_at.isoformat()})
+            found += 1
+    for task in db.scalars(select(Task).where(Task.due_at.is_not(None), Task.due_at < now, Task.status.not_in(FINAL))):
+        if first_time("task.overdue", task.id, task.due_at):
+            emit(db, "task.overdue", task.id, {**event_data(task), "due_at": task.due_at.isoformat()})
+            found += 1
+    return found
+
+
 def process_once(engine, settings, core=None) -> bool:
     core = core or CoreClient(settings)
     ai_core.use_settings(settings)
@@ -309,6 +342,7 @@ def process_once(engine, settings, core=None) -> bool:
             elif job.kind == "automation.dispatch":
                 dispatch(db, job.payload, core)
                 processes.on_task_event(db, core, job.payload)
+                plugins.fan_out(db, job.payload)
             elif job.kind == "automation.webhook":
                 deliver_webhook(db, settings, job.payload)
             elif job.kind == "automation.resume":
@@ -319,6 +353,14 @@ def process_once(engine, settings, core=None) -> bool:
                     resume(db, job.payload)
             elif job.kind == "automation.http":
                 processes.on_http(db, core, settings, job.payload)
+            elif job.kind == "plugin.node":
+                plugins.on_node(db, core, settings, job.payload)
+            elif job.kind == "plugin.call_done":
+                plugins.on_call_done(db, core, job.payload)
+            elif job.kind == "plugin.call_timeout":
+                plugins.on_call_timeout(db, core, job.payload)
+            elif job.kind == "plugin.deliver":
+                plugins.deliver(db, settings, job.payload["delivery_id"])
             elif job.kind == "automation.email":
                 flow_actions.deliver_email(settings, job.payload)
             elif job.kind == "process.overdue":
@@ -355,7 +397,16 @@ def main():
     signal.signal(signal.SIGINT, stop)
     signal.signal(signal.SIGTERM, stop)
     logging.basicConfig(level=logging.INFO)
+    swept = 0.0
     while not stopping:
+        if time.monotonic() - swept >= settings.overdue_sweep_seconds:
+            swept = time.monotonic()
+            try:
+                with Session(engine) as db:
+                    sweep_overdue(db)
+                    db.commit()
+            except Exception:  # noqa: BLE001 (the queue keeps running; the next sweep tries again)
+                logger.exception("overdue_sweep_failed")
         if not process_once(engine, settings, core):
             time.sleep(settings.worker_poll_seconds)
 

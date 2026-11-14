@@ -10,6 +10,7 @@ import {
   CalendarClock,
   Columns3,
   Download,
+  Puzzle,
   FilePlus2,
   FileText,
   FolderInput,
@@ -63,6 +64,7 @@ export type NodeKind =
   | 'send_message'
   | 'send_email'
   | 'http_request'
+  | 'plugin_action'
   | 'ai_extract'
 /** "automation" reacts to events; "process" is the route a form's dossiers follow. */
 export type FlowKind = 'automation' | 'process'
@@ -128,6 +130,8 @@ export interface TriggerInfo {
   sample: Record<string, unknown>
   /** Whether people may attach a flow with this trigger to individual tasks. */
   attachable?: boolean
+  /** Set on events a plugin declares ("Sự kiện của plugin"). */
+  group?: string
 }
 
 interface KindMeta {
@@ -377,6 +381,16 @@ export const KINDS: Record<NodeKind, KindMeta> = {
     color: '#0f8e9a',
     defaults: () => ({ to: '', subject: '', body: '' }),
   },
+  plugin_action: {
+    title: 'Bước của plugin',
+    group: 'Hành động',
+    hint: 'Do một plugin kết nối thực hiện',
+    icon: Puzzle,
+    color: '#6b5bd6',
+    // Offered per plugin step in its own palette group, with the plugin's settings filled in.
+    hidden: true,
+    defaults: () => ({ plugin_id: '', node: '', title: '', config: {}, outputs: {} }),
+  },
   http_request: {
     title: 'Gọi API lấy dữ liệu',
     group: 'Hành động',
@@ -468,6 +482,8 @@ export function outputs(kind: NodeKind, config: Record<string, unknown>): Branch
       return ['done', ...(config.timeout_days ? (['timeout'] as Branch[]) : [])]
     case 'http_request':
       return ['success', 'error']
+    case 'plugin_action':
+      return ['success', 'error', ...(config.mode === 'async' ? (['timeout'] as Branch[]) : [])]
     case 'subprocess':
       return ['approve', 'return', 'reject']
     case 'assign_task':
@@ -505,6 +521,7 @@ const OUTPUTS: Partial<Record<NodeKind, Record<string, string>>> = {
   send_message: { message_id: 'Mã tin nhắn', post_id: 'Mã bài viết' },
   send_email: { to: 'Người nhận', queued: 'Đã xếp hàng gửi' },
   http_request: { ok: 'Thành công', status: 'Mã phản hồi', body: 'Nội dung trả về' },
+  plugin_action: { ok: 'Thành công' },
   ai_extract: { summary: 'Tóm tắt' },
 }
 /** What a step produces for later steps, keyed the way conditions and text read it. */
@@ -515,6 +532,10 @@ export function nodeOutputs(id: string, kind: NodeKind, config: Record<string, u
   const extra = [
     ...((config.result_fields as { key: string; label: string }[]) ?? []),
     ...((config.fields as { key: string; label: string }[]) ?? []),
+    // A plugin step returns the values its manifest declares.
+    ...(kind === 'plugin_action'
+      ? Object.entries((config.outputs as Record<string, string>) ?? {}).map(([key, label]) => ({ key, label }))
+      : []),
   ]
   const name = nodeReference(id, config)
   const all = { ...base, ...Object.fromEntries(extra.map((field) => [field.key, field.label || field.key])) }
@@ -626,6 +647,8 @@ export function summary(
       return String(c.to || 'Nhập người nhận')
     case 'http_request':
       return `${String(c.method ?? 'GET')} ${String(c.path ?? '')}`.trim()
+    case 'plugin_action':
+      return String(c.title || 'Chọn bước của plugin')
     case 'ai_extract':
       return `Lấy ${((c.fields as unknown[]) ?? []).length} trường và tóm tắt`
     case 'sub_end':
