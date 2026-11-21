@@ -6,10 +6,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dx-core"
-version = "3.0.0"
+version = "3.1.0"
 license = "Apache-2.0"
 requires-python = ">=3.13"
-dependencies = ["dx-platform-kit==3.0.0", "dx-flowkit==0.2.0"]
+dependencies = ["dx-platform-kit==3.1.0", "dx-flowkit==0.2.0"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

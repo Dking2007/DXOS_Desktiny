@@ -334,7 +334,7 @@ Mã nguồn do dự án tự viết phát hành theo **Apache License 2.0** (SPD
 ## Biên dịch, phát hành và đóng góp
 
 - Cài đặt/biên dịch từ mã nguồn: [BUILD.md](BUILD.md) (`make venv deps build test`, `make install PREFIX=...`).
-- Lịch sử phiên bản: [CHANGELOG.md](CHANGELOG.md); bản hiện tại là **V3 (3.0.0)**. V3 khác V2 thế nào:
+- Lịch sử phiên bản: [CHANGELOG.md](CHANGELOG.md); bản hiện tại là **V3.1 (3.1.0)**. V3 khác V2 thế nào:
   [docs/V3_CHANGES.md](docs/V3_CHANGES.md); V2 khác V1: [docs/V2_CHANGES.md](docs/V2_CHANGES.md).
 - Báo lỗi / đề xuất (bug tracker): <https://github.com/Dking2007/DXOS_V2/issues>.
 - Bản phát hành (`.tar.gz` kèm `SHA256SUMS`): <https://github.com/Dking2007/DXOS_V2/releases>. Cách đóng góp: [CONTRIBUTING.md](CONTRIBUTING.md),

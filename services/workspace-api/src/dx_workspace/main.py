@@ -16,7 +16,7 @@ def create_app(settings=None, engine=None):
     engine = engine or make_engine(settings.database_url)
     app = FastAPI(
         title="Desktiny API",
-        version="3.0.0",
+        version="3.1.0",
         openapi_url="/workspace/v1/openapi.json",
         docs_url="/workspace/v1/docs",
     )

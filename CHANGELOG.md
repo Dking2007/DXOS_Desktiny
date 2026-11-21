@@ -7,12 +7,36 @@ V2 → V3: [docs/V3_CHANGES.md](docs/V3_CHANGES.md).
 
 ## [Unreleased]
 
-### Tài liệu
+## [3.1.0] - 2026-11-21 — plugin đóng gói
+
+Gộp nhánh `feat/plugin-dong-goi` (Raphael-Fug, Mai1174). Thêm migration `workspace_0028`; không xóa hay đổi
+API cũ nên giữ số chính 3. SDK `desktiny-plugin` lên 0.3.0 (thêm định dạng `desktiny-plugin/2`).
+
+### Added
+- **Plugin đóng gói** (`desktiny-plugin/2`, migration `workspace_0028`, [docs/plugins.md](docs/plugins.md)): cài một
+  tệp `.zip` là có tính năng mới, không cần máy chủ riêng.
+  - Desktiny lưu và tự phục vụ trang, script, CSS, ảnh của plugin ở `/workspace/v1/plugin-files/…` khi plugin đang
+    bật, luôn kèm CSP `sandbox` (mở thẳng địa chỉ cũng không chạy với origin của Desktiny); địa chỉ theo SHA-256 của
+    gói.
+  - Plugin mang theo **gói giao diện** (`pack`): xem trước cùng plugin, cài/nâng cấp/gỡ cùng plugin, không gỡ riêng được.
+  - Quản trị › Plugin: nhãn “Đóng gói”, số tệp giao diện, gói giao diện đi kèm; duyệt plugin đóng gói không cấp khoá.
+  - SDK khung tự nhận địa chỉ Desktiny với trang đóng gói; `desktiny-plugin check` kiểm trang và gói giao diện trong thư
+    mục. Plugin mẫu `examples/plugins/mot-cua-mau` (trang tính hạn theo ngày làm việc, phiếu tiếp nhận, quy trình một
+    cửa).
+- Gói giao diện chỉnh được trang đăng nhập: nền chuyển sắc (với ảnh nền là lớp phủ) có kiểm tương phản chữ trắng
+  ≥ 4,5:1 ở trình tạo gói và máy chủ; chữ trên nút đăng nhập, dòng ghi chú dưới nút, bật/tắt hiệu ứng chuyển động;
+  xem trước theo giá trị mới. Gói cũ giữ trang mặc định.
+
+### Docs
 - README: mô tả kiến trúc theo hai tầng của đề thi OLP PMNM 2026 (Core headless ở Tầng 1, ứng dụng giao diện ở Tầng 2);
   Core admin ghi là client riêng, không thuộc Core; thêm liên kết trực tiếp tới bug tracker và trang Releases.
 - SELF_REVIEW: thêm mục 5 đối chiếu từng tiêu chí PoF, yêu cầu bắt buộc, bốn nguyên tắc kỹ thuật và quy định nộp bài
   với thể lệ và đề thi gốc trên vfossa.vn (đọc ngày 21/11/2026).
 - Bỏ khỏi kho các ghi chép nội bộ về so sánh với dự án khác; sửa một liên kết hỏng trong `docs/design/`.
+
+### Changed
+- Đổi tên **Gói ngành** thành **Gói giao diện** trên menu, tiêu đề trang, hướng dẫn, thông báo và tài liệu (mã,
+  đường dẫn `/packs`, API và định dạng `desktiny-pack/1` giữ nguyên).
 
 ## [3.0.0] - 2026-11-15 — DXOS V3: gói ngành và plugin kết nối
 
@@ -26,8 +50,6 @@ số chính đổi cũng hợp lệ vì so với 0.2.2 bản này thêm migratio
 phiên bản của chính chúng.
 
 ### Changed
-- Đổi tên **Gói ngành** thành **Gói giao diện** trên menu, tiêu đề trang, hướng dẫn, thông báo và tài liệu (mã,
-  đường dẫn `/packs`, API và định dạng `desktiny-pack/1` giữ nguyên).
 - **Trang đăng nhập** làm lại: thẻ tiêu đề có khung viền trang trí trên nền xanh đậm, luôn vừa một màn hình, hiệu
   ứng xuất hiện, vệt sáng, hạt sáng, vòng biểu tượng xoay, ánh kim trên tiêu đề và nút; tắt khi máy đặt giảm chuyển
   động. Một nút "Đăng nhập bằng SSO".
@@ -55,16 +77,7 @@ phiên bản của chính chúng.
 ### Added
 - **Plugin đóng gói** (`desktiny-plugin/2`, migration `workspace_0028`, [docs/plugins.md](docs/plugins.md)): cài một
   tệp `.zip` là có tính năng mới, không cần máy chủ riêng.
-  - Desktiny lưu và tự phục vụ trang, script, CSS, ảnh của plugin ở `/workspace/v1/plugin-files/…` khi plugin đang
-    bật, luôn kèm CSP `sandbox` (mở thẳng địa chỉ cũng không chạy với origin của Desktiny); địa chỉ theo SHA-256 của
-    gói.
-  - Plugin mang theo **gói giao diện** (`pack`): xem trước cùng plugin, cài/nâng cấp/gỡ cùng plugin, không gỡ riêng được.
-  - Quản trị › Plugin: nhãn “Đóng gói”, số tệp giao diện, gói giao diện đi kèm; duyệt plugin đóng gói không cấp khoá.
-  - SDK khung tự nhận địa chỉ Desktiny với trang đóng gói; `desktiny-plugin check` kiểm trang và gói giao diện trong thư
-    mục. Plugin mẫu `examples/plugins/mot-cua-mau` (trang tính hạn theo ngày làm việc, phiếu tiếp nhận, quy trình một
-    cửa).
-- **Mở rộng plugin kết nối** (API bản 2, migration `workspace_0024`–`workspace_0027`, [docs/plugins.md](docs/plugins.md)):
-  - API ghi có phạm vi: `cases.comment`, `cases.fields.write` (chỉ trường khai trong `writes.fields` và được duyệt,
+  - Dee` (chỉ trường khai trong `writes.fields` và được duyệt,
     cần token phiên), `tasks.write` (cần token phiên), `notifications.send`; `Idempotency-Key` bắt buộc; lịch sử hồ sơ
     hiện “Plugin X” hoặc “A qua plugin X”; nhật ký hoạt động `plugin.write.*`.
   - Tệp: `files.read` (danh sách, nội dung qua Core kèm SHA-256), `cases.attach` (25 MB/tệp, 200 MB/ngày, gắn với
@@ -92,8 +105,8 @@ phiên bản của chính chúng.
   `PLUGIN_FRAME_SOURCES` (gateway dùng template của nginx). Bộ công cụ: `packages/desktiny-plugin` (Python),
   `packages/plugin-sdk` (JavaScript), plugin mẫu `examples/plugins/tra-cuu-mst`. 5 test backend, 2 test SDK, 3 test
   plugin mẫu, 1 test frontend.
-- **Gói giao diện (`desktiny-pack/1`), tầng 1 của hướng phát triển plugin/giao diện** (migration `workspace_0022`,
-  [docs/packs.md](docs/packs.md)). Màn **Quản trị › Gói giao diện** (`organization.manage`): cài gói `.zip` hoặc gói có
+- **Gói ngành (`desktiny-pack/1`), tầng 1 của hướng phát triển plugin/giao diện** (migration `workspace_0022`,
+  [docs/packs.md](docs/packs.md)). Màn **Quản trị › Gói ngành** (`organization.manage`): cài gói `.zip` hoặc gói có
   sẵn trong `packs/` sau khi **xem trước**, nâng cấp cùng `id`, gỡ (quy trình đã có hồ sơ chỉ ngừng phát hành), xuất
   `.zip`. Phần giao diện: tên ứng dụng và cơ quan, logo, favicon, màu sáng/tối (kiểm tương phản WCAG AA cả hai
   giao diện), phông, mật độ, bo góc, trang đăng nhập (khung/phẳng/ảnh nền), từ ngữ, ẩn/sắp menu, khối trang chủ;
@@ -383,9 +396,10 @@ Trạng thái kho trước khi bước vào V2, tag hồi tố tại `f089bfb`.
 ### Fixed
 - Thứ tự import trong `auth.py` để CI backend qua ruff — `d495abb`.
 
-[Unreleased]: https://github.com/Raphael-Fug/DXOS_V2/compare/v3.0.0...HEAD
-[3.0.0]: https://github.com/Raphael-Fug/DXOS_V2/compare/v0.2.2...v3.0.0
-[0.2.2]: https://github.com/Raphael-Fug/DXOS_V2/compare/v0.2.1...v0.2.2
-[0.2.1]: https://github.com/Raphael-Fug/DXOS_V2/compare/v0.2.0...v0.2.1
-[0.2.0]: https://github.com/Raphael-Fug/DXOS_V2/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/Raphael-Fug/DXOS_V2/releases/tag/v0.1.0
+[Unreleased]: https://github.com/Dking2007/DXOS_V2/compare/v3.1.0...HEAD
+[3.1.0]: https://github.com/Dking2007/DXOS_V2/compare/v3.0.0...v3.1.0
+[3.0.0]: https://github.com/Dking2007/DXOS_V2/compare/v0.2.2...v3.0.0
+[0.2.2]: https://github.com/Dking2007/DXOS_V2/compare/v0.2.1...v0.2.2
+[0.2.1]: https://github.com/Dking2007/DXOS_V2/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/Dking2007/DXOS_V2/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/Dking2007/DXOS_V2/releases/tag/v0.1.0
