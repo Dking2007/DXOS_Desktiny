@@ -62,7 +62,7 @@ Nguồn đã đối chiếu ngày 21/11/2026: [Thể lệ](https://vfossa.vn/tin
 
 | Yêu cầu | Thành phần | Trạng thái |
 |---|---|---|
-| Core headless ở Tầng 1, không cung cấp giao diện | `services/core-api`, `core-worker`; chỉ có API `/core/v1/` | Có. Core admin (`apps/core-admin`) là client riêng ở Tầng 2, không phải phần của Core |
+| Core headless ở Tầng 1, không cung cấp giao diện | `services/core-api`, `core-worker`; chỉ có API `/core/v1/` | Có. `--profile core` không phục vụ trang nào (`/`, `/console/` trả 404). Core admin (`apps/core-admin`) là client riêng ở Tầng 2, chỉ chạy với profile `console` hoặc `workspace` |
 | Identity/SSO | Keycloak, OIDC code flow + PKCE | Có |
 | API Gateway | Nginx (`infra/gateway/nginx.conf`): định tuyến, giới hạn tần suất, CSP, chặn `/internal/` | Có |
 | Dữ liệu có cấu trúc và phi cấu trúc | Schema/record có phiên bản (PostgreSQL); tệp có phiên bản (RustFS, S3) | Có |

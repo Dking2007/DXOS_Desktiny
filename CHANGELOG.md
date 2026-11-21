@@ -7,6 +7,14 @@ V2 → V3: [docs/V3_CHANGES.md](docs/V3_CHANGES.md).
 
 ## [Unreleased]
 
+### Changed
+- **Core không có giao diện khi chạy riêng** (đúng yêu cầu Core headless của đề thi): công cụ quản trị kỹ thuật
+  Core admin (`apps/core-admin`) chuyển từ profile `core` sang profile mới `console` (vẫn có trong `workspace`).
+  `--profile core` chỉ chạy Core API, worker, Keycloak, gateway và kho lưu trữ; gateway trả 404 kèm lời giải thích
+  ở `/` và `/console/` thay vì 502. Muốn dùng Core admin khi chỉ chạy Core: thêm `--profile console`. README,
+  `docs/installation.md`, `docs/operations.md`, `SELF_REVIEW.md` hướng dẫn thử Core bằng `examples/core-client` và
+  `/core/v1/docs`; test triển khai kiểm `--profile core` không có ứng dụng giao diện nào.
+
 ## [3.1.0] - 2026-11-21 — plugin đóng gói
 
 Gộp nhánh `feat/plugin-dong-goi` (Raphael-Fug, Mai1174). Thêm migration `workspace_0028`; không xóa hay đổi
