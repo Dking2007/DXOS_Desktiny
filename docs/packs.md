@@ -3,11 +3,11 @@ SPDX-License-Identifier: Apache-2.0
 SPDX-FileCopyrightText: 2026 Desktiny contributors
 -->
 
-# Gói ngành (`desktiny-pack/1`)
+# Gói giao diện (`desktiny-pack/1`)
 
-Gói ngành đóng gói **nghiệp vụ** (quy trình, biểu mẫu, mẫu quy trình, luồng tự động, bài kiến thức cho trợ lý
+Gói giao diện đóng gói **nghiệp vụ** (quy trình, biểu mẫu, mẫu quy trình, luồng tự động, bài kiến thức cho trợ lý
 AI) và **giao diện** (tên, logo, màu, phông, trang đăng nhập, từ ngữ, menu, trang chủ) của một ngành hay một cơ
-quan. Gói **không chứa mã**. Cài, nâng cấp, gỡ ở **Quản trị › Gói ngành** (quyền `organization.manage`); gỡ gói thì
+quan. Gói **không chứa mã**. Cài, nâng cấp, gỡ ở **Quản trị › Gói giao diện** (quyền `organization.manage`); gỡ gói thì
 Desktiny về đúng giao diện và nghiệp vụ mặc định. Đây là tầng 1 của hướng mở rộng; plugin có mã chạy ở máy chủ
 riêng (tầng 2) xem [`plugins.md`](plugins.md).
 
@@ -64,7 +64,7 @@ mỗi tệp văn bản 2 MB. Đường dẫn tuyệt đối hoặc có `..` bị
 | `font` | `source-sans-3` (mặc định), `be-vietnam-pro` | Phông đã đóng gói sẵn, không nhận URL. |
 | `density` | `comfortable`, `compact` | |
 | `radius` | `small`, `medium`, `large` | |
-| `login` | `{ "style": "framed" \| "flat" \| "image", "title", "subtitle", "background" }` | `image` cần `background` (PNG/JPEG/WebP ≤ 2 MB). |
+| `login` | `{ "style": "framed" \| "flat" \| "image", "title", "subtitle", "background", "ground", "ground_to", "button_label", "note", "effects" }` | `image` cần `background` (PNG/JPEG/WebP ≤ 2 MB). `ground`/`ground_to`: màu nền `#rrggbb` (trên → dưới; với `image` là lớp phủ lên ảnh), chữ trắng trên nền phải đạt tương phản ≥ 4,5:1. `button_label` (≤ 40), `note` (≤ 200): chữ trên nút và dòng dưới nút. `effects: false` tắt chuyển động của kiểu `framed`. Bỏ trống thì giữ như mặc định. |
 | `terminology` | `{ "Hồ sơ": "Hồ sơ học vụ" }`, ≤ 60 cặp | Đổi chữ hiển thị ở menu, tiêu đề trang, trang chủ (cả dạng viết hoa đầu và thường). Không đổi dữ liệu, đường dẫn, API. |
 | `menu.hide` | `tasks`, `cases`, `chat`, `feed`, `drive`, `reports` | Không ẩn được trang chủ, phê duyệt, phần quản trị. |
 | `menu.order` | khoá trong `home, tasks, approvals, cases, chat, feed, drive, reports, processes, assistant, plugins, packs, settings` | Phân hệ không nêu giữ chỗ sau các phân hệ được nêu. |
@@ -141,7 +141,7 @@ Thư mục gói được tìm ở `PACKS_DIR` (biến môi trường), thư mụ
 
 1. Chép `packs/truong-hoc` thành thư mục mới, đổi `id`, `name`, `version`.
 2. Vẽ quy trình trên canvas, rồi dùng trình tạo gói chọn nó và **Xuất** để có tệp `processes/*.json` đúng định dạng.
-3. Nén thư mục thành `.zip`, tải lên ở **Gói ngành**, đọc kỹ phần xem trước rồi cài.
+3. Nén thư mục thành `.zip`, tải lên ở **Gói giao diện**, đọc kỹ phần xem trước rồi cài.
 4. Gói trong repo phải qua `reuse lint` (thư mục `packs/` được khai trong `REUSE.toml`), không dùng tên, logo, con dấu
    của cơ quan thật, không chứa phông hay ảnh tải từ ngoài.
 
