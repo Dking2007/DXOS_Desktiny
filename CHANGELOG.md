@@ -7,6 +7,13 @@ V2 → V3: [docs/V3_CHANGES.md](docs/V3_CHANGES.md).
 
 ## [Unreleased]
 
+### Tài liệu
+- README: mô tả kiến trúc theo hai tầng của đề thi OLP PMNM 2026 (Core headless ở Tầng 1, ứng dụng giao diện ở Tầng 2);
+  Core admin ghi là client riêng, không thuộc Core; thêm liên kết trực tiếp tới bug tracker và trang Releases.
+- SELF_REVIEW: thêm mục 5 đối chiếu từng tiêu chí PoF, yêu cầu bắt buộc, bốn nguyên tắc kỹ thuật và quy định nộp bài
+  với thể lệ và đề thi gốc trên vfossa.vn (đọc ngày 21/11/2026).
+- Bỏ khỏi kho các ghi chép nội bộ về so sánh với dự án khác; sửa một liên kết hỏng trong `docs/design/`.
+
 ## [3.0.0] - 2026-11-15 — DXOS V3: gói ngành và plugin kết nối
 
 Bản này gồm gói ngành (PR #37, áp dụng lại sau khi bị revert ở PR #38) và nhánh `feat/plugin-ket-noi`
@@ -292,8 +299,8 @@ phiên bản của chính chúng.
   công khai; cổng nội bộ/HTTP phải có trong biến mới `ASSISTANT_ALLOWED_HOSTS`; kiểm lại trước mỗi
   lần gọi, không theo chuyển hướng.
 - `scripts/audit_repo.mjs` và bước CI tương ứng: thoát 1 nếu Git đang theo dõi tệp `.env` (trừ `.example`), khóa/chứng chỉ riêng, bản dump, `infra/identity/generated/`, hoặc image Compose không ghim phiên bản hay dùng `latest`. Chạy trên kho hiện tại: sạch (269 tệp); thử trên kho mẫu có lỗi: 3 vi phạm, thoát 1. Ý tưởng từ gagaduy/OpenDXOS.
-- `packages/pii-vn` (`dx-piivn` 0.1.0): dò CCCD, CMND, số điện thoại di động, số tài khoản, mã số thuế và e-mail trong văn bản, không phụ thuộc thư viện ngoài. CCCD được kiểm mã tỉnh, chữ số thế kỷ và năm sinh; số 12 chữ số ngẫu nhiên qua khoảng 1,6% (test đo, ngưỡng 3%). 12 test, `ruff` sạch. Danh sách mã tỉnh và đầu số di động chưa đối chiếu văn bản chính thức; chưa nối vào Workspace. Xem `docs/danh-gia-3-du-an.md`.
-- Chuỗi băm cho nhật ký audit của Core (`dx_core/audit_chain.py`, migration `core_0003`): mỗi dòng audit mới chứa `seq`, `prev_hash`, `entry_hash` (SHA-256) nên sửa, xóa hoặc đảo dòng bị phát hiện. `GET /core/v1/audit-logs/verify` (quản trị) trả `ok`, số dòng đã kiểm, `head` và dòng đầu tiên bị hỏng. Trên PostgreSQL, trigger chặn `UPDATE`/`DELETE` bảng `audit_logs`. 5 test mới; migration và trigger đã chạy thử trên PostgreSQL 17. Dòng audit cũ (trước migration) được báo là `unchained`, không coi là hợp lệ. Ý tưởng lấy từ dự án PSA-OVNCR/dxos (I4); xem `docs/so-sanh-psa-dxos.md`. Chưa neo `head` ra ngoài và chưa có chuỗi cho audit của Workspace.
+- `packages/pii-vn` (`dx-piivn` 0.1.0): dò CCCD, CMND, số điện thoại di động, số tài khoản, mã số thuế và e-mail trong văn bản, không phụ thuộc thư viện ngoài. CCCD được kiểm mã tỉnh, chữ số thế kỷ và năm sinh; số 12 chữ số ngẫu nhiên qua khoảng 1,6% (test đo, ngưỡng 3%). 12 test, `ruff` sạch. Danh sách mã tỉnh và đầu số di động chưa đối chiếu văn bản chính thức; chưa nối vào Workspace.
+- Chuỗi băm cho nhật ký audit của Core (`dx_core/audit_chain.py`, migration `core_0003`): mỗi dòng audit mới chứa `seq`, `prev_hash`, `entry_hash` (SHA-256) nên sửa, xóa hoặc đảo dòng bị phát hiện. `GET /core/v1/audit-logs/verify` (quản trị) trả `ok`, số dòng đã kiểm, `head` và dòng đầu tiên bị hỏng. Trên PostgreSQL, trigger chặn `UPDATE`/`DELETE` bảng `audit_logs`. 5 test mới; migration và trigger đã chạy thử trên PostgreSQL 17. Dòng audit cũ (trước migration) được báo là `unchained`, không coi là hợp lệ. Ý tưởng lấy từ dự án PSA-OVNCR/dxos (I4). Chưa neo `head` ra ngoài và chưa có chuỗi cho audit của Workspace.
 - `packages/flowkit` (`dx-flowkit` 0.1.0): kiểm tra và chạy thử đồ thị quy trình JSON, tách từ `dx_core.workflow`, không phụ thuộc thư viện ngoài. 56 test; cùng kết quả với mã gốc trên 20.000 ca ngẫu nhiên. `dx_core.workflow` chưa dùng gói này.
 - `plugins/vn-document-format` (0.1.0): plugin ONLYOFFICE kiểm tra thể thức văn bản hành chính theo Nghị định 30/2020/NĐ-CP, Phụ lục I. 29 test; đã chạy thử trong ONLYOFFICE 8.3.3 trên hai tệp mẫu. Có icon, ảnh chụp và CHANGELOG theo hướng dẫn marketplace. Chưa kiểm lề trên 8.3.3 (thiếu hàm đọc lề); chưa gửi lên marketplace.
 - Mục "Đóng góp ngược cho cộng đồng nguồn mở" trong README, ghi trạng thái thật từng việc.

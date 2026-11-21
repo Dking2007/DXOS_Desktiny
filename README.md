@@ -14,15 +14,20 @@ version, workflow generic và luồng hồ sơ/phê duyệt. Cơ sở thiết k�
 
 ## Kiến trúc
 
+Theo mô hình hai tầng của đề thi OLP PMNM 2026 (DX-OS Open-Core):
+
 | Tầng | Thành phần | Quyền sở hữu |
 |---|---|---|
-| Core | FastAPI, worker, Core admin, Keycloak, Nginx | Principal/ACL, schema/record, storage/version, workflow |
-| Workspace | FastAPI, worker, web Vue | Tổ chức, Drive, form, hồ sơ, submission, quyết định |
-| Tích hợp | PostgreSQL, RustFS, ONLYOFFICE tùy chọn | DB riêng mỗi service; private bytes; editor riêng |
+| Tầng 1 — Core headless (không có giao diện, chỉ API) | `core-api` (FastAPI), `core-worker`, Keycloak, cổng API Nginx, PostgreSQL, RustFS, Valkey | Principal/ACL, schema/record, storage/version, workflow, audit |
+| Tầng 2 — Ứng dụng có giao diện | Workspace: `workspace-api`, `workspace-worker`, web Vue | Tổ chức, Drive, form, hồ sơ, submission, quyết định |
+| Tầng 2 — Công cụ quản trị kỹ thuật | Core admin (`apps/core-admin`, `/console/`) | Chỉ là một client của Core API, không chứa logic Core |
+| Tích hợp tùy chọn | ONLYOFFICE Docs | Editor chạy riêng |
 
-Không share ORM hoặc SQL xuyên database. Payload live ở Core; Workspace giữ
+Core không phục vụ trang giao diện nào: mọi chức năng đi qua API `/core/v1/` (tài liệu OpenAPI
+tại `/core/v1/docs`). Không share ORM hoặc SQL xuyên database. Payload live ở Core; Workspace giữ
 snapshot đã trình, metadata và quyết định nghiệp vụ. Core phải phục vụ client
-khác khi Workspace tắt. Xem [architecture](docs/architecture.md).
+khác khi Workspace tắt (ví dụ [`examples/core-client`](examples/core-client)). Xem [architecture](docs/architecture.md)
+và phần đối chiếu yêu cầu đề thi ở [SELF_REVIEW.md](SELF_REVIEW.md#5-đối-chiếu-yêu-cầu-đề-thi).
 
 ## Chạy bằng Docker Compose
 
@@ -331,7 +336,8 @@ Mã nguồn do dự án tự viết phát hành theo **Apache License 2.0** (SPD
 - Cài đặt/biên dịch từ mã nguồn: [BUILD.md](BUILD.md) (`make venv deps build test`, `make install PREFIX=...`).
 - Lịch sử phiên bản: [CHANGELOG.md](CHANGELOG.md); bản hiện tại là **V3 (3.0.0)**. V3 khác V2 thế nào:
   [docs/V3_CHANGES.md](docs/V3_CHANGES.md); V2 khác V1: [docs/V2_CHANGES.md](docs/V2_CHANGES.md).
-- Báo lỗi / đề xuất: tab **Issues** của repo. Cách đóng góp: [CONTRIBUTING.md](CONTRIBUTING.md),
+- Báo lỗi / đề xuất (bug tracker): <https://github.com/Dking2007/DXOS_V2/issues>.
+- Bản phát hành (`.tar.gz` kèm `SHA256SUMS`): <https://github.com/Dking2007/DXOS_V2/releases>. Cách đóng góp: [CONTRIBUTING.md](CONTRIBUTING.md),
   [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), bảo mật: [SECURITY.md](SECURITY.md).
 - Tự rà soát tiêu chí PoF OLP PMNM 2026: [SELF_REVIEW.md](SELF_REVIEW.md).
 
