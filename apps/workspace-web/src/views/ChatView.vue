@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <!-- SPDX-FileCopyrightText: 2026 Desktiny contributors -->
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import {
@@ -12,6 +12,7 @@ import {
   Download,
   ExternalLink,
   ListPlus,
+  Loader2,
   LogOut,
   MessageSquarePlus,
   Paperclip,
@@ -49,15 +50,16 @@ import FilePreview from '../components/FilePreview.vue'
 import AvatarPhoto from '../components/AvatarPhoto.vue'
 import {
   ACCEPT,
-  MAX_FILE_BYTES,
+  attachmentProblem,
+  attachmentSummary,
   avatarColor,
-  dayLabel,
   fileSize,
   initials,
   listTime,
   timeLabel,
   uploadAttachment,
 } from '../chat/upload'
+import { messageRows } from '../chat/rows'
 import '../chat/chat.css'
 const EMOJI = ['👍', '❤️', '😂', '🎉', '😮', '🙏']
 const route = useRoute()
@@ -113,25 +115,7 @@ const messages = computed(() => {
   return [...bySeq.values()].sort((a, b) => a.seq - b.seq)
 })
 /** Consecutive messages from one person within five minutes read as one block. */
-const rows = computed(() =>
-  messages.value.map((message, index) => {
-    const previous = messages.value[index - 1]
-    const next = messages.value[index + 1]
-    const day = dayLabel(message.created_at)
-    const close = (a?: ChatMessage, b?: ChatMessage) =>
-      !!a &&
-      !!b &&
-      a.sender_id === b.sender_id &&
-      dayLabel(a.created_at) === dayLabel(b.created_at) &&
-      Math.abs(new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) < 5 * 60_000
-    return {
-      message,
-      day: !previous || dayLabel(previous.created_at) !== day ? day : null,
-      first: !close(previous, message),
-      last: !close(message, next),
-    }
-  }),
-)
+const rows = computed(() => messageRows(messages.value))
 const others = computed(() =>
   (conversation.data.value?.members ?? []).filter((m) => m.user_id !== session.user?.id),
 )
@@ -144,14 +128,23 @@ const seenText = computed(() => {
   if (conversation.data.value?.kind === 'direct') return 'Đã xem'
   return readers.length === others.value.length ? 'Mọi người đã xem' : `${readers.length} người đã xem`
 })
+const loadingOlder = ref(false)
 async function loadOlder() {
   const first = messages.value[0]
-  if (!first) return
-  const page = await api.request<MessagePage>(
-    `/conversations/${activeId.value}/messages?before_seq=${first.seq}&limit=50`,
-  )
-  older.value = [...page.items, ...older.value]
-  hasMoreBefore.value = page.has_more_before
+  if (!first || loadingOlder.value) return
+  const id = activeId.value
+  loadingOlder.value = true
+  try {
+    const page = await api.request<MessagePage>(`/conversations/${id}/messages?before_seq=${first.seq}&limit=50`)
+    // Switched conversations meanwhile: this history belongs to the previous one.
+    if (activeId.value !== id) return
+    older.value = [...page.items, ...older.value]
+    hasMoreBefore.value = page.has_more_before
+  } catch (cause) {
+    error.value = cause
+  } finally {
+    loadingOlder.value = false
+  }
 }
 const scroller = ref<HTMLElement>()
 /** Follow new content only while the reader is at the bottom, not while reading history. */
@@ -171,12 +164,14 @@ let lastRead = 0
 watch(
   () => messages.value.at(-1)?.seq,
   async (seq) => {
+    // The cursor belongs to the conversation these messages came from, even if it changes meanwhile.
+    const id = activeId.value
     await nextTick()
     toBottom()
     // The read cursor moves only when the page is actually visible to the reader.
-    if (seq && seq > lastRead && document.visibilityState === 'visible') {
+    if (seq && seq > lastRead && document.visibilityState === 'visible' && activeId.value === id) {
       lastRead = seq
-      await api.request(`/conversations/${activeId.value}/read-cursor`, {
+      await api.request(`/conversations/${id}/read-cursor`, {
         method: 'POST',
         body: JSON.stringify({ seq }),
       })
@@ -213,12 +208,24 @@ const canSend = computed(
     (draft.value.trim().length > 0 || pending.value.some((p) => p.attachment)) &&
     !pending.value.some((p) => p.error),
 )
+/** Tooltip on the send button: says why it is disabled instead of failing after a click. */
+const sendTitle = computed(() => {
+  if (sending.value) return 'Đang gửi…'
+  if (uploading.value) return 'Đang tải tệp lên…'
+  if (pending.value.some((p) => p.error)) return 'Bỏ các tệp lỗi trước khi gửi'
+  if (!canSend.value) return 'Nhập nội dung hoặc đính kèm tệp để gửi'
+  return editing.value ? 'Lưu thay đổi (Enter)' : 'Gửi (Enter)'
+})
 function resetComposer() {
   draft.value = ''
   mentionIds.value = []
   replyTo.value = null
   editing.value = null
-  for (const item of pending.value) if (item.preview) URL.revokeObjectURL(item.preview)
+  for (const item of pending.value) {
+    // Leaving the conversation (or the page) stops uploads nobody will send; a finished one ignores this.
+    if (!item.attachment && !item.error) item.abort()
+    if (item.preview) URL.revokeObjectURL(item.preview)
+  }
   pending.value = []
 }
 watch(activeId, (value) => {
@@ -247,8 +254,9 @@ function addFiles(files: FileList | File[]) {
     }
     pending.value = [...pending.value, item]
     const entry = pending.value.at(-1)!
-    if (file.size > MAX_FILE_BYTES) {
-      entry.error = `Vượt ${fileSize(MAX_FILE_BYTES)}`
+    const problem = attachmentProblem(file)
+    if (problem) {
+      entry.error = problem
       continue
     }
     const job = uploadAttachment(activeId.value, file, session.user?.csrf_token ?? '', (fraction) => {
@@ -350,21 +358,41 @@ function onKey(event: KeyboardEvent) {
     event.preventDefault()
     void send()
   }
-  if (event.key === 'Escape') resetComposer()
+  // Escape only leaves reply/edit mode: it must never silently throw away a typed draft.
+  if (event.key === 'Escape') {
+    if (showMention.value || showEmoji.value) {
+      showMention.value = false
+      showEmoji.value = false
+    } else if (editing.value) resetComposer()
+    else replyTo.value = null
+  }
 }
 async function react(message: ChatMessage, emoji: string) {
-  await api.request(`/messages/${message.id}/reactions/me`, {
-    method: 'PUT',
-    body: JSON.stringify({ emoji }),
-  })
-  picker.value = null
-  await latest.refetch()
+  try {
+    await api.request(`/messages/${message.id}/reactions/me`, {
+      method: 'PUT',
+      body: JSON.stringify({ emoji }),
+    })
+    picker.value = null
+    await latest.refetch()
+  } catch (cause) {
+    error.value = cause
+  }
 }
+const removing = ref<string | null>(null)
 async function remove(message: ChatMessage) {
+  if (removing.value) return
   if (!window.confirm('Xóa tin nhắn này? Tệp đính kèm cũng không còn xem được.')) return
-  await api.request(`/messages/${message.id}`, { method: 'DELETE' })
-  older.value = older.value.map((m) => (m.id === message.id ? { ...m, deleted: true, body: '', attachments: [] } : m))
-  await latest.refetch()
+  removing.value = message.id
+  try {
+    await api.request(`/messages/${message.id}`, { method: 'DELETE' })
+    older.value = older.value.map((m) => (m.id === message.id ? { ...m, deleted: true, body: '', attachments: [] } : m))
+    await latest.refetch()
+  } catch (cause) {
+    error.value = cause
+  } finally {
+    removing.value = null
+  }
 }
 function startEdit(message: ChatMessage) {
   for (const item of pending.value) removePending(item)
@@ -400,11 +428,36 @@ function snippet(message: ChatMessage | null) {
   if (!message) return ''
   if (message.deleted) return 'Tin nhắn đã xóa'
   if (message.body) return message.body
-  const kinds = message.attachments.map((a) => a.kind)
-  if (kinds.every((k) => k === 'image')) return `📷 ${kinds.length > 1 ? `${kinds.length} ảnh` : 'Ảnh'}`
-  if (kinds.includes('video')) return '🎬 Video'
-  return `📎 ${message.attachments.length} tệp`
+  return attachmentSummary(message.attachments.map((a) => a.kind))
 }
+// Popovers and the picture viewer close on Escape or a click elsewhere.
+const mentionAnchor = ref<HTMLElement>()
+const emojiAnchor = ref<HTMLElement>()
+const lightboxClose = ref<HTMLButtonElement>()
+function onDocumentPointer(event: PointerEvent) {
+  const target = event.target as Node
+  if (showMention.value && !mentionAnchor.value?.contains(target)) showMention.value = false
+  if (showEmoji.value && !emojiAnchor.value?.contains(target)) showEmoji.value = false
+  if (picker.value && !(target instanceof Element && target.closest('.chat-tools'))) picker.value = null
+}
+function onDocumentKey(event: KeyboardEvent) {
+  if (event.key !== 'Escape') return
+  if (lightbox.value) lightbox.value = null
+  else if (picker.value) picker.value = null
+}
+onMounted(() => {
+  document.addEventListener('pointerdown', onDocumentPointer)
+  document.addEventListener('keydown', onDocumentKey)
+})
+onBeforeUnmount(() => {
+  document.removeEventListener('pointerdown', onDocumentPointer)
+  document.removeEventListener('keydown', onDocumentKey)
+})
+watch(lightbox, async (value) => {
+  if (!value) return
+  await nextTick()
+  lightboxClose.value?.focus()
+})
 
 // ---- New conversation, members ----
 const showNew = ref(route.query.new === '1')
@@ -435,7 +488,10 @@ function togglePerson(id: string) {
   if (newKind.value === 'direct') newMembers.value = [id]
   else newMembers.value = newMembers.value.includes(id) ? newMembers.value.filter((x) => x !== id) : [...newMembers.value, id]
 }
+const creating = ref(false)
 async function createConversation() {
+  if (creating.value) return
+  creating.value = true
   error.value = null
   try {
     const created = await api.request<Conversation>('/conversations', {
@@ -454,12 +510,17 @@ async function createConversation() {
     activeId.value = created.id
   } catch (cause) {
     error.value = cause
+  } finally {
+    creating.value = false
   }
 }
 const showAdd = ref(false)
 const addIds = ref<string[]>([])
 const addHistory = ref(false)
+const adding = ref(false)
 async function addMembers() {
+  if (adding.value) return
+  adding.value = true
   error.value = null
   try {
     await api.request(`/conversations/${activeId.value}/members`, {
@@ -471,13 +532,24 @@ async function addMembers() {
     await conversation.refetch()
   } catch (cause) {
     error.value = cause
+  } finally {
+    adding.value = false
   }
 }
+const leaving = ref(false)
 async function leave() {
+  if (leaving.value) return
   if (!window.confirm('Rời khỏi hội thoại này? Bạn sẽ không đọc được lịch sử nữa.')) return
-  await api.request(`/conversations/${activeId.value}/members/${session.user?.id}`, { method: 'DELETE' })
-  activeId.value = ''
-  await queryClient.invalidateQueries({ queryKey: ['conversations'] })
+  leaving.value = true
+  try {
+    await api.request(`/conversations/${activeId.value}/members/${session.user?.id}`, { method: 'DELETE' })
+    activeId.value = ''
+    await queryClient.invalidateQueries({ queryKey: ['conversations'] })
+  } catch (cause) {
+    error.value = cause
+  } finally {
+    leaving.value = false
+  }
 }
 const kindLabel: Record<Conversation['kind'], string> = {
   direct: 'Trò chuyện riêng',
@@ -512,6 +584,7 @@ const kindLabel: Record<Conversation['kind'], string> = {
         <button
           v-for="item in visibleList"
           :key="item.id"
+          v-memo="[item, item.id === activeId]"
           class="chat-thread"
           :class="{ active: item.id === activeId, unread: item.unread > 0 }"
           @click="activeId = item.id"
@@ -585,6 +658,7 @@ const kindLabel: Record<Conversation['kind'], string> = {
             class="icon-button"
             aria-label="Rời hội thoại"
             title="Rời hội thoại"
+            :disabled="leaving"
             @click="leave"
           >
             <LogOut :size="18" />
@@ -598,15 +672,44 @@ const kindLabel: Record<Conversation['kind'], string> = {
           @load.capture="onMediaLoad"
           @loadedmetadata.capture="onMediaLoad"
         >
-          <button v-if="hasMoreBefore" class="button ghost small chat-older" @click="loadOlder">Xem tin nhắn cũ hơn</button>
-          <div v-if="!messages.length && !latest.isPending.value" class="chat-hello">
+          <button v-if="hasMoreBefore" class="button ghost small chat-older" :disabled="loadingOlder" @click="loadOlder">
+            <Loader2 v-if="loadingOlder" :size="14" class="spin" />{{ loadingOlder ? 'Đang tải…' : 'Xem tin nhắn cũ hơn' }}
+          </button>
+          <StatePanel
+            v-if="!messages.length && (latest.isPending.value || latest.error.value)"
+            :loading="latest.isPending.value"
+            :error="latest.error.value"
+            :rows="4"
+            @retry="latest.refetch()"
+          />
+          <div v-if="!messages.length && !latest.isPending.value && !latest.error.value" class="chat-hello">
             <span class="chat-avatar large" :style="{ background: avatarColor(conversation.data.value.title) }">{{
               initials(conversation.data.value.title)
             }}<AvatarPhoto v-if="conversation.data.value.kind === 'direct'" :user-id="conversation.data.value.peer_id" /></span>
             <strong>{{ conversation.data.value.title }}</strong>
-            <small>Hãy gửi lời chào đầu tiên 👋</small>
+            <small>Hãy gửi lời chào đầu tiên.</small>
           </div>
-          <template v-for="row in rows" :key="row.message.id">
+          <!-- v-memo: typing in the composer or a poll that changes nothing must not re-render every
+               message. The list names everything a row reads; message objects keep their identity
+               between polls (TanStack Query's structural sharing), so unchanged rows are skipped.
+               Vue's compiler supports v-memo on <template v-for>; the lint rule predates that. -->
+          <!-- eslint-disable vue/no-useless-template-attributes -->
+          <template
+            v-for="row in rows"
+            :key="row.message.id"
+            v-memo="[
+              row.message,
+              row.day,
+              row.first,
+              row.last,
+              row.message.id === lastMine?.id ? seenText : '',
+              picker === row.message.id,
+              removing === row.message.id,
+              conversation.data.value.kind,
+              session.user?.id,
+            ]"
+          >
+            <!-- eslint-enable vue/no-useless-template-attributes -->
             <div v-if="row.day" class="chat-day"><span>{{ row.day }}</span></div>
             <div
               class="chat-row"
@@ -626,7 +729,9 @@ const kindLabel: Record<Conversation['kind'], string> = {
                 <div v-if="row.message.deleted" class="chat-bubble deleted">Tin nhắn đã bị xóa</div>
                 <template v-else>
                   <div v-if="row.message.reply_to" class="chat-reply-ref">
-                    <Reply :size="12" /> {{ row.message.reply_to.sender_name }}: {{ row.message.reply_to.body || 'Tin nhắn đã xóa' }}
+                    <Reply :size="12" aria-hidden="true" /><span
+                      >{{ row.message.reply_to.sender_name }}: {{ row.message.reply_to.body || 'Tin nhắn đã xóa' }}</span
+                    >
                   </div>
                   <MessageAttachments
                     v-if="row.message.attachments.length"
@@ -664,7 +769,7 @@ const kindLabel: Record<Conversation['kind'], string> = {
                 ><button aria-label="Tạo việc từ tin nhắn" title="Tạo việc" @click="taskFrom = row.message"><ListPlus :size="15" /></button
                 ><template v-if="row.message.mine"
                   ><button v-if="row.message.body" aria-label="Sửa" title="Sửa" @click="startEdit(row.message)"><Pencil :size="15" /></button
-                  ><button aria-label="Xóa" title="Xóa" @click="remove(row.message)"><Trash2 :size="15" /></button
+                  ><button aria-label="Xóa" title="Xóa" :disabled="removing === row.message.id" @click="remove(row.message)"><Trash2 :size="15" /></button
                 ></template>
                 <div v-if="picker === row.message.id" class="chat-emoji-pop">
                   <button v-for="emoji in EMOJI" :key="emoji" @click="react(row.message, emoji)">{{ emoji }}</button>
@@ -676,24 +781,42 @@ const kindLabel: Record<Conversation['kind'], string> = {
 
         <footer class="chat-composer">
           <div v-if="error" class="notice error chat-error">
-            {{ errorText(error) }}<button class="icon-button" aria-label="Đóng" @click="error = null"><X :size="14" /></button>
+            <span>{{ errorText(error) }}</span
+            ><button class="icon-button" aria-label="Đóng thông báo lỗi" title="Đóng" @click="error = null"><X :size="14" /></button>
           </div>
           <div v-if="replyTo || editing" class="chat-context">
-            <span v-if="editing"><Pencil :size="14" /> Đang sửa tin nhắn</span>
-            <span v-else
-              ><Reply :size="14" /> Trả lời <b>{{ replyTo?.sender_name }}</b>: {{ snippet(replyTo).slice(0, 80) }}</span
+            <span v-if="editing" class="chat-context-text"><Pencil :size="14" aria-hidden="true" /><span>Đang sửa tin nhắn</span></span>
+            <span v-else class="chat-context-text"
+              ><Reply :size="14" aria-hidden="true" /><span
+                >Trả lời <b>{{ replyTo?.sender_name }}</b>: {{ snippet(replyTo).slice(0, 80) }}</span
+              ></span
             >
-            <button class="icon-button" aria-label="Bỏ" @click="resetComposer"><X :size="15" /></button>
+            <button
+              class="icon-button"
+              :aria-label="editing ? 'Hủy sửa tin nhắn' : 'Bỏ trả lời'"
+              :title="editing ? 'Hủy sửa (Esc)' : 'Bỏ trả lời (Esc)'"
+              @click="editing ? resetComposer() : (replyTo = null)"
+            >
+              <X :size="15" />
+            </button>
           </div>
           <div v-if="pending.length" class="chat-pending">
             <div v-for="item in pending" :key="item.key" class="chat-pending-item" :class="{ failed: item.error }">
               <img v-if="item.preview" :src="item.preview" alt="" />
-              <span v-else class="chat-pending-file"><Paperclip :size="16" /><small>{{ item.file.name }}</small></span>
+              <span v-else class="chat-pending-file" :title="item.file.name"><Paperclip :size="16" /><small>{{ item.file.name }}</small></span>
               <span v-if="!item.attachment && !item.error" class="chat-progress"
                 ><span :style="{ width: `${Math.round(item.progress * 100)}%` }"
               /></span>
               <span v-if="item.error" class="chat-pending-error" :title="item.error">{{ item.error }}</span>
-              <button class="chat-pending-remove" aria-label="Bỏ tệp" @click="removePending(item)"><X :size="12" /></button>
+              <button
+                type="button"
+                class="chat-pending-remove"
+                :aria-label="`Bỏ tệp ${item.file.name}`"
+                :title="item.attachment || item.error ? 'Bỏ tệp' : 'Hủy tải lên'"
+                @click="removePending(item)"
+              >
+                <X :size="13" />
+              </button>
             </div>
           </div>
           <form class="chat-input" @submit.prevent="send">
@@ -708,12 +831,13 @@ const kindLabel: Record<Conversation['kind'], string> = {
             >
               <Paperclip :size="19" />
             </button>
-            <div class="chat-pop-anchor">
+            <div ref="mentionAnchor" class="chat-pop-anchor">
               <button
                 type="button"
                 class="icon-button"
                 aria-label="Nhắc tên"
-                title="Nhắc tên"
+                :title="others.length ? 'Nhắc tên' : 'Hội thoại chưa có thành viên khác để nhắc tên'"
+                :aria-expanded="showMention"
                 :disabled="!others.length"
                 @click="showMention = !showMention"
               >
@@ -736,8 +860,15 @@ const kindLabel: Record<Conversation['kind'], string> = {
               @keydown="onKey"
               @paste="onPaste"
             />
-            <div class="chat-pop-anchor">
-              <button type="button" class="icon-button" aria-label="Chèn biểu tượng cảm xúc" @click="showEmoji = !showEmoji">
+            <div ref="emojiAnchor" class="chat-pop-anchor">
+              <button
+                type="button"
+                class="icon-button"
+                aria-label="Chèn biểu tượng cảm xúc"
+                title="Chèn biểu tượng cảm xúc"
+                :aria-expanded="showEmoji"
+                @click="showEmoji = !showEmoji"
+              >
                 <SmilePlus :size="19" />
               </button>
               <div v-if="showEmoji" class="chat-menu emoji">
@@ -746,13 +877,30 @@ const kindLabel: Record<Conversation['kind'], string> = {
                 </button>
               </div>
             </div>
-            <button class="chat-send" :disabled="!canSend" :aria-label="editing ? 'Lưu' : 'Gửi'" :title="uploading ? 'Đang tải tệp lên…' : ''">
-              <SendHorizontal :size="18" />
+            <button
+              class="chat-send"
+              :disabled="!canSend"
+              :aria-busy="sending"
+              :aria-label="sending ? 'Đang gửi' : editing ? 'Lưu tin nhắn' : 'Gửi tin nhắn'"
+              :title="sendTitle"
+            >
+              <Loader2 v-if="sending" :size="18" class="spin" /><SendHorizontal v-else :size="18" />
             </button>
           </form>
         </footer>
         <div v-if="dragging" class="chat-drop"><UploadCloud :size="38" /><strong>Thả để gửi ảnh, video hoặc tệp</strong></div>
       </template>
+      <div v-else-if="activeId && (conversation.isPending.value || conversation.error.value)" class="chat-empty-state">
+        <StatePanel
+          :loading="conversation.isPending.value"
+          :error="conversation.error.value"
+          :rows="3"
+          @retry="conversation.refetch()"
+        />
+        <button v-if="conversation.error.value" class="button secondary small" type="button" @click="activeId = ''">
+          <ArrowLeft :size="15" />Về danh sách hội thoại
+        </button>
+      </div>
       <div v-else class="chat-empty-state">
         <MessageSquarePlus :size="40" />
         <strong>Chọn một hội thoại</strong>
@@ -771,12 +919,12 @@ const kindLabel: Record<Conversation['kind'], string> = {
     :download="() => downloadAttachment(filePreview!)"
     @close="filePreview = null"
   />
-  <div v-if="lightbox" class="chat-lightbox" role="dialog" aria-label="Xem ảnh" @click.self="lightbox = null">
+  <div v-if="lightbox" class="chat-lightbox" role="dialog" aria-modal="true" aria-label="Xem ảnh" @click.self="lightbox = null">
     <img :src="lightbox.url" :alt="lightbox.name" />
     <div class="chat-lightbox-bar">
-      <span>{{ lightbox.name }} · {{ fileSize(lightbox.size) }}</span>
+      <span class="chat-lightbox-name" :title="lightbox.name">{{ lightbox.name }} · {{ fileSize(lightbox.size) }}</span>
       <a class="button secondary small" :href="`${lightbox.url}?download=1`" :download="lightbox.name"><Download :size="15" />Tải về</a>
-      <button class="button secondary small" @click="lightbox = null"><X :size="15" />Đóng</button>
+      <button ref="lightboxClose" class="button secondary small" title="Đóng (Esc)" @click="lightbox = null"><X :size="15" />Đóng</button>
     </div>
   </div>
 
@@ -836,7 +984,13 @@ const kindLabel: Record<Conversation['kind'], string> = {
       <div v-if="error" class="notice error">{{ errorText(error) }}</div>
       <div class="form-actions">
         <button type="button" class="button secondary" @click="showNew = false">Hủy</button
-        ><button class="button" :disabled="newKind !== 'department' && !newMembers.length">Bắt đầu trò chuyện</button>
+        ><button
+          class="button"
+          :disabled="creating || (newKind !== 'department' && !newMembers.length)"
+          :title="newKind !== 'department' && !newMembers.length ? 'Chọn ít nhất một đồng nghiệp' : ''"
+        >
+          <Loader2 v-if="creating" :size="15" class="spin" />{{ creating ? 'Đang tạo…' : 'Bắt đầu trò chuyện' }}
+        </button>
       </div>
     </form>
   </ModalDialog>
@@ -860,7 +1014,9 @@ const kindLabel: Record<Conversation['kind'], string> = {
       <div v-if="error" class="notice error">{{ errorText(error) }}</div>
       <div class="form-actions">
         <button type="button" class="button secondary" @click="showAdd = false">Hủy</button
-        ><button class="button" :disabled="!addIds.length">Thêm</button>
+        ><button class="button" :disabled="adding || !addIds.length" :title="addIds.length ? '' : 'Chọn người cần thêm'">
+          <Loader2 v-if="adding" :size="15" class="spin" />{{ adding ? 'Đang thêm…' : 'Thêm' }}
+        </button>
       </div>
     </form>
   </ModalDialog>

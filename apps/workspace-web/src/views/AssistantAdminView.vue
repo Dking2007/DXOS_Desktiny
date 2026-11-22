@@ -4,7 +4,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
-import { BookOpen, CheckCircle2, Circle, Cpu, Save, Settings2, Sparkles, Wand2 } from 'lucide-vue-next'
+import { BookOpen, CheckCircle2, Circle, Cpu, Loader2, Save, Settings2, Sparkles, Wand2 } from 'lucide-vue-next'
 import type { AssistantAdmin } from '@dx/web-shared/types.ts'
 import StatePanel from '@dx/web-shared/components/StatePanel.vue'
 import { api } from '../api'
@@ -53,7 +53,7 @@ useUnsavedGuard(dirty)
 
 const busy = ref(false)
 async function saveConfig() {
-  if (!admin.data.value) return
+  if (!admin.data.value || busy.value || !dirty.value) return
   busy.value = true
   try {
     await api.request('/assistant/config', {
@@ -82,6 +82,12 @@ async function refresh() {
   ])
 }
 
+const TABS: { value: Tab; label: string; icon: typeof Settings2 }[] = [
+  { value: 'overview', label: 'Cấu hình chung', icon: Settings2 },
+  { value: 'providers', label: 'Dịch vụ AI', icon: Cpu },
+  { value: 'knowledge', label: 'Kiến thức', icon: BookOpen },
+  { value: 'features', label: 'Tính năng AI', icon: Wand2 },
+]
 const active = computed(() => admin.data.value?.providers.find((p) => p.active))
 const ai = useAi()
 const myData = computed(() => ai.on('assistant_my_data'))
@@ -111,11 +117,17 @@ const checklist = computed(() => {
       <Sparkles :size="16" />Thử hỏi trợ lý
     </button>
   </header>
-  <nav class="subnav" aria-label="Phần cài đặt trợ lý">
-    <button :class="{ active: tab === 'overview' }" @click="tab = 'overview'"><Settings2 :size="15" /> Cấu hình chung</button>
-    <button :class="{ active: tab === 'providers' }" @click="tab = 'providers'"><Cpu :size="15" /> Dịch vụ AI</button>
-    <button :class="{ active: tab === 'knowledge' }" @click="tab = 'knowledge'"><BookOpen :size="15" /> Kiến thức</button>
-    <button :class="{ active: tab === 'features' }" @click="tab = 'features'"><Wand2 :size="15" /> Tính năng AI</button>
+  <nav class="subnav assistant-subnav" aria-label="Phần cài đặt trợ lý">
+    <button
+      v-for="item in TABS"
+      :key="item.value"
+      type="button"
+      :class="{ active: tab === item.value }"
+      :aria-current="tab === item.value ? 'page' : undefined"
+      @click="tab = item.value"
+    >
+      <component :is="item.icon" :size="15" aria-hidden="true" />{{ item.label }}
+    </button>
   </nav>
   <StatePanel
     v-if="!admin.data.value"
@@ -153,17 +165,19 @@ const checklist = computed(() => {
               placeholder="Ví dụ: Xưng “anh/chị”. Khi hỏi về nghỉ phép, nhắc nộp đơn trước 3 ngày."
             />
           </div>
-          <div class="field" style="max-width: 260px">
+          <div class="field assistant-limit">
             <label for="assistant-limit">Số câu hỏi tối đa mỗi người mỗi ngày</label>
             <input id="assistant-limit" v-model.number="dailyLimit" type="number" min="0" max="10000" />
             <small class="muted">0 là không giới hạn. Giới hạn giúp kiểm soát chi phí dịch vụ AI.</small>
           </div>
           <div class="form-actions">
-            <button class="button" :disabled="busy || !dirty"><Save :size="16" />{{ busy ? 'Đang lưu…' : 'Lưu cấu hình' }}</button>
+            <button class="button" :disabled="busy || !dirty" :aria-busy="busy" :title="dirty ? '' : 'Chưa có thay đổi để lưu'">
+              <Loader2 v-if="busy" :size="16" class="spin" /><Save v-else :size="16" />{{ busy ? 'Đang lưu…' : 'Lưu cấu hình' }}
+            </button>
           </div>
         </form>
       </section>
-      <aside class="stack" style="align-content: start">
+      <aside class="stack assistant-aside">
         <section class="card">
           <header class="card-header"><h3>Mức sẵn sàng</h3></header>
           <ul class="assistant-checklist">
@@ -200,3 +214,11 @@ const checklist = computed(() => {
     <AiSettingsPanel v-if="tab === 'features'" />
   </template>
 </template>
+<style scoped>
+.assistant-limit {
+  max-width: 280px;
+}
+.assistant-aside {
+  align-content: start;
+}
+</style>

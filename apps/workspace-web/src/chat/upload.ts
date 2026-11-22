@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Desktiny contributors
 import { ApiError, csrfCookie, newIntent } from '@dx/web-shared/api.ts'
 import type { ChatAttachment } from '@dx/web-shared/types.ts'
+import { formatDate, formatTime, preferences } from '../ui/preferences'
 
 export const MAX_FILE_BYTES = 50 * 1024 * 1024
 export const ACCEPT =
@@ -93,11 +94,12 @@ export function dayLabel(iso: string) {
   const same = (a: Date, b: Date) => a.toDateString() === b.toDateString()
   if (same(date, today)) return 'Hôm nay'
   if (same(date, yesterday)) return 'Hôm qua'
-  return date.toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })
+  return `${date.toLocaleDateString('vi-VN', { weekday: 'long' })}, ${formatDate(date)}`
 }
 
+// Plain string work (no Intl formatter built per message); follows the person's 24h/12h choice.
 export function timeLabel(iso: string) {
-  return new Date(iso).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+  return formatTime(iso)
 }
 
 /** Short time for the conversation list: clock today, weekday this week, date otherwise. */
@@ -107,5 +109,30 @@ export function listTime(iso: string) {
   if (date.toDateString() === now.toDateString()) return timeLabel(iso)
   if (now.getTime() - date.getTime() < 6 * 86400000)
     return date.toLocaleDateString('vi-VN', { weekday: 'short' })
-  return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
+  // Day and month only: the person's date format without its year.
+  const full = formatDate(date)
+  return preferences.value.dateFormat === 'ymd' ? full.slice(5) : full.slice(0, 5)
+}
+
+/** True when `file` matches the chat composer's accept list (MIME type or file extension). */
+export function fileAllowed(file: { name: string; type: string }, accept = ACCEPT) {
+  const name = file.name.toLowerCase()
+  return accept.split(',').some((rule) =>
+    rule.startsWith('.') ? name.endsWith(rule) : !!file.type && file.type === rule,
+  )
+}
+
+/** Why a picked file cannot be attached, or null when it can. */
+export function attachmentProblem(file: { name: string; type: string; size: number }) {
+  if (!fileAllowed(file)) return 'Loại tệp không hỗ trợ'
+  if (file.size > MAX_FILE_BYTES) return `Vượt ${fileSize(MAX_FILE_BYTES)}`
+  return null
+}
+
+/** Plain-text preview of a message that only carries attachments. */
+export function attachmentSummary(kinds: string[]) {
+  if (!kinds.length) return ''
+  if (kinds.every((k) => k === 'image')) return kinds.length > 1 ? `${kinds.length} ảnh` : 'Ảnh'
+  if (kinds.includes('video')) return 'Video'
+  return `${kinds.length} tệp đính kèm`
 }

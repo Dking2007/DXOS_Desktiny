@@ -3,7 +3,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
-import { Database, Eye, ListRestart, Plug, RefreshCw, Save } from 'lucide-vue-next'
+import { Database, Eye, ListRestart, Loader2, Plug, RefreshCw, Save } from 'lucide-vue-next'
 import StatePanel from '@dx/web-shared/components/StatePanel.vue'
 import { api } from '../api'
 import { toast } from '../ui/toast'
@@ -160,7 +160,7 @@ function setAll(value: boolean) {
 }
 
 async function save() {
-  if (!settings.data.value) return
+  if (!settings.data.value || busy.value || !dirty.value) return
   busy.value = true
   try {
     await api.request('/ai/settings', {
@@ -183,6 +183,7 @@ async function save() {
   }
 }
 async function testEmbedding() {
+  if (testing.value) return
   testing.value = true
   try {
     const result = await api.request<{ ok: boolean; message: string }>('/ai/settings/test-embedding', {
@@ -197,26 +198,31 @@ async function testEmbedding() {
     testing.value = false
   }
 }
+const reindexing = ref(false)
 async function reindex() {
+  if (reindexing.value) return
+  reindexing.value = true
   try {
     await api.request('/ai/index', { method: 'POST' })
     toast.success('Đã xếp lịch lập chỉ mục. Việc này chạy nền, có thể mất vài phút.')
   } catch (error) {
     toast.error(error)
+  } finally {
+    reindexing.value = false
   }
 }
 </script>
 <template>
   <StatePanel v-if="!settings.data.value" :loading="settings.isPending.value" :error="settings.error.value" @retry="settings.refetch()" />
   <template v-else>
-    <div v-if="active && !enabledCount" class="notice" style="margin-bottom: 16px">
+    <div v-if="active && !enabledCount" class="notice ai-settings-notice">
       <span class="grow"
         >Chưa bật tính năng AI nào. Gói khuyến nghị bật {{ RECOMMENDED.length }} tính năng chỉ đọc những gì người dùng đã
         được xem và trả lời bằng chữ; bạn vẫn xem lại được trước khi lưu.</span
       >
       <button type="button" class="button small" @click="recommended">Dùng gói khuyến nghị</button>
     </div>
-    <div v-if="!active" class="notice warning" style="margin-bottom: 16px">
+    <div v-if="!active" class="notice warning ai-settings-notice">
       Chưa có dịch vụ AI đang dùng. Thêm và chọn một dịch vụ ở tab <strong>Dịch vụ AI</strong> trước; các tính năng
       dưới đây dùng dịch vụ đó nếu bạn không chọn riêng.
     </div>
@@ -238,11 +244,11 @@ async function reindex() {
             <label :for="`ai-${feature.key}`">
               <strong>{{ feature.label }}</strong>
               <small :id="`ai-${feature.key}-hint`">{{ feature.description }}</small>
-              <small v-if="feature.needs_vision" class="muted"
-                ><Eye :size="12" /> Tệp scan, ảnh chụp cần dịch vụ đọc được ảnh (Claude, OpenAI, Gemini, model có
-                thị giác trên Ollama/vLLM).</small
+              <small v-if="feature.needs_vision" class="muted ai-vision-note"
+                ><Eye :size="12" aria-hidden="true" /><span>Tệp scan, ảnh chụp cần dịch vụ đọc được ảnh (Claude, OpenAI, Gemini, model có
+                thị giác trên Ollama/vLLM).</span></small
               >
-              <small v-if="visionWarning(feature)" style="color: var(--red-ink)"
+              <small v-if="visionWarning(feature)" class="ai-vision-warning"
                 >Dịch vụ đang chọn chỉ đọc chữ: tài liệu scan sẽ không đọc được.</small
               >
             </label>
@@ -309,8 +315,8 @@ async function reindex() {
       <section class="card">
         <header class="card-header">
           <div>
-            <h2><Database :size="18" /> Tìm theo ý nghĩa</h2>
-            <p class="muted" style="font-size: 14px; margin-top: 4px">
+            <h2 class="ai-settings-title"><Database :size="18" aria-hidden="true" />Tìm theo ý nghĩa</h2>
+            <p class="muted ai-settings-intro">
               Cần một dịch vụ tạo vector (embedding): Ollama, OpenAI, Gemini, vLLM hoặc cổng Chat Completions. Nội
               dung tài liệu, công việc, hồ sơ được gửi tới dịch vụ này để lập chỉ mục.
             </p>
@@ -350,13 +356,33 @@ async function reindex() {
             </div>
           </div>
           <div class="inline-actions">
-            <button type="button" class="button secondary small" :disabled="!embedProvider || !embedModel || testing" @click="testEmbedding">
-              <Plug :size="14" />{{ testing ? 'Đang thử…' : 'Thử tạo vector' }}
+            <button
+              type="button"
+              class="button secondary small"
+              :disabled="!embedProvider || !embedModel || testing"
+              :title="!embedProvider ? 'Chọn dịch vụ tạo vector trước' : !embedModel ? 'Nhập model tạo vector' : ''"
+              :aria-busy="testing"
+              @click="testEmbedding"
+            >
+              <Loader2 v-if="testing" :size="14" class="spin" /><Plug v-else :size="14" />{{ testing ? 'Đang thử…' : 'Thử tạo vector' }}
             </button>
-            <button type="button" class="button secondary small" :disabled="!settings.data.value.index.ready || dirty" @click="reindex">
-              <RefreshCw :size="14" />Lập chỉ mục lại
+            <button
+              type="button"
+              class="button secondary small"
+              :disabled="!settings.data.value.index.ready || dirty || reindexing"
+              :title="
+                dirty
+                  ? 'Lưu cấu hình trước khi lập chỉ mục lại'
+                  : !settings.data.value.index.ready
+                    ? 'Chưa bật tìm theo ý nghĩa'
+                    : ''
+              "
+              :aria-busy="reindexing"
+              @click="reindex"
+            >
+              <RefreshCw :size="14" :class="{ spin: reindexing }" />{{ reindexing ? 'Đang xếp lịch…' : 'Lập chỉ mục lại' }}
             </button>
-            <span v-if="settings.data.value.index.ready" class="muted" style="font-size: 14px">
+            <span v-if="settings.data.value.index.ready" class="muted ai-settings-small">
               Đã lập chỉ mục {{ settings.data.value.index.indexed }}/{{ settings.data.value.index.total }} mục
               ({{ settings.data.value.index.by_type.file ?? 0 }} tài liệu, {{ settings.data.value.index.by_type.task ?? 0 }}
               công việc, {{ settings.data.value.index.by_type.case ?? 0 }} hồ sơ).
@@ -366,15 +392,46 @@ async function reindex() {
       </section>
 
       <div class="form-actions sticky-actions">
-        <span class="muted grow" style="font-size: 14px">
+        <span class="muted grow ai-settings-small">
           Đang bật {{ enabledCount }}/{{ settings.data.value.features.length }} tính năng. Mỗi lần dùng tính năng AI
           tính vào giới hạn lượt/người/ngày ở tab Cấu hình chung.
         </span>
         <button type="button" class="button secondary" @click="recommended">Gói khuyến nghị</button>
         <button type="button" class="button secondary" @click="setAll(true)">Bật tất cả</button>
         <button type="button" class="button secondary" @click="setAll(false)">Tắt tất cả</button>
-        <button class="button" :disabled="busy || !dirty"><Save :size="16" />{{ busy ? 'Đang lưu…' : 'Lưu cấu hình' }}</button>
+        <button class="button" :disabled="busy || !dirty" :title="dirty ? '' : 'Chưa có thay đổi để lưu'" :aria-busy="busy">
+          <Loader2 v-if="busy" :size="16" class="spin" /><Save v-else :size="16" />{{ busy ? 'Đang lưu…' : 'Lưu cấu hình' }}
+        </button>
       </div>
     </form>
   </template>
 </template>
+<style scoped>
+.ai-settings-notice {
+  margin-bottom: 16px;
+}
+.ai-settings-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.ai-settings-intro {
+  margin-top: 6px;
+  font-size: 0.875rem;
+}
+.ai-settings-small {
+  font-size: 0.875rem;
+}
+.ai-vision-note {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.ai-vision-note > svg {
+  flex: none;
+  align-self: center;
+}
+.ai-vision-warning {
+  color: var(--red-ink);
+}
+</style>

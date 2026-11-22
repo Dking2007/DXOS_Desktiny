@@ -6,7 +6,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useQueryClient } from '@tanstack/vue-query'
-import { FileText, SendHorizontal } from 'lucide-vue-next'
+import { FileText, Loader2, SendHorizontal } from 'lucide-vue-next'
 import { errorText } from '@dx/web-shared/api.ts'
 import { api } from '../api'
 import { useAi } from '../ai/useAi'
@@ -122,7 +122,7 @@ defineExpose({ clear, turns })
       <div v-else class="assistant-msg bot">
         <AssistantText :text="turn.content" />
         <div v-if="turn.sources?.length" class="assistant-sources">
-          <FileText :size="13" />
+          <FileText :size="13" aria-hidden="true" />
           <span v-for="source in turn.sources" :key="source" :title="source">{{ source }}</span>
         </div>
       </div>
@@ -142,8 +142,15 @@ defineExpose({ clear, turns })
       aria-label="Câu hỏi về hồ sơ"
       @keydown="onKey"
     />
-    <button class="assistant-send" type="submit" :disabled="busy || draft.trim().length < 2" aria-label="Gửi câu hỏi">
-      <SendHorizontal :size="18" />
+    <button
+      class="assistant-send"
+      type="submit"
+      :disabled="busy || draft.trim().length < 2"
+      :aria-busy="busy"
+      :aria-label="busy ? 'Đang chờ trả lời' : 'Gửi câu hỏi'"
+      :title="busy ? 'AI đang đọc hồ sơ…' : draft.trim().length < 2 ? 'Nhập câu hỏi (ít nhất 2 ký tự)' : 'Gửi (Enter)'"
+    >
+      <Loader2 v-if="busy" :size="18" class="spin" /><SendHorizontal v-else :size="18" />
     </button>
   </form>
   <footer class="assistant-foot">

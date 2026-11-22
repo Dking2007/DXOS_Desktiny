@@ -8,6 +8,7 @@ import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import {
   AlertTriangle,
   Download,
+  Loader2,
   Package,
   Palette,
   Pencil,
@@ -84,6 +85,8 @@ const previewError = ref<unknown>(null)
 const pending = ref<{ file?: File; builtin?: string } | null>(null)
 const activate = ref(true)
 const removing = ref<InstalledPack | null>(null)
+/** Which row action is running (`<pack id>:<action>`), so only its button shows the spinner. */
+const working = ref('')
 
 const SOURCE: Record<InstalledPack['source'], string> = {
   builtin: 'Có sẵn',
@@ -136,10 +139,15 @@ function pickFile(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   input.value = ''
-  if (file) void openPreview({ file })
+  if (!file) return
+  if (!/\.zip$/i.test(file.name)) {
+    toast.error('Gói giao diện là tệp .zip.')
+    return
+  }
+  void openPreview({ file })
 }
 async function install() {
-  if (!pending.value) return
+  if (!pending.value || busy.value) return
   busy.value = true
   try {
     const result = await api.request<{ notes: string[] }>('/packs', {
@@ -158,7 +166,9 @@ async function install() {
   }
 }
 async function useLook(packId: string | null) {
+  if (busy.value) return
   busy.value = true
+  working.value = `${packId ?? 'default'}:look`
   try {
     await api.request('/appearance', {
       method: 'PUT',
@@ -170,10 +180,11 @@ async function useLook(packId: string | null) {
     toast.error(cause)
   } finally {
     busy.value = false
+    working.value = ''
   }
 }
 async function remove() {
-  if (!removing.value) return
+  if (!removing.value || busy.value) return
   busy.value = true
   try {
     const result = await api.request<{ notes: string[] }>(
@@ -191,6 +202,8 @@ async function remove() {
   }
 }
 async function exportPack(pack: InstalledPack) {
+  if (working.value) return
+  working.value = `${pack.pack_id}:export`
   try {
     const response = await fetch(`/workspace/v1/packs/${encodeURIComponent(pack.pack_id)}/export`, {
       credentials: 'same-origin',
@@ -204,6 +217,8 @@ async function exportPack(pack: InstalledPack) {
     URL.revokeObjectURL(url)
   } catch (cause) {
     toast.error(cause)
+  } finally {
+    working.value = ''
   }
 }
 function edit(pack: InstalledPack) {
@@ -231,11 +246,12 @@ function swatches(look: AppearanceLook | null) {
   <header class="page-head compact">
     <h1 class="sr-only">Gói giao diện</h1>
     <div class="page-actions">
-      <label class="button secondary"
+      <label class="button secondary pack-upload" :class="{ disabled: busy }" title="Chọn tệp .zip của gói giao diện"
         ><Upload :size="17" />Tải gói lên (.zip)<input
           type="file"
           accept=".zip,application/zip"
           class="sr-only"
+          :disabled="busy"
           @change="pickFile"
       /></label>
       <button class="button" type="button" @click="building = 'new'"><Plus :size="17" />Tạo gói của cơ quan</button>
@@ -269,13 +285,21 @@ function swatches(look: AppearanceLook | null) {
             }}<template v-if="active.appearance.org_name"> · {{ active.appearance.org_name }}</template></small
           >
         </div>
-        <button v-if="active" class="button secondary small" :disabled="busy" @click="useLook(null)">
-          <RotateCcw :size="15" />Về giao diện mặc định
+        <button v-if="active" class="button secondary small" :disabled="busy" :aria-busy="working === 'default:look'" @click="useLook(null)">
+          <Loader2 v-if="working === 'default:look'" :size="15" class="spin" /><RotateCcw v-else :size="15" />{{
+            working === 'default:look' ? 'Đang áp dụng…' : 'Về giao diện mặc định'
+          }}
         </button>
       </section>
 
-      <section class="card">
+      <section class="card pack-section">
         <header class="card-header"><h2>Gói đã cài</h2></header>
+        <StatePanel
+          v-if="!listing.data.value.installed.length"
+          :empty="true"
+          title="Chưa cài gói nào"
+          description="Cài một gói có sẵn bên dưới, tải gói .zip lên hoặc tạo gói của cơ quan."
+        />
         <div class="pack-list">
           <article v-for="pack in listing.data.value.installed" :key="pack.pack_id" class="pack-item">
             <span class="pack-icon" :class="{ look: pack.has_appearance }"
@@ -301,17 +325,29 @@ function swatches(look: AppearanceLook | null) {
                 v-if="pack.has_appearance && !pack.appearance_active"
                 class="button small"
                 :disabled="busy"
+                :aria-busy="working === `${pack.pack_id}:look`"
                 @click="useLook(pack.pack_id)"
               >
-                <Palette :size="15" />Dùng giao diện này
+                <Loader2 v-if="working === `${pack.pack_id}:look`" :size="15" class="spin" /><Palette v-else :size="15" />{{
+                  working === `${pack.pack_id}:look` ? 'Đang áp dụng…' : 'Dùng giao diện này'
+                }}
               </button>
-              <button v-if="pack.source === 'local'" class="button secondary small" @click="edit(pack)">
+              <button v-if="pack.source === 'local'" class="button secondary small" :disabled="busy" @click="edit(pack)">
                 <Pencil :size="15" />Sửa
               </button>
-              <button v-if="pack.source !== 'builtin' || pack.removable" class="button ghost small" @click="exportPack(pack)">
-                <Download :size="15" />Xuất
+              <button
+                v-if="pack.source !== 'builtin' || pack.removable"
+                class="button ghost small"
+                :disabled="!!working"
+                :aria-busy="working === `${pack.pack_id}:export`"
+                title="Tải gói về dạng .zip"
+                @click="exportPack(pack)"
+              >
+                <Loader2 v-if="working === `${pack.pack_id}:export`" :size="15" class="spin" /><Download v-else :size="15" />{{
+                  working === `${pack.pack_id}:export` ? 'Đang xuất…' : 'Xuất'
+                }}
               </button>
-              <button v-if="pack.removable" class="button ghost small" @click="removing = pack">
+              <button v-if="pack.removable" class="button ghost small pack-remove" :disabled="busy" @click="removing = pack">
                 <Trash2 :size="15" />Gỡ
               </button>
             </div>
@@ -319,7 +355,7 @@ function swatches(look: AppearanceLook | null) {
         </div>
       </section>
 
-      <section v-if="listing.data.value.available.length" class="card">
+      <section v-if="listing.data.value.available.length" class="card pack-section">
         <header class="card-header"><h2>Gói có sẵn trong bản phát hành</h2></header>
         <div class="pack-list">
           <article v-for="pack in listing.data.value.available" :key="pack.pack_id" class="pack-item">
@@ -336,7 +372,7 @@ function swatches(look: AppearanceLook | null) {
               }}</small>
             </div>
             <div class="pack-actions">
-              <button class="button small" @click="openPreview({ builtin: pack.pack_id })">
+              <button class="button small" :disabled="busy" @click="openPreview({ builtin: pack.pack_id })">
                 {{ pack.installed_version ? 'Xem và nâng cấp' : 'Xem và cài' }}
               </button>
             </div>
@@ -360,8 +396,11 @@ function swatches(look: AppearanceLook | null) {
       }
     "
   >
-    <div v-if="previewError" class="notice error error-inline">{{ errorText(previewError) }}</div>
+    <div v-if="previewError" class="notice error error-inline" role="alert">{{ errorText(previewError) }}</div>
     <StatePanel v-else-if="!preview" :loading="true" />
+    <div v-if="previewError && !preview" class="form-actions">
+      <button type="button" class="button secondary" @click="pending = null">Đóng</button>
+    </div>
     <div v-if="preview" class="stack">
       <div>
         <strong>{{ preview.pack.name }}</strong>
@@ -409,7 +448,7 @@ function swatches(look: AppearanceLook | null) {
         </ul>
       </div>
       <label v-if="preview.appearance" class="checkbox-label"
-        ><input v-model="activate" type="checkbox" /> Dùng giao diện của gói ngay sau khi cài (thay giao diện đang
+        ><input v-model="activate" type="checkbox" />Dùng giao diện của gói ngay sau khi cài (thay giao diện đang
         dùng)</label
       >
       <small class="muted"
@@ -418,14 +457,24 @@ function swatches(look: AppearanceLook | null) {
       >
       <div class="form-actions">
         <button type="button" class="button secondary" :disabled="busy" @click="pending = null">Hủy</button
-        ><button type="button" class="button" :disabled="busy" @click="install">
-          {{ busy ? 'Đang cài…' : preview.upgrade_from ? 'Nâng cấp' : 'Cài gói' }}
+        ><button type="button" class="button" :disabled="busy" :aria-busy="busy" @click="install">
+          <Loader2 v-if="busy" :size="16" class="spin" />{{
+            busy ? (preview.upgrade_from ? 'Đang nâng cấp…' : 'Đang cài…') : preview.upgrade_from ? 'Nâng cấp' : 'Cài gói'
+          }}
         </button>
       </div>
     </div>
   </ModalDialog>
 
-  <ModalDialog v-if="removing" title="Gỡ gói giao diện" @close="removing = null">
+  <ModalDialog
+    v-if="removing"
+    title="Gỡ gói giao diện"
+    @close="
+      () => {
+        if (!busy) removing = null
+      }
+    "
+  >
     <div class="stack">
       <p>
         Gỡ <strong>{{ removing.name }}</strong>?
@@ -438,24 +487,39 @@ function swatches(look: AppearanceLook | null) {
       </p>
       <p v-if="removing.appearance_active" class="muted">Ứng dụng sẽ về giao diện mặc định.</p>
       <div class="form-actions">
-        <button type="button" class="button secondary" @click="removing = null">Hủy</button
-        ><button type="button" class="button danger" :disabled="busy" @click="remove">
-          {{ busy ? 'Đang gỡ…' : 'Gỡ gói' }}
+        <button type="button" class="button secondary" :disabled="busy" @click="removing = null">Hủy</button
+        ><button type="button" class="button danger" :disabled="busy" :aria-busy="busy" @click="remove">
+          <Loader2 v-if="busy" :size="16" class="spin" />{{ busy ? 'Đang gỡ…' : 'Gỡ gói' }}
         </button>
       </div>
     </div>
   </ModalDialog>
 </template>
 <style scoped>
+.pack-upload:has(input:focus-visible) {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+.pack-upload.disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
 .pack-current {
   display: flex;
-  gap: 14px;
+  flex-wrap: wrap;
+  gap: 16px;
   align-items: center;
-  margin-bottom: 20px;
-  padding: 16px 18px;
+  margin-bottom: 24px;
+  padding: 20px;
 }
 .pack-current .grow {
   display: grid;
+  gap: 2px;
+  flex: 1;
+  min-width: 180px;
+}
+.pack-section + .pack-section {
+  margin-top: 24px;
 }
 .pack-current-icon,
 .pack-icon {
@@ -474,16 +538,19 @@ function swatches(look: AppearanceLook | null) {
 .pack-item {
   display: flex;
   flex-wrap: wrap;
-  gap: 14px;
+  gap: 16px;
   align-items: flex-start;
-  padding: 14px 18px;
+  padding: 16px 20px;
   border-top: 1px solid var(--border-soft);
 }
 .pack-item .grow {
   display: grid;
-  gap: 2px;
+  gap: 4px;
   flex: 1;
   min-width: 220px;
+}
+.pack-item small.mono {
+  overflow-wrap: anywhere;
 }
 .pack-item p {
   margin: 4px 0;
@@ -501,7 +568,22 @@ function swatches(look: AppearanceLook | null) {
 .pack-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
+}
+.pack-remove:hover:not(:disabled) {
+  color: var(--red-ink);
+}
+@media (max-width: 640px) {
+  .pack-item {
+    padding: 16px;
+  }
+  .pack-item .grow {
+    min-width: 0;
+    flex-basis: calc(100% - 60px);
+  }
+  .pack-actions {
+    width: 100%;
+  }
 }
 .pack-swatches {
   display: grid;
@@ -522,23 +604,24 @@ function swatches(look: AppearanceLook | null) {
 }
 .pack-preview-look {
   display: flex;
-  gap: 12px;
+  gap: 16px;
   align-items: center;
-  padding: 12px;
+  padding: 16px;
   border: 1px solid var(--border);
   border-radius: 12px;
 }
 .pack-preview-look > div {
   display: grid;
-  gap: 2px;
+  gap: 4px;
+  min-width: 0;
 }
 .pack-adds {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 12px;
+  gap: 16px;
 }
 .pack-adds ul {
-  margin: 4px 0 0;
+  margin: 6px 0 0;
   padding-left: 18px;
 }
 .notice ul {
@@ -547,6 +630,7 @@ function swatches(look: AppearanceLook | null) {
 }
 .pack-foot {
   margin-top: 16px;
-  font-size: 13.5px;
+  font-size: 0.8438rem;
+  line-height: 1.55;
 }
 </style>

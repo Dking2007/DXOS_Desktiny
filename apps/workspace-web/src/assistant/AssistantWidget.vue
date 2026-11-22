@@ -4,11 +4,30 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
-import { BookOpen, Bot, BriefcaseBusiness, Check, ClipboardCheck, Copy, FileText, FolderOpen, ListTodo, Puzzle, RotateCcw, SendHorizontal, Settings2, Sparkles, X } from 'lucide-vue-next'
+import {
+  AlertCircle,
+  BookOpen,
+  Bot,
+  BriefcaseBusiness,
+  Check,
+  ClipboardCheck,
+  Copy,
+  FileText,
+  FolderOpen,
+  ListTodo,
+  Loader2,
+  Puzzle,
+  RotateCcw,
+  SendHorizontal,
+  Settings2,
+  Sparkles,
+  X,
+} from 'lucide-vue-next'
 import type { AssistantReply, AssistantStatus } from '@dx/web-shared/types.ts'
 import { errorText } from '@dx/web-shared/api.ts'
 import { api } from '../api'
 import { useSession } from '../stores/session'
+import { toast } from '../ui/toast'
 import AssistantText from './AssistantText.vue'
 import type { AssistantItem } from '@dx/web-shared/types.ts'
 import './assistant.css'
@@ -40,6 +59,8 @@ const status = useQuery({
   staleTime: 60_000,
 })
 const ready = computed(() => !!status.data.value?.ready)
+// Opened from the command palette while the status could not be read: say so instead of showing nothing.
+const failed = computed(() => !status.data.value && !!status.error.value)
 // On a dossier page the work tab is there even when the general assistant is off.
 const visible = computed(() => ready.value || !!status.data.value?.can_manage || !!caseContext.value)
 const onCase = computed(() => assistantTab.value === 'case' && !!caseContext.value)
@@ -132,6 +153,7 @@ async function send(text = draft.value) {
   }
 }
 function reset() {
+  if (!window.confirm('Xóa cuộc trò chuyện hiện tại và bắt đầu lại?')) return
   if (onCase.value) return caseChat.value?.clear()
   turns.value = []
   error.value = ''
@@ -144,9 +166,16 @@ async function copy(index: number) {
     copied.value = index
     window.setTimeout(() => (copied.value = -1), 1500)
   } catch {
-    // Clipboard access can be denied; nothing else to do.
+    toast.error('Trình duyệt không cho sao chép; hãy chọn và sao chép thủ công.')
   }
 }
+// Closing hands focus back to the round button, so keyboard users are not dropped at the top of the page.
+const fab = ref<HTMLButtonElement>()
+watch(assistantOpen, async (open, was) => {
+  if (open || !was) return
+  await nextTick()
+  fab.value?.focus({ preventScroll: true })
+})
 function onKey(event: KeyboardEvent) {
   if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
     event.preventDefault()
@@ -154,7 +183,10 @@ function onKey(event: KeyboardEvent) {
   }
 }
 function onGlobalKey(event: KeyboardEvent) {
-  if (event.key === 'Escape' && assistantOpen.value) assistantOpen.value = false
+  // A modal dialog on the page handles its own Escape first.
+  if (event.key !== 'Escape' || !assistantOpen.value || event.defaultPrevented) return
+  if (document.querySelector('dialog[open]')) return
+  assistantOpen.value = false
 }
 // On a phone the round button floats over list rows; it slides aside while the page scrolls
 // down and comes back as soon as the person scrolls up.
@@ -174,14 +206,19 @@ onBeforeUnmount(() => {
   document.removeEventListener('keydown', onGlobalKey)
   window.removeEventListener('scroll', onScroll)
 })
+// The assistant can only be switched on or off from its admin page, which also refreshes the status
+// when it saves; re-check once on leaving that page instead of on every navigation.
 watch(
-  () => route.fullPath,
-  () => queryClient.invalidateQueries({ queryKey: ['assistant-status'] }),
+  () => route.path.startsWith('/assistant'),
+  (onAdmin, wasOnAdmin) => {
+    if (wasOnAdmin && !onAdmin) void queryClient.invalidateQueries({ queryKey: ['assistant-status'] })
+  },
 )
 </script>
 <template>
   <button
     v-if="showButton && !assistantOpen"
+    ref="fab"
     type="button"
     class="assistant-fab"
     :class="{ tucked }"
@@ -192,13 +229,15 @@ watch(
     <Sparkles :size="24" />
   </button>
   <Transition name="assistant-pop">
-    <section v-if="assistantOpen && visible" class="assistant-panel" role="dialog" aria-label="Trợ lý AI">
+    <section v-if="assistantOpen && (visible || failed)" class="assistant-panel" role="dialog" aria-label="Trợ lý AI">
       <header class="assistant-head">
         <span class="assistant-avatar" aria-hidden="true"><Bot :size="20" /></span>
         <div class="grow">
           <strong>{{ onCase ? 'Trợ lý công việc' : 'Trợ lý Desktiny' }}</strong>
           <small v-if="onCase" :title="caseContext?.title">{{ caseContext?.title }}</small>
-          <small v-else>{{ !ready
+          <small v-else>{{ failed
+              ? 'Không kết nối được'
+              : !ready
               ? 'Chưa sẵn sàng'
               : status.data.value?.my_data
                 ? 'Quy trình, việc & tài liệu của bạn'
@@ -255,11 +294,22 @@ watch(
         :suggestions="caseContext.suggestions"
       />
       <div v-else ref="scroller" class="assistant-body" aria-live="polite">
-        <div v-if="!ready" class="assistant-setup">
-          <Settings2 :size="26" />
+        <div v-if="failed" class="assistant-setup" role="alert">
+          <AlertCircle :size="26" aria-hidden="true" />
+          <strong>Không tải được trạng thái trợ lý</strong>
+          <p>{{ errorText(status.error.value) }}</p>
+          <button type="button" class="button small" :disabled="status.isFetching.value" @click="status.refetch()">
+            <RotateCcw :size="15" :class="{ spin: status.isFetching.value }" />{{ status.isFetching.value ? 'Đang thử lại…' : 'Thử lại' }}
+          </button>
+        </div>
+        <div v-else-if="!ready" class="assistant-setup">
+          <Settings2 :size="26" aria-hidden="true" />
           <strong>Trợ lý chưa được bật</strong>
-          <p>Bật trợ lý, thêm một dịch vụ AI và viết vài bài kiến thức để mọi người bắt đầu hỏi.</p>
-          <RouterLink to="/assistant" class="button small" @click="assistantOpen = false">Mở cài đặt trợ lý</RouterLink>
+          <template v-if="status.data.value?.can_manage">
+            <p>Bật trợ lý, thêm một dịch vụ AI và viết vài bài kiến thức để mọi người bắt đầu hỏi.</p>
+            <RouterLink to="/assistant" class="button small" @click="assistantOpen = false">Mở cài đặt trợ lý</RouterLink>
+          </template>
+          <p v-else>Quản trị viên chưa bật trợ lý chung cho cơ quan. Hãy liên hệ họ nếu bạn cần dùng.</p>
         </div>
         <template v-else>
           <div class="assistant-msg bot">
@@ -302,6 +352,7 @@ watch(
                 type="button"
                 class="assistant-copy"
                 :aria-label="copied === index ? 'Đã chép' : 'Chép câu trả lời'"
+                title="Chép câu trả lời"
                 @click="copy(index)"
               >
                 <Check v-if="copied === index" :size="13" /><Copy v-else :size="13" />{{
@@ -326,8 +377,15 @@ watch(
           aria-label="Câu hỏi cho trợ lý"
           @keydown="onKey"
         />
-        <button class="assistant-send" type="submit" :disabled="busy || !draft.trim()" aria-label="Gửi câu hỏi">
-          <SendHorizontal :size="18" />
+        <button
+          class="assistant-send"
+          type="submit"
+          :disabled="busy || !draft.trim()"
+          :aria-busy="busy"
+          :aria-label="busy ? 'Đang chờ trả lời' : 'Gửi câu hỏi'"
+          :title="busy ? 'Trợ lý đang trả lời…' : draft.trim() ? 'Gửi (Enter)' : 'Nhập câu hỏi để gửi'"
+        >
+          <Loader2 v-if="busy" :size="18" class="spin" /><SendHorizontal v-else :size="18" />
         </button>
       </form>
       <footer v-if="ready && !onCase" class="assistant-foot">
