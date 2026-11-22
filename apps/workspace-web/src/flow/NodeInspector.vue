@@ -3,7 +3,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import DocumentListEditor from './DocumentListEditor.vue'
-import { Copy, Plus, Trash2 } from 'lucide-vue-next'
+import { AlertTriangle, Copy, Plus, Trash2 } from 'lucide-vue-next'
+import { isMac } from './shortcuts'
 import { KINDS, OPERATORS, RECIPIENTS, nodeReference, waitLabel } from './nodes'
 import StepOptions from './StepOptions.vue'
 import NodeSettings from './NodeSettings.vue'
@@ -30,6 +31,7 @@ const emit = defineEmits<{
   remove: []
   duplicate: []
 }>()
+const mod = isMac() ? '⌘' : 'Ctrl'
 const c = computed(() => props.data.config)
 const meta = computed(() => KINDS[props.data.kind])
 const conditions = computed(() => (c.value.conditions as FlowCondition[]) ?? [])
@@ -102,22 +104,23 @@ const waitUnit = computed(() => {
       <button
         v-if="data.kind !== 'trigger'"
         class="icon-button"
-        title="Nhân bản"
-        aria-label="Nhân bản node"
+        :title="`Nhân bản (${mod}+D)`"
+        aria-label="Nhân bản bước"
         @click="emit('duplicate')"
       >
         <Copy :size="16" /></button
       ><button
         v-if="data.kind !== 'trigger'"
-        class="icon-button"
-        title="Xóa node"
-        aria-label="Xóa node"
+        class="icon-button danger"
+        title="Xóa bước (Delete) — có thể hoàn tác"
+        aria-label="Xóa bước"
         @click="emit('remove')"
       >
         <Trash2 :size="16" />
       </button>
     </header>
-    <div v-if="data.errors?.length" class="notice error inspector-errors">
+    <div v-if="data.errors?.length" class="notice error inspector-errors" role="alert">
+      <AlertTriangle :size="18" aria-hidden="true" />
       <ul>
         <li v-for="message in data.errors" :key="message">{{ message }}</li>
       </ul>

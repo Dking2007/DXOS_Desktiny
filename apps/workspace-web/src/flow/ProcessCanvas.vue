@@ -266,15 +266,27 @@ function backToJourney() {
   selectedId.value = null
   fitAll(300)
 }
+// Refits once the panel has its new size; cancelled if the canvas goes away first.
+let refit: ReturnType<typeof setTimeout> | undefined
 function toggleExpanded() {
   expanded.value = !expanded.value
-  void nextTick(() => setTimeout(() => fitAll(250), 60))
+  void nextTick(() => {
+    clearTimeout(refit)
+    refit = setTimeout(() => fitAll(250), 60)
+  })
 }
 function onKey(event: KeyboardEvent) {
   if (event.key === 'Escape' && expanded.value) toggleExpanded()
 }
 onMounted(() => window.addEventListener('keydown', onKey))
-onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKey)
+  clearTimeout(refit)
+})
+/** A stable function: an inline one is a new prop each render and makes the minimap redraw. */
+function miniMapColor(node: Node<FlowNodeData>) {
+  return node.data?.status ? KINDS[node.data.kind].color : '#c9d4dd'
+}
 
 const STATE: Record<string, string> = {
   succeeded: 'Đã xong',
@@ -438,7 +450,7 @@ const modeText = computed(() => {
               position="bottom-right"
               pannable
               zoomable
-              :node-color="(node: Node<FlowNodeData>) => (node.data?.status ? KINDS[node.data.kind].color : '#c9d4dd')"
+              :node-color="miniMapColor"
               :node-stroke-width="0"
             />
           </VueFlow>
@@ -638,7 +650,7 @@ const modeText = computed(() => {
 }
 .pc-title h2 {
   margin: 2px 0 2px;
-  font-size: 20px;
+  font-size: 1.25rem;
 }
 .pc-tools {
   display: flex;
@@ -689,18 +701,18 @@ const modeText = computed(() => {
   min-width: 220px;
 }
 .pc-status-text strong {
-  font-size: 16px;
+  font-size: 1rem;
   color: var(--tone);
 }
 .pc-progress {
   display: flex;
   gap: 16px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--muted);
 }
 .pc-progress b {
   display: block;
-  font-size: 20px;
+  font-size: 1.25rem;
   line-height: 1.1;
   color: var(--text, inherit);
 }
@@ -734,7 +746,7 @@ const modeText = computed(() => {
   border-radius: 10px;
   background: color-mix(in srgb, var(--surface) 92%, transparent);
   backdrop-filter: blur(6px);
-  font-size: 12.5px;
+  font-size: 0.7812rem;
   pointer-events: none;
 }
 .legend::before {
@@ -830,7 +842,7 @@ const modeText = computed(() => {
   min-width: 0;
 }
 .pc-journey small {
-  font-size: 12.5px;
+  font-size: 0.7812rem;
   color: var(--muted);
 }
 .pc-dot {
@@ -842,7 +854,7 @@ const modeText = computed(() => {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  font-size: 12.5px;
+  font-size: 0.7812rem;
   font-weight: 700;
   color: #fff;
   background: #8fa3b5;
@@ -871,7 +883,7 @@ const modeText = computed(() => {
 }
 .pc-hint {
   margin-top: auto;
-  font-size: 12.5px;
+  font-size: 0.7812rem;
 }
 .pc-back {
   align-self: flex-start;
@@ -882,13 +894,13 @@ const modeText = computed(() => {
 }
 .pc-detail h3 {
   margin: 0;
-  font-size: 18px;
+  font-size: 1.125rem;
 }
 .pc-kind {
   display: inline-flex;
   gap: 6px;
   align-items: center;
-  font-size: 12.5px;
+  font-size: 0.7812rem;
   font-weight: 700;
   color: var(--node-color);
 }
@@ -897,12 +909,12 @@ const modeText = computed(() => {
   flex-wrap: wrap;
   gap: 8px 12px;
   align-items: center;
-  font-size: 13.5px;
+  font-size: 0.8438rem;
 }
 .pc-state {
   padding: 2px 10px;
   border-radius: 999px;
-  font-size: 12.5px;
+  font-size: 0.7812rem;
   font-weight: 700;
   background: var(--surface-2);
 }
@@ -923,7 +935,7 @@ const modeText = computed(() => {
   grid-template-columns: auto 1fr;
   gap: 4px 12px;
   margin: 0;
-  font-size: 13.5px;
+  font-size: 0.8438rem;
 }
 .pc-times dt {
   color: var(--muted);
