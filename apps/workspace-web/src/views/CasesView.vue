@@ -113,7 +113,19 @@ watch(formId, () => {
 watch([status, search], () => {
   cursor.value = null
 })
+const canCreate = computed(() => session.can('cases.create'))
+function clearFilters() {
+  status.value = ''
+  search.value = ''
+}
 function openCreate() {
+  if (!canCreate.value) return
+  // A dialog closed with "discard" starts empty next time.
+  title.value = ''
+  processId.value = ''
+  formId.value = ''
+  fileIds.value = []
+  errors.value = {}
   showCreate.value = true
   error.value = null
   intent.value = newIntent()
@@ -122,8 +134,13 @@ function openCreate() {
 const createDirty = computed(
   () =>
     !!title.value.trim() ||
+    !!formId.value ||
+    priority.value !== 'normal' ||
     fileIds.value.length > 0 ||
     JSON.stringify(payload.value) !== JSON.stringify(initialPayload(selectedForm.value?.fields ?? [])),
+)
+const createBlocked = computed(() =>
+  !title.value.trim() ? 'Nhập tên hồ sơ trước.' : !selectedForm.value ? 'Chọn quy trình trước.' : '',
 )
 function closeCreate() {
   if (!busy.value && confirmDiscard(createDirty.value)) {
@@ -139,7 +156,7 @@ watch(
   { immediate: true },
 )
 async function create() {
-  if (!selectedForm.value) return
+  if (busy.value || createBlocked.value || !selectedForm.value) return
   errors.value = validatePayload(selectedForm.value.fields, payload.value)
   if (Object.keys(errors.value).length) return
   busy.value = true
@@ -171,7 +188,7 @@ async function create() {
 <template>
   <header class="page-head compact">
     <h1 class="sr-only">Hồ sơ</h1>
-    <button class="button" @click="openCreate">
+    <button v-if="canCreate" class="button" @click="openCreate">
       <FilePlus2 :size="18" />Tạo hồ sơ
     </button>
   </header>
@@ -215,7 +232,9 @@ async function create() {
           : 'Hồ sơ là đề nghị cần người có thẩm quyền duyệt: chọn mẫu, điền thông tin, đính kèm tài liệu rồi chuyển duyệt.'
       "
       @retry="cases.refetch()"
-      ><button v-if="session.can('cases.create')" class="button small" @click="openCreate">
+      ><button v-if="status || search" class="button small secondary" @click="clearFilters">
+        Xóa bộ lọc</button
+      ><button v-else-if="canCreate" class="button small" @click="openCreate">
         <FilePlus2 :size="16" />Tạo hồ sơ
       </button></StatePanel
     >
@@ -236,7 +255,7 @@ async function create() {
               <div class="primary-cell">
                 <span class="file-icon"><Files :size="20" /></span>
                 <div>
-                  <RouterLink :to="`/cases/${item.id}`" class="row-link">{{
+                  <RouterLink :to="`/cases/${item.id}`" class="row-link case-title" :title="item.title">{{
                     item.title
                   }}</RouterLink
                   ><small class="mono">{{ item.code }}</small>
@@ -272,7 +291,7 @@ async function create() {
               <span v-else-if="item.status === 'pending_workflow_start'" class="muted">Đang chuyển duyệt…</span>
               <span v-else class="muted">—</span>
             </td>
-            <td class="muted">
+            <td class="muted nowrap">
               {{ formatDate(item.updated_at || item.created_at, true) }}
             </td>
             <td>
@@ -280,6 +299,7 @@ async function create() {
                 :to="`/cases/${item.id}`"
                 class="icon-button"
                 :aria-label="`Mở ${item.title}`"
+                title="Mở hồ sơ"
                 ><ArrowRight :size="17"
               /></RouterLink>
             </td>
@@ -374,7 +394,7 @@ async function create() {
           </div>
         </div>
         <template v-if="selectedForm"
-          ><hr class="divider" style="margin: 0" />
+          ><hr class="divider case-divider" />
           <div>
             <span class="eyebrow">THÔNG TIN HỒ SƠ</span
             ><SchemaForm
@@ -386,11 +406,7 @@ async function create() {
           </div>
           <div>
             <span class="eyebrow">TÀI LIỆU ĐÍNH KÈM</span>
-            <p
-              v-if="!files.data.value?.items.length"
-              class="muted"
-              style="font-size: 15px"
-            >
+            <p v-if="!files.data.value?.items.length" class="muted">
               Chưa có tài liệu. Bạn có thể bổ sung sau từ kho Tài liệu.
             </p>
             <div class="case-document-list">
@@ -402,7 +418,8 @@ async function create() {
                   v-model="fileIds"
                   type="checkbox"
                   :value="file.id"
-                /><span>{{ file.name }}</span></label
+                  :disabled="busy"
+                /><span class="case-file-name" :title="file.name">{{ file.name }}</span></label
               >
             </div>
           </div>
@@ -422,10 +439,32 @@ async function create() {
           @click="closeCreate"
         >
           Hủy</button
-        ><button class="button" :disabled="busy || !selectedForm">
+        ><button class="button" :disabled="busy || !!createBlocked" :title="createBlocked">
           {{ busy ? 'Đang tạo…' : 'Tạo bản nháp' }}
         </button>
       </div>
     </form></ModalDialog
   >
 </template>
+<style scoped>
+.case-title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.nowrap {
+  white-space: nowrap;
+}
+.case-divider {
+  margin: 0;
+}
+.case-file-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+</style>

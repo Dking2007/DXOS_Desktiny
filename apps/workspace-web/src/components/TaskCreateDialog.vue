@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <!-- SPDX-FileCopyrightText: 2026 Desktiny contributors -->
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
 import { FileText, FolderOpen, Plus, Sparkles, Trash2, Upload, X } from 'lucide-vue-next'
 import { api } from '../api'
@@ -12,7 +12,10 @@ import { toast } from '../ui/toast'
 import { confirmDiscard } from '../ui/unsaved'
 import { useAi } from '../ai/useAi'
 import DrivePicker from './DrivePicker.vue'
+import PeoplePicker from './pickers/PeoplePicker.vue'
+import type { PickerOption } from './pickers/filter'
 import { mergeIds, uploadToDrive, type AttachedFile } from './attachments'
+import { uploadLabel } from './workForms'
 const props = defineProps<{
   parentId?: string
   caseId?: string
@@ -32,6 +35,47 @@ const options = useQuery({
   queryKey: ['tasks', 'assignable'],
   queryFn: () => api.request<Assignable>('/tasks/assignable-users'),
 })
+const departmentName = computed(() => new Map((options.data.value?.departments ?? []).map((d) => [d.id, d.name])))
+const members = computed(() => {
+  const map = new Map<string, string[]>()
+  for (const user of options.data.value?.users ?? [])
+    if (user.department_id) map.set(user.department_id, [...(map.get(user.department_id) ?? []), user.id])
+  return map
+})
+const memberCount = (id: string) => `${members.value.get(id)?.length ?? 0} người`
+const personOptions = (valueOf: (id: string) => string): PickerOption[] =>
+  (options.data.value?.users ?? []).map((u) => ({
+    value: valueOf(u.id),
+    label: u.display_name,
+    secondary: (u.department_id && departmentName.value.get(u.department_id)) || undefined,
+    group: 'Cá nhân',
+    kind: 'user',
+    userId: u.id,
+  }))
+const targetOptions = computed<PickerOption[]>(() => [
+  { value: '', label: 'Lưu nháp, chưa giao', group: '', kind: 'special' },
+  ...personOptions((id) => `user:${id}`),
+  ...(options.data.value?.departments ?? []).map((d) => ({
+    value: `dept:${d.id}`,
+    label: d.name,
+    secondary: `${memberCount(d.id)} · trưởng đơn vị phân công tiếp`,
+    group: 'Đơn vị',
+    kind: 'dept' as const,
+  })),
+])
+const watcherOptions = computed<PickerOption[]>(() => [
+  ...personOptions((id) => id),
+  ...(options.data.value?.departments ?? [])
+    .filter((d) => members.value.has(d.id))
+    .map((d) => ({
+      value: `dept:${d.id}`,
+      label: d.name,
+      secondary: memberCount(d.id),
+      group: 'Cả phòng',
+      kind: 'dept' as const,
+      memberIds: members.value.get(d.id),
+    })),
+])
 const title = ref(props.defaultTitle ?? '')
 const description = ref('')
 const target = ref('')
@@ -42,17 +86,22 @@ const watcherIds = ref<string[]>([])
 // Brief, templates or data the person will need, attached before the task is sent.
 const attachments = ref<AttachedFile[]>([])
 const uploading = ref(false)
+const progress = ref({ done: 0, total: 0 })
 const picking = ref(false)
 const filePicker = ref<HTMLInputElement>()
 async function uploadPicked(event: Event) {
   const input = event.target as HTMLInputElement
   const chosen = [...(input.files ?? [])]
   input.value = ''
+  if (!chosen.length) return
   uploading.value = true
+  progress.value = { done: 0, total: chosen.length }
   try {
+    // Files that went up before a failure stay attached; only the rest need picking again.
     for (const file of chosen) {
       const uploaded = await uploadToDrive(file)
       if (!attachments.value.some((f) => f.id === uploaded.id)) attachments.value.push(uploaded)
+      progress.value = { ...progress.value, done: progress.value.done + 1 }
     }
   } catch (cause) {
     toast.error(cause)
@@ -134,7 +183,19 @@ const dirty = computed(
 function close() {
   if (!busy.value && confirmDiscard(dirty.value)) emit('close')
 }
+// Indexed by line so focus lands on the line just added (a v-for ref array keeps no order).
+const checklistInputs: (HTMLInputElement | null)[] = []
+/** Enter in a checklist line adds the next line instead of sending the whole form. */
+async function addChecklistItem(after = checklist.value.length - 1) {
+  checklist.value.splice(after + 1, 0, '')
+  await nextTick()
+  checklistInputs[after + 1]?.focus()
+}
+const submitBlocked = computed(() =>
+  !title.value.trim() ? 'Nhập tên công việc trước.' : uploading.value ? 'Chờ tải tệp xong.' : '',
+)
 async function submit() {
+  if (busy.value || submitBlocked.value) return
   busy.value = true
   error.value = null
   const [kind, id] = target.value.split(':')
@@ -184,9 +245,9 @@ async function submit() {
       >
     </div>
     <form @submit.prevent="submit">
-      <div v-if="ai.on('task_parse')" class="ai-card" style="margin-bottom: 16px">
+      <div v-if="ai.on('task_parse')" class="ai-card task-parse">
         <label class="ai-title" for="task-sentence"><Sparkles :size="16" />Giao việc bằng một câu</label>
-        <div class="inline-actions" style="margin-top: 8px">
+        <div class="inline-actions task-parse-row">
           <input
             id="task-sentence"
             v-model="sentence"
@@ -218,36 +279,21 @@ async function submit() {
           <label for="task-description">Nội dung, yêu cầu</label
           ><textarea id="task-description" v-model="description" rows="3" />
         </div>
-        <div class="field">
-          <label for="task-target">Người / đơn vị nhận</label
-          ><select id="task-target" v-model="target">
-            <option value="">Lưu nháp, chưa giao</option>
-            <optgroup v-if="options.data.value?.users.length" label="Cá nhân">
-              <option
-                v-for="user in options.data.value?.users"
-                :key="user.id"
-                :value="`user:${user.id}`"
-              >
-                {{ user.display_name }}
-              </option>
-            </optgroup>
-            <optgroup
-              v-if="options.data.value?.departments.length"
-              label="Đơn vị (trưởng đơn vị phân công tiếp)"
-            >
-              <option
-                v-for="unit in options.data.value?.departments"
-                :key="unit.id"
-                :value="`dept:${unit.id}`"
-              >
-                {{ unit.name }}
-              </option>
-            </optgroup></select
-          ><small>{{ scopeHint }}</small>
+        <div class="field full-width">
+          <label for="task-target">Người / đơn vị nhận</label>
+          <PeoplePicker
+            id="task-target"
+            v-model="target"
+            :options="targetOptions"
+            :disabled="busy"
+            placeholder="Tìm theo tên hoặc đơn vị…"
+            recent-key="dx.picker.task-target"
+          />
+          <small>{{ scopeHint }} Để trống để lưu nháp, giao sau.</small>
         </div>
         <div class="field">
           <label for="task-due">Hạn hoàn thành</label
-          ><input id="task-due" v-model="dueAt" type="datetime-local" />
+          ><input id="task-due" v-model="dueAt" type="datetime-local" /><small>Có thể để trống nếu chưa có hạn.</small>
         </div>
         <div class="field">
           <label for="task-priority">Mức ưu tiên</label
@@ -257,31 +303,41 @@ async function submit() {
             <option value="high">Cao</option>
             <option value="urgent">Khẩn</option>
           </select>
-        </div>
-        <div class="field">
-          <label for="task-watchers">Người theo dõi</label
-          ><select id="task-watchers" v-model="watcherIds" multiple size="3">
-            <option
-              v-for="user in options.data.value?.users"
-              :key="user.id"
-              :value="user.id"
-            >
-              {{ user.display_name }}
-            </option>
-          </select>
+          <small>Việc khẩn được đánh dấu nổi bật cho người nhận.</small>
         </div>
         <div class="field full-width">
-          <label>Tài liệu đính kèm</label>
-          <div v-if="attachments.length" class="ai-chips">
-            <span v-for="file in attachments" :key="file.id" class="file-chip"
-              ><FileText :size="14" />{{ file.name
-              }}<button type="button" class="icon-button" :aria-label="`Bỏ ${file.name}`" @click="attachments = attachments.filter((f) => f.id !== file.id)">
+          <label for="task-watchers">Người theo dõi</label>
+          <PeoplePicker
+            id="task-watchers"
+            v-model="watcherIds"
+            multiple
+            :options="watcherOptions"
+            :disabled="busy"
+            placeholder="Thêm người theo dõi…"
+            recent-key="dx.picker.task-watchers"
+          />
+          <small>Theo dõi tiến độ mà không phải thực hiện. Chọn tên một phòng để thêm cả phòng.</small>
+        </div>
+        <div class="field full-width">
+          <span id="task-files-label" class="field-label">Tài liệu đính kèm</span>
+          <div v-if="attachments.length" class="ai-chips" role="list" aria-labelledby="task-files-label">
+            <span v-for="file in attachments" :key="file.id" class="file-chip" role="listitem"
+              ><FileText :size="14" aria-hidden="true" /><span class="file-chip-name" :title="file.name ?? ''">{{
+                file.name
+              }}</span
+              ><button
+                type="button"
+                class="icon-button file-chip-remove"
+                :aria-label="`Bỏ ${file.name}`"
+                title="Bỏ tệp này"
+                @click="attachments = attachments.filter((f) => f.id !== file.id)"
+              >
                 <X :size="13" /></button
             ></span>
           </div>
           <div class="inline-actions">
             <button type="button" class="button ghost small" :disabled="uploading" @click="filePicker?.click()">
-              <Upload :size="15" />{{ uploading ? 'Đang tải lên…' : 'Tải tệp lên' }}
+              <Upload :size="15" />{{ uploading ? uploadLabel(progress.done, progress.total) : 'Tải tệp lên' }}
             </button>
             <button type="button" class="button ghost small" :disabled="uploading" @click="picking = true">
               <FolderOpen :size="15" />Chọn từ kho tài liệu
@@ -291,39 +347,76 @@ async function submit() {
           <small class="muted">Người nhận việc mở được các tệp này qua công việc, không cần chia sẻ riêng.</small>
         </div>
         <div class="field full-width">
-          <label>Checklist cần hoàn thành trước khi nộp</label>
+          <span class="field-label">Checklist cần hoàn thành trước khi nộp</span>
           <div v-for="(_, index) in checklist" :key="index" class="checklist-edit">
             <input
+              :ref="(el) => (checklistInputs[index] = el as HTMLInputElement)"
               v-model="checklist[index]"
               :aria-label="`Mục ${index + 1}`"
               maxlength="300"
+              placeholder="Ví dụ: Gửi bản dự thảo cho phòng Kế hoạch"
+              @keydown.enter.prevent="addChecklistItem(index)"
             /><button
               type="button"
               class="icon-button"
-              aria-label="Xóa mục"
+              :aria-label="`Xóa mục ${index + 1}`"
+              title="Xóa mục"
               @click="checklist.splice(index, 1)"
             >
               <Trash2 :size="16" />
             </button>
           </div>
-          <button
-            type="button"
-            class="button ghost small"
-            style="justify-self: start"
-            @click="checklist.push('')"
-          >
+          <button type="button" class="button ghost small checklist-add" @click="addChecklistItem()">
             <Plus :size="15" />Thêm mục
           </button>
         </div>
       </div>
       <div class="form-actions">
-        <button type="button" class="button secondary" @click="close">
+        <button type="button" class="button secondary" :disabled="busy" @click="close">
           Hủy</button
-        ><button class="button" :disabled="busy || uploading || !title.trim()">
-          {{ busy ? 'Đang lưu…' : target ? 'Giao việc' : 'Lưu nháp' }}
+        ><button class="button" :disabled="busy || !!submitBlocked" :title="submitBlocked">
+          {{ busy ? (target ? 'Đang giao…' : 'Đang lưu…') : target ? 'Giao việc' : 'Lưu nháp' }}
         </button>
       </div>
     </form>
   </ModalDialog>
   <DrivePicker v-if="picking" :exclude="attachments.map((f) => f.id)" @close="picking = false" @picked="attachPicked" />
 </template>
+<style scoped>
+#task-due {
+  min-width: 0;
+}
+.task-parse {
+  margin-bottom: 20px;
+}
+.task-parse-row {
+  margin-top: 8px;
+  flex-wrap: nowrap;
+}
+.task-parse-row input {
+  flex: 1;
+  min-width: 0;
+}
+.field-label {
+  font-weight: 600;
+  font-size: 0.9375rem;
+}
+.file-chip-name {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.file-chip-remove {
+  width: 28px;
+  height: 28px;
+}
+.checklist-add {
+  align-self: flex-start;
+}
+@media (max-width: 640px) {
+  .task-parse-row {
+    flex-wrap: wrap;
+  }
+}
+</style>

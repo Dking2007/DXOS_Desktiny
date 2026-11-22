@@ -6,6 +6,7 @@ import { ListPlus, Sparkles } from 'lucide-vue-next'
 import ModalDialog from '@dx/web-shared/components/ModalDialog.vue'
 import { errorText } from '@dx/web-shared/api.ts'
 import { api } from '../api'
+import { useSession } from '../stores/session'
 
 /** A long conversation in a few lines, what was agreed, and work to hand out from it. */
 const props = defineProps<{ conversationId: string; title: string }>()
@@ -16,9 +17,12 @@ interface Summary {
   actions: { text: string; assignee: string | null }[]
   messages: number
 }
+const session = useSession()
 const result = ref<Summary | null>(null)
 const error = ref('')
-onMounted(async () => {
+async function summarize() {
+  error.value = ''
+  result.value = null
   try {
     result.value = await api.request<Summary>(`/ai/conversations/${props.conversationId}/summary`, {
       method: 'POST',
@@ -27,13 +31,17 @@ onMounted(async () => {
   } catch (cause) {
     error.value = errorText(cause)
   }
-})
+}
+onMounted(summarize)
 </script>
 <template>
   <ModalDialog :title="`Tóm tắt: ${title}`" @close="emit('close')">
     <div class="stack" aria-live="polite">
       <p v-if="!result && !error" class="muted">AI đang đọc cuộc trò chuyện…</p>
-      <div v-if="error" class="notice error">{{ error }}</div>
+      <div v-if="error" class="notice error summary-error" role="alert">
+        <span>{{ error }}</span>
+        <button type="button" class="button secondary small" @click="summarize">Thử lại</button>
+      </div>
       <template v-if="result">
         <section class="ai-card">
           <header><span class="ai-title"><Sparkles :size="16" />Nội dung chính</span></header>
@@ -47,7 +55,11 @@ onMounted(async () => {
           <header><span class="ai-title">Việc cần làm</span></header>
           <div v-for="(action, index) in result.actions" :key="index" class="ai-issue">
             <span class="grow">{{ action.text }}</span>
-            <button class="button secondary small ai-action" @click="emit('task', action.text)">
+            <button
+              v-if="session.can('tasks.create')"
+              class="button secondary small ai-action"
+              @click="emit('task', action.text)"
+            >
               <ListPlus :size="14" />Tạo việc
             </button>
           </div>
@@ -57,3 +69,10 @@ onMounted(async () => {
     </div>
   </ModalDialog>
 </template>
+<style scoped>
+.summary-error {
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+</style>

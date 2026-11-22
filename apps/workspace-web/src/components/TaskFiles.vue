@@ -12,6 +12,7 @@ import { previewKind } from '../ui/preview'
 import FilePreview from './FilePreview.vue'
 import DrivePicker from './DrivePicker.vue'
 import { mergeIds, uploadToDrive, type AttachedFile } from './attachments'
+import { uploadLabel } from './workForms'
 
 /**
  * Files on a task: the brief from whoever gave it and the results handed in. Everyone on the
@@ -31,6 +32,8 @@ const canAttach = () => !props.closed && (props.canManage || props.isAssignee)
 const canRemove = (file: AttachedFile) =>
   !props.closed && (props.canManage || (props.isAssignee && file.owner_id === session.user?.id))
 const busy = ref(false)
+/** Upload progress while files go up one by one; total 0 when nothing is uploading. */
+const progress = ref({ done: 0, total: 0 })
 const picking = ref(false)
 const picker = ref<HTMLInputElement>()
 const preview = ref<AttachedFile | null>(null)
@@ -49,17 +52,28 @@ async function uploadPicked(event: Event) {
   input.value = ''
   if (!chosen.length) return
   busy.value = true
+  progress.value = { done: 0, total: chosen.length }
+  const uploaded: AttachedFile[] = []
   try {
-    const uploaded = []
-    for (const file of chosen) uploaded.push(await uploadToDrive(file))
-    await save(
-      mergeIds(props.files.map((f) => f.id), uploaded.map((f) => f.id)),
-      `Đã đính kèm ${uploaded.length} tệp (lưu trong Tài liệu của tôi)`,
-    )
+    for (const file of chosen) {
+      uploaded.push(await uploadToDrive(file))
+      progress.value = { ...progress.value, done: uploaded.length }
+    }
+  } catch (error) {
+    toast.error(error)
+  }
+  // Whatever reached the drive before a failure is still attached, so nothing is uploaded twice.
+  try {
+    if (uploaded.length)
+      await save(
+        mergeIds(props.files.map((f) => f.id), uploaded.map((f) => f.id)),
+        `Đã đính kèm ${uploaded.length} tệp (lưu trong Tài liệu của tôi)`,
+      )
   } catch (error) {
     toast.error(error)
   } finally {
     busy.value = false
+    progress.value = { done: 0, total: 0 }
   }
 }
 async function attachFromDrive(files: DriveFile[]) {
@@ -101,10 +115,10 @@ async function download(file: AttachedFile) {
 <template>
   <section class="card">
     <header class="card-header">
-      <h2><Paperclip :size="18" /> Tài liệu</h2>
+      <h2 class="files-title"><Paperclip :size="18" aria-hidden="true" />Tài liệu</h2>
       <div v-if="canAttach()" class="inline-actions">
         <button class="button secondary small" :disabled="busy" @click="picker?.click()">
-          <Upload :size="14" />{{ busy ? 'Đang tải lên…' : 'Tải tệp lên' }}
+          <Upload :size="14" />{{ progress.total ? uploadLabel(progress.done, progress.total) : 'Tải tệp lên' }}
         </button>
         <button class="button secondary small" :disabled="busy" @click="picking = true">
           <FolderOpen :size="14" />Chọn từ kho
@@ -112,17 +126,17 @@ async function download(file: AttachedFile) {
         <input ref="picker" type="file" multiple hidden @change="uploadPicked" />
       </div>
     </header>
-    <p v-if="!files.length" class="step-empty" style="padding: 18px 23px">
+    <p v-if="!files.length" class="step-empty files-empty">
       Chưa có tài liệu.<template v-if="canAttach()">
         {{ ' ' }}{{ canManage ? 'Đính kèm yêu cầu, mẫu biểu cho người làm.' : 'Đính kèm kết quả trước khi nộp.' }}</template
       >
     </p>
     <div v-for="file in files" :key="file.id" class="list-row">
-      <FileText :size="18" />
+      <FileText :size="18" aria-hidden="true" class="files-icon" />
       <div class="grow">
         <template v-if="file.restricted"><p class="muted">Tệp đã bị xóa khỏi kho tài liệu</p></template>
         <template v-else>
-          <p>{{ file.name }}</p>
+          <p class="files-name" :title="file.name ?? ''">{{ file.name }}</p>
           <small class="muted">{{ formatSize(file.size ?? 0) }}<template v-if="file.owner_name"> · {{ file.owner_name }}</template></small>
         </template>
       </div>
@@ -163,3 +177,22 @@ async function download(file: AttachedFile) {
     @close="preview = null"
   />
 </template>
+<style scoped>
+.files-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.files-empty {
+  padding: 18px 23px;
+}
+.files-icon {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+.files-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+</style>

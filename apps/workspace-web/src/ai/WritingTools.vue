@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <!-- SPDX-FileCopyrightText: 2026 Desktiny contributors -->
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { Sparkles, Undo2 } from 'lucide-vue-next'
 import { api } from '../api'
 import { toast } from '../ui/toast'
@@ -11,6 +11,8 @@ const text = defineModel<string>({ required: true })
 const busy = ref<'' | 'rewrite' | 'proofread' | 'title'>('')
 const previous = ref<string | null>(null)
 const titles = ref<string[]>([])
+/** Too little text for the AI to work on; the buttons say so instead of doing nothing. */
+const short = computed(() => text.value.trim().length < 3)
 async function run(action: 'rewrite' | 'proofread' | 'title') {
   if (text.value.trim().length < 3) return
   busy.value = action
@@ -45,14 +47,35 @@ function undo() {
 }
 </script>
 <template>
-  <div class="ai-chips" aria-label="AI hỗ trợ viết">
-    <button type="button" class="button ghost small ai-action" :disabled="!!busy" @mousedown.prevent @click="run('rewrite')">
+  <div class="ai-chips" role="group" aria-label="AI hỗ trợ viết">
+    <button
+      type="button"
+      class="button ghost small ai-action"
+      :disabled="!!busy || short"
+      :title="short ? 'Viết ít nhất vài chữ trước.' : ''"
+      @mousedown.prevent
+      @click="run('rewrite')"
+    >
       <Sparkles :size="14" />{{ busy === 'rewrite' ? 'Đang viết…' : 'Viết gọn lại' }}
     </button>
-    <button type="button" class="button ghost small ai-action" :disabled="!!busy" @mousedown.prevent @click="run('proofread')">
+    <button
+      type="button"
+      class="button ghost small ai-action"
+      :disabled="!!busy || short"
+      :title="short ? 'Viết ít nhất vài chữ trước.' : ''"
+      @mousedown.prevent
+      @click="run('proofread')"
+    >
       {{ busy === 'proofread' ? 'Đang sửa…' : 'Sửa chính tả' }}
     </button>
-    <button type="button" class="button ghost small ai-action" :disabled="!!busy" @mousedown.prevent @click="run('title')">
+    <button
+      type="button"
+      class="button ghost small ai-action"
+      :disabled="!!busy || short"
+      :title="short ? 'Viết ít nhất vài chữ trước.' : ''"
+      @mousedown.prevent
+      @click="run('title')"
+    >
       {{ busy === 'title' ? 'Đang nghĩ…' : 'Gợi ý tiêu đề' }}
     </button>
     <button v-if="previous !== null" type="button" class="button ghost small" @mousedown.prevent @click="undo">

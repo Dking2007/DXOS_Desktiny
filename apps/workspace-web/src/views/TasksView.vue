@@ -22,9 +22,13 @@ import StatePanel from '@dx/web-shared/components/StatePanel.vue'
 import StatusBadge from '@dx/web-shared/components/StatusBadge.vue'
 import TaskCreateDialog from '../components/TaskCreateDialog.vue'
 import { useOverview } from '../ui/overview'
+import { useSession } from '../stores/session'
 const route = useRoute()
 const router = useRouter()
 const queryClient = useQueryClient()
+const session = useSession()
+// Only people allowed to create tasks see the button; the server refuses the others anyway.
+const canCreate = computed(() => session.can('tasks.create'))
 type Scope = 'mine' | 'review' | 'created' | 'watching' | 'managed' | 'all'
 const scope = ref<Scope>((route.query.scope as Scope) || 'mine')
 // The menu badge counts work to do plus results to accept; each has its own tab with its count,
@@ -66,6 +70,12 @@ watch(
   },
 )
 watch([scope, status, search, overdueOnly], () => (cursor.value = null))
+const filtered = computed(() => !!status.value || !!search.value || overdueOnly.value)
+function clearFilters() {
+  status.value = ''
+  search.value = ''
+  overdueOnly.value = false
+}
 const tasks = useQuery({
   queryKey: computed(() => [
     'tasks',
@@ -137,7 +147,7 @@ function closeCreate() {
 <template>
   <header class="page-head compact">
     <h1 class="sr-only">Công việc</h1>
-    <div class="page-actions">
+    <div v-if="canCreate" class="page-actions">
       <button class="button" @click="showCreate = true">
         <Plus :size="18" />Giao việc
       </button>
@@ -168,7 +178,7 @@ function closeCreate() {
           <option value="draft">Bản nháp</option>
           <option value="cancelled">Đã hủy</option>
         </select>
-        <label class="checkbox-label" style="margin: 0"
+        <label class="checkbox-label tasks-overdue-toggle"
           ><input v-model="overdueOnly" type="checkbox" />Quá hạn</label
         >
         <label class="search-box"
@@ -209,15 +219,23 @@ function closeCreate() {
       :error="tasks.error.value"
       :empty="items.length === 0"
       :title="
-        scope === 'mine'
-          ? 'Bạn chưa có việc được giao'
-          : scope === 'review'
-            ? 'Không có kết quả nào chờ bạn nghiệm thu'
-            : 'Chưa có công việc phù hợp'
+        filtered
+          ? 'Không có công việc khớp bộ lọc'
+          : scope === 'mine'
+            ? 'Bạn chưa có việc được giao'
+            : scope === 'review'
+              ? 'Không có kết quả nào chờ bạn nghiệm thu'
+              : 'Chưa có công việc phù hợp'
       "
-      description="Công việc được giao cho bạn hoặc đơn vị bạn điều phối sẽ xuất hiện tại đây."
+      :description="
+        filtered
+          ? 'Thử bỏ bớt bộ lọc trạng thái, quá hạn hoặc từ khóa tìm kiếm.'
+          : 'Công việc được giao cho bạn hoặc đơn vị bạn điều phối sẽ xuất hiện tại đây.'
+      "
       @retry="tasks.refetch()"
-      ><button class="button small" @click="showCreate = true">
+      ><button v-if="filtered" class="button small secondary" @click="clearFilters">
+        Xóa bộ lọc</button
+      ><button v-else-if="canCreate" class="button small" @click="showCreate = true">
         <Plus :size="16" />Giao việc
       </button></StatePanel
     >
@@ -238,7 +256,7 @@ function closeCreate() {
               <div class="primary-cell">
                 <span class="file-icon"><ListChecks :size="19" /></span>
                 <div>
-                  <RouterLink :to="`/tasks/${task.id}`" class="row-link">{{
+                  <RouterLink :to="`/tasks/${task.id}`" class="row-link task-title" :title="task.title">{{
                     task.title
                   }}</RouterLink
                   ><small
@@ -256,9 +274,9 @@ function closeCreate() {
                 >(chờ phân công)</small
               >
             </td>
-            <td :class="task.overdue ? 'overdue-text' : 'muted'">
+            <td class="nowrap" :class="task.overdue ? 'overdue-text' : 'muted'">
               <AlarmClock v-if="task.overdue" :size="14" />
-              {{ formatDate(task.due_at, true) }}
+              {{ task.due_at ? formatDate(task.due_at, true) : '—' }}
             </td>
             <td>
               <span class="priority" :class="`priority-${task.priority}`">{{
@@ -284,7 +302,7 @@ function closeCreate() {
           class="kanban-card"
           :class="{ overdue: task.overdue }"
         >
-          <strong>{{ task.title }}</strong>
+          <strong class="kanban-title" :title="task.title">{{ task.title }}</strong>
           <small>{{ task.assignee_name || task.department_name || 'Chưa giao' }}</small>
           <div class="kanban-meta">
             <span class="priority" :class="`priority-${task.priority}`">{{
@@ -306,11 +324,10 @@ function closeCreate() {
           v-for="task in group.tasks"
           :key="task.id"
           :to="`/tasks/${task.id}`"
-          class="list-row"
-          style="color: inherit; text-decoration: none"
+          class="list-row plain-link"
         >
           <div class="grow">
-            <p>{{ task.title }}</p>
+            <p class="ellipsis" :title="task.title">{{ task.title }}</p>
             <small
               >{{ task.assignee_name || task.department_name || 'Chưa giao' }} ·
               {{ formatDate(task.due_at, true) }}</small
@@ -332,5 +349,40 @@ function closeCreate() {
       </button>
     </div>
   </section>
-  <TaskCreateDialog v-if="showCreate" @close="closeCreate" @created="created" />
+  <TaskCreateDialog v-if="showCreate && canCreate" @close="closeCreate" @created="created" />
 </template>
+<style scoped>
+.tasks-overdue-toggle {
+  margin: 0;
+  min-height: 36px;
+  gap: 8px;
+}
+.task-title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.kanban-title {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.nowrap {
+  white-space: nowrap;
+}
+.plain-link {
+  color: inherit;
+  text-decoration: none;
+}
+.ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+</style>

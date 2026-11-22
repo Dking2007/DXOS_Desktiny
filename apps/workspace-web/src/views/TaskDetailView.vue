@@ -35,6 +35,9 @@ import PluginFrames from '../components/plugins/PluginFrames.vue'
 import PluginActions from '../components/plugins/PluginActions.vue'
 import TaskFiles from '../components/TaskFiles.vue'
 import { TASK_STAGES, dueText, nextStep, taskStage } from '../ui/taskGuide'
+import { initialsOf } from '../ui/people'
+import { confirmDiscard } from '../ui/unsaved'
+import { reasonMissing } from '../components/workForms'
 const route = useRoute()
 const router = useRouter()
 const queryClient = useQueryClient()
@@ -46,6 +49,8 @@ const detail = useQuery({
 })
 const task = computed(() => detail.data.value)
 const busy = ref(false)
+/** Which button started the request in flight, so only that one says "Đang …". */
+const running = ref<string>('')
 const error = ref<unknown>(null)
 const pending = ref<TaskAction | null>(null)
 const reason = ref('')
@@ -85,6 +90,8 @@ const transitions = computed(
     >[],
 )
 const canManage = computed(() => task.value?.actions.includes('assign') ?? false)
+const closed = computed(() => ['completed', 'cancelled'].includes(task.value?.status ?? ''))
+const canCreate = computed(() => session.can('tasks.create'))
 // The step that moves the work forward comes first; talking about it and the rest follow.
 const primaryActions = computed(() => transitions.value.filter((action) => !actionMeta[action].tone))
 const otherActions = computed(() =>
@@ -133,8 +140,10 @@ const eventLabels: Record<string, string> = {
   automation_detached: 'Gỡ luồng tự động',
   updated: 'Cập nhật',
 }
-async function run(work: () => Promise<unknown>) {
+async function run(work: () => Promise<unknown>, label = '') {
+  if (busy.value) return false
   busy.value = true
+  running.value = label
   error.value = null
   try {
     await work()
@@ -146,10 +155,14 @@ async function run(work: () => Promise<unknown>) {
     return false
   } finally {
     busy.value = false
+    running.value = ''
   }
 }
+// Steps that only move the work along run at once; handing in, signing off, sending back,
+// reporting a problem and cancelling are confirmed in a dialog first.
+const IMMEDIATE: TaskAction[] = ['accept', 'start', 'unblock']
 function ask(action: TaskAction) {
-  if (action !== 'assign' && !actionMeta[action].needsReason && action !== 'submit') {
+  if (IMMEDIATE.includes(action)) {
     void transition(action)
     return
   }
@@ -169,8 +182,44 @@ const DONE: Record<Exclude<TaskAction, 'assign'>, string> = {
   unblock: 'Việc được tiếp tục',
   cancel: 'Đã hủy việc',
 }
+const pendingDirty = computed(
+  () =>
+    !!reason.value.trim() ||
+    !!assignTarget.value ||
+    (pending.value === 'submit' && result.value !== (task.value?.result ?? '')),
+)
+function closePending() {
+  if (!busy.value && confirmDiscard(pendingDirty.value)) pending.value = null
+}
+/** Why the dialog's confirm button cannot go through yet, checked before the server says so. */
+const pendingBlocked = computed(() => {
+  const value = task.value
+  const action = pending.value
+  if (!value || !action) return ''
+  if (action === 'assign') return assignTarget.value ? '' : 'Chọn người hoặc đơn vị nhận.'
+  if (reasonMissing(!!actionMeta[action].needsReason, reason.value)) return 'Nêu lý do trước khi xác nhận.'
+  if (action === 'submit' && value.checklist_done < value.checklist_total)
+    return 'Hoàn thành checklist trước khi nộp kết quả.'
+  const required = (value as { required_file_count?: number }).required_file_count ?? 0
+  if (action === 'submit' && value.files.length < required)
+    return `Cần đính kèm ít nhất ${required} tệp kết quả trước khi nộp.`
+  if (action === 'complete' && value.subtasks.some((child) => !['completed', 'cancelled'].includes(child.status)))
+    return 'Còn việc con chưa hoàn tất hoặc hủy.'
+  return ''
+})
+const CONFIRM_TEXT: Record<Exclude<TaskAction, 'assign'>, string> = {
+  accept: 'Tiếp nhận',
+  start: 'Bắt đầu',
+  submit: 'Nộp kết quả',
+  complete: 'Xác nhận nghiệm thu',
+  return: 'Trả lại',
+  block: 'Báo vướng mắc',
+  unblock: 'Tiếp tục',
+  cancel: 'Hủy việc',
+}
 async function transition(action: TaskAction) {
   if (!task.value) return
+  if (pending.value && pendingBlocked.value) return
   const ok = await run(() =>
     api.request(`/tasks/${id}/transitions`, {
       method: 'POST',
@@ -181,6 +230,7 @@ async function transition(action: TaskAction) {
         result: action === 'submit' ? result.value : null,
       }),
     }),
+    action,
   )
   if (ok) {
     pending.value = null
@@ -188,7 +238,7 @@ async function transition(action: TaskAction) {
   }
 }
 async function assign() {
-  if (!task.value || !assignTarget.value) return
+  if (!task.value || pendingBlocked.value) return
   const [kind, target] = assignTarget.value.split(':')
   const ok = await run(() =>
     api.request(`/tasks/${id}/assign`, {
@@ -200,6 +250,7 @@ async function assign() {
         reason: reason.value,
       }),
     }),
+    'assign',
   )
   if (ok) {
     pending.value = null
@@ -211,15 +262,23 @@ async function toggle(index: number) {
   const checklist = task.value.checklist.map((item, i) =>
     i === index ? { ...item, done: !item.done } : item,
   )
-  await run(() =>
-    api.request(`/tasks/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ expected_revision: task.value!.revision, checklist }),
-    }),
+  await run(
+    () =>
+      api.request(`/tasks/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ expected_revision: task.value!.revision, checklist }),
+      }),
+    'checklist',
   )
 }
+const dueBlocked = computed(() =>
+  dueEdit.value && reasonMissing(true, dueEdit.value.reason) ? 'Nêu lý do đổi hạn.' : '',
+)
+function closeDue() {
+  if (!busy.value && confirmDiscard(!!dueEdit.value?.reason.trim())) dueEdit.value = null
+}
 async function changeDue() {
-  if (!task.value || !dueEdit.value) return
+  if (!task.value || !dueEdit.value || dueBlocked.value) return
   const ok = await run(() =>
     api.request(`/tasks/${id}`, {
       method: 'PATCH',
@@ -229,6 +288,7 @@ async function changeDue() {
         due_reason: dueEdit.value!.reason,
       }),
     }),
+    'due',
   )
   if (ok) {
     dueEdit.value = null
@@ -237,11 +297,13 @@ async function changeDue() {
 }
 async function addComment() {
   if (!comment.value.trim()) return
-  const ok = await run(() =>
-    api.request(`/tasks/${id}/comments`, {
-      method: 'POST',
-      body: JSON.stringify({ body: comment.value }),
-    }),
+  const ok = await run(
+    () =>
+      api.request(`/tasks/${id}/comments`, {
+        method: 'POST',
+        body: JSON.stringify({ body: comment.value }),
+      }),
+    'comment',
   )
   if (ok) comment.value = ''
 }
@@ -252,7 +314,7 @@ async function discuss() {
       body: JSON.stringify({ kind: 'task', ref_id: id }),
     })
     await router.push(`/chat?c=${conversation.id}`)
-  })
+  }, 'discuss')
 }
 function localInput(value: string | null) {
   if (!value) return ''
@@ -262,13 +324,14 @@ function localInput(value: string | null) {
 </script>
 <template>
   <div class="breadcrumb">
-    <RouterLink to="/tasks"
-      ><ArrowLeft :size="14" style="vertical-align: middle; margin-right: 5px" />Công
-      việc</RouterLink
-    ><span>/</span
+    <RouterLink to="/tasks" class="crumb-back"
+      ><ArrowLeft :size="14" aria-hidden="true" />Công việc</RouterLink
+    ><span aria-hidden="true">/</span
     ><template v-if="task?.parent"
-      ><RouterLink :to="`/tasks/${task.parent.id}`">{{ task.parent.title }}</RouterLink
-      ><span>/</span></template
+      ><RouterLink :to="`/tasks/${task.parent.id}`" class="crumb-title" :title="task.parent.title">{{
+        task.parent.title
+      }}</RouterLink
+      ><span aria-hidden="true">/</span></template
     ><span>Chi tiết</span>
   </div>
   <StatePanel
@@ -280,14 +343,14 @@ function localInput(value: string | null) {
   <template v-if="task">
     <header class="page-head">
       <div>
-        <h1>{{ task.title }}</h1>
-        <div class="inline-actions" style="margin-top: 12px">
+        <h1 class="task-heading">{{ task.title }}</h1>
+        <div class="inline-actions task-badges">
           <StatusBadge kind="task" :status="task.status" /><span
             class="priority"
             :class="`priority-${task.priority}`"
             >{{ priorityLabel[task.priority] }}</span
-          ><span v-if="due" :class="task.overdue ? 'overdue-text' : 'muted'"
-            ><AlarmClock :size="14" /> {{ due }}</span
+          ><span v-if="due" class="task-due" :class="task.overdue ? 'overdue-text' : 'muted'"
+            ><AlarmClock :size="14" aria-hidden="true" />{{ due }}</span
           >
         </div>
       </div>
@@ -300,7 +363,9 @@ function localInput(value: string | null) {
           :disabled="busy"
           @click="ask(action)"
         >
-          <component :is="actionMeta[action].icon" :size="16" />{{ actionMeta[action].label }}
+          <component :is="actionMeta[action].icon" :size="16" />{{
+            running === action && !pending ? 'Đang xử lý…' : actionMeta[action].label
+          }}
         </button>
         <button
           v-for="action in otherActions"
@@ -310,13 +375,15 @@ function localInput(value: string | null) {
           :disabled="busy"
           @click="ask(action)"
         >
-          <component :is="actionMeta[action].icon" :size="16" />{{ actionMeta[action].label }}
+          <component :is="actionMeta[action].icon" :size="16" />{{
+            running === action && !pending ? 'Đang xử lý…' : actionMeta[action].label
+          }}
         </button>
-        <button v-if="canManage" class="button secondary" @click="ask('assign')">
+        <button v-if="canManage" class="button secondary" :disabled="busy" @click="ask('assign')">
           <UserRoundPlus :size="16" />Giao lại
         </button>
         <button class="button secondary" :disabled="busy" @click="discuss">
-          <MessagesSquare :size="16" />Trao đổi
+          <MessagesSquare :size="16" />{{ running === 'discuss' ? 'Đang mở…' : 'Trao đổi' }}
         </button>
         <button
           v-for="action in dangerActions"
@@ -354,8 +421,9 @@ function localInput(value: string | null) {
           <dd :class="{ 'overdue-text': task.overdue }">
             {{ task.due_at ? formatDate(task.due_at, true) : 'Không đặt hạn' }}
             <button
-              v-if="canManage && !['completed', 'cancelled'].includes(task.status)"
-              class="button ghost small"
+              v-if="canManage && !closed"
+              class="button ghost small due-change"
+              :disabled="busy"
               @click="dueEdit = { value: localInput(task.due_at), reason: '' }"
             >
               <CalendarClock :size="14" />Đổi hạn
@@ -373,8 +441,7 @@ function localInput(value: string | null) {
         {{ errorText(error)
         }}<button
           v-if="error instanceof ApiError && error.status === 409"
-          class="button secondary small"
-          style="margin-left: 10px"
+          class="button secondary small notice-action"
           @click="detail.refetch()"
         >
           Tải bản mới
@@ -423,7 +490,7 @@ function localInput(value: string | null) {
           :task-id="task.id"
           :files="task.files"
           :revision="task.revision"
-          :closed="['completed', 'cancelled'].includes(task.status)"
+          :closed="closed"
           :can-manage="canManage"
           :is-assignee="task.assignee_id === session.user?.id"
           @changed="detail.refetch()"
@@ -431,19 +498,15 @@ function localInput(value: string | null) {
         <section class="card">
           <header class="card-header">
             <h2>Việc con</h2>
-            <button
-              v-if="!['completed', 'cancelled'].includes(task.status)"
-              class="button ghost small"
-              @click="showSubtask = true"
-            >
+            <button v-if="!closed && canCreate" class="button ghost small" @click="showSubtask = true">
               <Plus :size="15" />Thêm việc con
             </button>
           </header>
-          <p v-if="!task.subtasks.length" class="step-empty" style="padding: 18px 23px">
+          <p v-if="!task.subtasks.length" class="step-empty card-pad">
             Chưa có việc con. Việc cha chỉ nghiệm thu khi mọi việc con đã xong hoặc hủy.
           </p>
           <TaskBreakdown
-            v-if="ai.on('task_breakdown') && !['completed', 'cancelled'].includes(task.status)"
+            v-if="ai.on('task_breakdown') && !closed && canCreate"
             :task-id="task.id"
             :case-id="task.case_id"
             @created="detail.refetch()"
@@ -452,11 +515,10 @@ function localInput(value: string | null) {
             v-for="child in task.subtasks"
             :key="child.id"
             :to="`/tasks/${child.id}`"
-            class="list-row"
-            style="color: inherit; text-decoration: none"
+            class="list-row plain-link"
           >
             <div class="grow">
-              <p>{{ child.title }}</p>
+              <p class="ellipsis" :title="child.title">{{ child.title }}</p>
               <small>{{ child.assignee_name || 'Chưa giao' }}</small>
             </div>
             <StatusBadge kind="task" :status="child.status" />
@@ -467,13 +529,15 @@ function localInput(value: string | null) {
           <div class="card-body stack">
             <p v-if="!task.comments.length" class="muted">Chưa có bình luận.</p>
             <div v-for="item in task.comments" :key="item.id" class="comment">
-              <span class="avatar">{{ item.author_name.split(' ').slice(-1)[0]?.[0] }}</span>
-              <div>
-                <strong>{{ item.author_name }}</strong>
-                <small class="muted"
-                  ><template v-if="item.via"> qua plugin {{ item.via }}</template> ·
-                  {{ formatDate(item.created_at, true) }}</small
-                >
+              <span class="avatar" aria-hidden="true">{{ initialsOf(item.author_name) }}</span>
+              <div class="comment-body">
+                <div class="comment-meta">
+                  <strong>{{ item.author_name }}</strong>
+                  <small class="muted"
+                    ><template v-if="item.via">qua plugin {{ item.via }} · </template
+                    >{{ formatDate(item.created_at, true) }}</small
+                  >
+                </div>
                 <p class="prewrap">{{ item.body }}</p>
               </div>
             </div>
@@ -481,14 +545,19 @@ function localInput(value: string | null) {
               <textarea
                 v-model="comment"
                 rows="2"
-                placeholder="Viết bình luận…"
+                maxlength="5000"
+                placeholder="Viết bình luận… (Ctrl + Enter để gửi)"
                 aria-label="Bình luận"
-              /><button class="button" :disabled="busy || !comment.trim()">Gửi</button>
+                @keydown.ctrl.enter.prevent="addComment"
+                @keydown.meta.enter.prevent="addComment"
+              /><button class="button" :disabled="busy || !comment.trim()">
+                <Send :size="15" />{{ running === 'comment' ? 'Đang gửi…' : 'Gửi' }}
+              </button>
             </form>
           </div>
         </section>
       </div>
-      <aside class="stack" style="align-content: start">
+      <aside class="stack task-aside">
         <section class="card">
           <header class="card-header"><h3>Chi tiết</h3></header>
           <dl class="card-body detail-meta">
@@ -520,7 +589,7 @@ function localInput(value: string | null) {
             <div><dt>Tạo lúc</dt><dd>{{ formatDate(task.created_at, true) }}</dd></div>
           </dl>
         </section>
-        <TaskAutomations :task-id="task.id" :closed="['completed', 'cancelled'].includes(task.status)" />
+        <TaskAutomations :task-id="task.id" :closed="closed" />
         <PluginFrames place="task.side" :context="{ task_id: task.id }" />
         <section class="card">
           <header class="card-header"><h3>Hoạt động</h3></header>
@@ -543,7 +612,7 @@ function localInput(value: string | null) {
     <ModalDialog
       v-if="pending"
       :title="pending === 'assign' ? 'Giao lại công việc' : actionMeta[pending].label"
-      @close="pending = null"
+      @close="closePending"
     >
       <div v-if="error" class="notice error error-inline" role="alert">
         {{ errorText(error) }}
@@ -575,49 +644,68 @@ function localInput(value: string | null) {
         </div>
         <div v-if="pending === 'submit'" class="field">
           <label for="task-result">Kết quả thực hiện</label
-          ><textarea id="task-result" v-model="result" rows="4" />
+          ><textarea id="task-result" v-model="result" rows="4" maxlength="5000" :disabled="busy" />
           <small v-if="task.checklist_done < task.checklist_total" class="field-error"
-            >Còn {{ task.checklist_total - task.checklist_done }} mục checklist chưa xong.</small
+            >Còn {{ task.checklist_total - task.checklist_done }} mục checklist chưa xong. Đánh dấu
+            xong trước khi nộp.</small
           >
         </div>
+        <p v-if="pending === 'complete'" class="muted">
+          Nghiệm thu sẽ đóng công việc và báo cho người thực hiện. Sau khi hoàn tất không sửa được
+          checklist, tài liệu hay hạn nữa.
+        </p>
+        <p v-else-if="pending === 'cancel'" class="muted">
+          Hủy việc sẽ dừng mọi xử lý và báo cho người thực hiện. Lịch sử vẫn được giữ lại.
+        </p>
         <div class="field">
           <label for="task-reason"
-            >Lý do<span
-              v-if="pending !== 'assign' && pending !== 'submit' && actionMeta[pending].needsReason"
-              class="required"
-            >
+            >{{
+              pending !== 'assign' && actionMeta[pending].needsReason ? 'Lý do' : 'Ghi chú (không bắt buộc)'
+            }}<span v-if="pending !== 'assign' && actionMeta[pending].needsReason" class="required">
               *</span
             ></label
           ><textarea
             id="task-reason"
             v-model="reason"
             rows="3"
-            :required="pending !== 'assign' && pending !== 'submit' && actionMeta[pending].needsReason"
+            maxlength="2000"
+            :disabled="busy"
+            :required="pending !== 'assign' && actionMeta[pending].needsReason"
           />
         </div>
         <div class="form-actions">
-          <button type="button" class="button secondary" @click="pending = null">Hủy</button
-          ><button class="button" :disabled="busy">Xác nhận</button>
+          <button type="button" class="button secondary" :disabled="busy" @click="closePending">Hủy</button
+          ><button
+            class="button"
+            :class="{ danger: pending === 'cancel' }"
+            :disabled="busy || !!pendingBlocked"
+            :title="pendingBlocked"
+          >
+            {{ busy ? 'Đang ghi nhận…' : pending === 'assign' ? 'Giao lại' : CONFIRM_TEXT[pending] }}
+          </button>
         </div>
       </form>
     </ModalDialog>
-    <ModalDialog v-if="dueEdit" title="Đổi hạn hoàn thành" @close="dueEdit = null">
+    <ModalDialog v-if="dueEdit" title="Đổi hạn hoàn thành" @close="closeDue">
       <div v-if="error" class="notice error error-inline" role="alert">
         {{ errorText(error) }}
       </div>
       <form class="stack" @submit.prevent="changeDue">
         <div class="field">
           <label for="due-new">Hạn mới</label
-          ><input id="due-new" v-model="dueEdit.value" type="datetime-local" />
+          ><input id="due-new" v-model="dueEdit.value" type="datetime-local" :disabled="busy" />
+          <small>Để trống nếu việc không còn hạn.</small>
         </div>
         <div class="field">
           <label for="due-reason">Lý do đổi hạn<span class="required"> *</span></label
-          ><textarea id="due-reason" v-model="dueEdit.reason" rows="3" required />
+          ><textarea id="due-reason" v-model="dueEdit.reason" rows="3" maxlength="2000" required :disabled="busy" />
           <small>Hạn cũ, hạn mới và người thay đổi được lưu vào lịch sử.</small>
         </div>
         <div class="form-actions">
-          <button type="button" class="button secondary" @click="dueEdit = null">Hủy</button
-          ><button class="button" :disabled="busy">Lưu</button>
+          <button type="button" class="button secondary" :disabled="busy" @click="closeDue">Hủy</button
+          ><button class="button" :disabled="busy || !!dueBlocked" :title="dueBlocked">
+            {{ busy ? 'Đang lưu…' : 'Lưu hạn mới' }}
+          </button>
         </div>
       </form>
     </ModalDialog>
@@ -636,3 +724,71 @@ function localInput(value: string | null) {
     />
   </template>
 </template>
+<style scoped>
+.crumb-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.crumb-title {
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.task-heading {
+  overflow-wrap: anywhere;
+}
+.task-badges {
+  margin-top: 12px;
+}
+.task-due {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.due-change {
+  margin-left: 8px;
+}
+.notice-action {
+  margin-left: 12px;
+}
+.card-pad {
+  padding: 18px 23px;
+}
+.plain-link {
+  color: inherit;
+  text-decoration: none;
+}
+.ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.task-aside {
+  align-content: start;
+}
+.comment-body {
+  min-width: 0;
+  flex: 1;
+}
+.comment-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+}
+.comment-form textarea {
+  flex: 1;
+  min-width: 0;
+}
+@media (max-width: 640px) {
+  .comment-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .crumb-title {
+    max-width: 180px;
+  }
+}
+</style>

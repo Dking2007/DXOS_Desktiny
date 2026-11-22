@@ -38,7 +38,7 @@ function confirm() {
 </script>
 <template>
   <ModalDialog title="Chọn từ kho tài liệu" @close="emit('close')">
-    <form class="search-box" style="margin-bottom: 12px" @submit.prevent="query = search.trim()">
+    <form class="search-box picker-search" role="search" @submit.prevent="query = search.trim()">
       <Search :size="16" /><input
         v-model="search"
         type="search"
@@ -55,18 +55,54 @@ function confirm() {
       :description="query ? '' : 'Gõ tên để tìm trong mọi thư mục bạn được xem.'"
       @retry="files.refetch()"
     />
-    <label v-for="file in items" :key="file.id" class="list-row" style="cursor: pointer">
-      <input type="checkbox" :checked="chosen.includes(file.id)" @change="toggle(file.id)" />
-      <FileText :size="16" />
-      <span class="grow"
-        >{{ file.name }}<small class="muted"> · {{ formatSize(file.size ?? 0) }} · {{ formatDate(file.created_at) }}</small></span
-      >
-    </label>
+    <div v-if="items.length" class="picker-list">
+      <label v-for="file in items" :key="file.id" class="list-row picker-row">
+        <input type="checkbox" :checked="chosen.includes(file.id)" @change="toggle(file.id)" />
+        <FileText :size="16" aria-hidden="true" class="picker-icon" />
+        <span class="grow"
+          ><span class="picker-name" :title="file.name">{{ file.name }}</span
+          ><small class="muted">{{ formatSize(file.size ?? 0) }} · {{ formatDate(file.created_at) }}</small></span
+        >
+      </label>
+    </div>
     <div class="form-actions">
       <button type="button" class="button secondary" @click="emit('close')">Hủy</button>
-      <button type="button" class="button" :disabled="!chosen.length" @click="confirm">
-        Đính kèm {{ chosen.length || '' }} tệp
+      <button
+        type="button"
+        class="button"
+        :disabled="!chosen.length"
+        :title="chosen.length ? '' : 'Chọn ít nhất một tệp.'"
+        @click="confirm"
+      >
+        {{ chosen.length ? `Đính kèm ${chosen.length} tệp` : 'Đính kèm tệp' }}
       </button>
     </div>
   </ModalDialog>
 </template>
+<style scoped>
+.picker-search {
+  margin-bottom: 12px;
+}
+.picker-list {
+  max-height: min(50dvh, 420px);
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.picker-row {
+  cursor: pointer;
+  padding: 12px 16px;
+  gap: 12px;
+}
+.picker-icon {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+.picker-name {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+</style>

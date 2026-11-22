@@ -30,7 +30,7 @@ const maxWait = computed(() =>
 )
 </script>
 <template>
-  <section class="card" style="margin-top: 20px">
+  <section class="card wait-card">
     <header class="card-header">
       <div><span class="eyebrow">CẢI TIẾN QUY TRÌNH</span><h2>Hồ sơ đang chờ lâu ở bước nào?</h2></div>
     </header>
@@ -39,7 +39,7 @@ const maxWait = computed(() =>
         :empty="metrics.data.value?.sample_size === 0" compact title="Chưa đủ hồ sơ để tính thời gian chờ"
         @retry="metrics.refetch()" />
       <template v-if="metrics.data.value?.sample_size">
-        <p class="muted" style="font-size: 14px">Tính trên {{ metrics.data.value.sample_size }} lượt duyệt · {{ metrics.data.value.overdue_cases }} hồ sơ quá hạn · {{ metrics.data.value.returns }} lần trả lại<span v-if="metrics.data.value.truncated"> · chỉ lấy 2.000 lượt gần nhất</span></p>
+        <p class="muted wait-intro">Tính trên {{ metrics.data.value.sample_size }} lượt duyệt · {{ metrics.data.value.overdue_cases }} hồ sơ quá hạn · {{ metrics.data.value.returns }} lần trả lại<span v-if="metrics.data.value.truncated"> · chỉ lấy 2.000 lượt gần nhất</span></p>
         <div v-for="step in metrics.data.value.steps" :key="`${step.package_version_id}:${step.step}`" class="metric-row">
           <div><strong>{{ step.step }}</strong><small>{{ step.count }} lượt · {{ step.waiting }} đang chờ<span v-if="step.overdue" class="overdue-text"> · {{ step.overdue }} quá hạn</span></small>
             <div v-if="step.case_ids.length" class="metric-cases"><RouterLink v-for="(caseId, n) in step.case_ids" :key="caseId" :to="`/cases/${caseId}`">Hồ sơ {{ n + 1 }}</RouterLink></div>
@@ -49,7 +49,7 @@ const maxWait = computed(() =>
             <span class="metric-bar-label">Chờ trung bình {{ step.average_wait_hours === null ? 'chưa có' : `${step.average_wait_hours} giờ` }}</span>
           </div>
         </div>
-        <div v-if="metrics.data.value.suggestions.length" class="notice" style="margin-top: 18px">
+        <div v-if="metrics.data.value.suggestions.length" class="notice wait-suggestions">
           <strong>Điểm cần kiểm tra</strong>
           <p v-for="suggestion in metrics.data.value.suggestions" :key="`${suggestion.kind}:${suggestion.step}`">{{ suggestion.step ? `${suggestion.step}: ` : '' }}{{ suggestion.message }}</p>
         </div>
@@ -57,3 +57,17 @@ const maxWait = computed(() =>
     </div>
   </section>
 </template>
+<style scoped>
+.wait-card {
+  margin-top: 24px;
+}
+.wait-intro {
+  font-size: 0.875rem;
+  margin-bottom: 12px;
+}
+.wait-suggestions {
+  margin-top: 20px;
+  flex-direction: column;
+  gap: 6px;
+}
+</style>
