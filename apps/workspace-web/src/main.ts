@@ -5,7 +5,8 @@ import { createPinia } from 'pinia'
 import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query'
 import App from './App.vue'
 import { router } from './router'
-import { applyTheme } from './ui/theme'
+import { setDateFormatter } from '@dx/web-shared/api.ts'
+import { formatDate, formatDateTime, startPreferences } from './ui/preferences'
 import { loadAppearance } from './ui/appearance'
 import '@dx/web-shared/style.css'
 import './style.css'
@@ -14,7 +15,10 @@ import './shell.css'
 import './ai/ai.css'
 import './refine.css'
 
-applyTheme()
+// Personal settings (theme, text size, motion…) go on <html> before anything renders.
+startPreferences()
+// Every list's dates follow the person's date/time format (reactive: they read the live settings).
+setDateFormatter((value, withTime) => (withTime ? formatDateTime(value, undefined, value) : formatDate(value, undefined, value)))
 const app = createApp(App)
 app.use(createPinia())
 app.use(VueQueryPlugin, {

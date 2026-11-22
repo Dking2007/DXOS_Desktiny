@@ -73,6 +73,7 @@ function update(field: FormField, event: Event) {
           :disabled="disabled"
           :required="field.required"
           :aria-invalid="!!errors?.[field.key]"
+          :aria-describedby="errors?.[field.key] ? `error-${field.key}` : undefined"
           @change="update(field, $event)"
         >
           <option value="">Chọn {{ field.label.toLowerCase() }}</option>
@@ -106,6 +107,7 @@ function update(field: FormField, event: Event) {
           :required="field.required"
           :step="field.type === 'number' ? 'any' : undefined"
           :aria-invalid="!!errors?.[field.key]"
+          :aria-describedby="errors?.[field.key] ? `error-${field.key}` : undefined"
           @input="update(field, $event)"
         />
         <small

@@ -30,7 +30,7 @@
   min-height: 40px;
   cursor: pointer;
   font: inherit;
-  font-size: 15px;
+  font-size: 0.9375rem;
   text-align: left;
 }
 .topbar-search span {
@@ -45,7 +45,7 @@
 }
 kbd {
   font-family: ui-monospace, monospace;
-  font-size: 12px;
+  font-size: 0.75rem;
   padding: 2px 6px;
   border-radius: 5px;
   border: 1px solid var(--border);
@@ -75,7 +75,7 @@ kbd {
   padding: 4px 2px;
   color: var(--teal-ink);
   font-weight: 600;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .link-button:hover {
   text-decoration: underline;
@@ -96,9 +96,10 @@ kbd {
 .create-dropdown button {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   width: 100%;
-  padding: 9px 10px;
+  min-height: 52px;
+  padding: var(--space-2) 10px;
   border: 0;
   border-radius: 10px;
   background: none;
@@ -111,14 +112,18 @@ kbd {
 }
 .create-dropdown strong {
   display: block;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 600;
 }
 .create-dropdown small {
   display: block;
-  font-size: 13px;
+  font-size: 0.8125rem;
+  line-height: 1.4;
   color: var(--muted);
-  margin-top: 1px;
+  margin-top: 2px;
+}
+.dropdown-text {
+  min-width: 0;
 }
 .dropdown-icon {
   flex: none;
@@ -127,8 +132,8 @@ kbd {
   width: 34px;
   height: 34px;
   border-radius: 10px;
-  background: var(--teal-soft);
-  color: var(--teal-ink);
+  background: color-mix(in srgb, var(--tone, var(--teal-ink)) var(--tone-tint, 12%), var(--surface));
+  color: var(--tone, var(--teal-ink));
 }
 
 /* ---- Notifications ---- */
@@ -147,7 +152,7 @@ kbd {
   border: 2px solid var(--surface);
   background: var(--red);
   color: #fff;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 700;
   font-style: normal;
   line-height: 13px;
@@ -165,14 +170,15 @@ kbd {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--space-3);
   padding: 14px 16px 8px;
 }
 .notification-panel-head strong {
-  font-size: 16px;
+  font-size: 1rem;
 }
 .chip-row {
   display: flex;
-  gap: 6px;
+  gap: var(--space-2);
   padding: 0 16px 12px;
   overflow-x: auto;
   border-bottom: 1px solid var(--border);
@@ -184,7 +190,7 @@ kbd {
   color: var(--ink-2);
   border-radius: 999px;
   padding: 4px 11px;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .chip:hover {
   border-color: var(--border-strong);
@@ -202,7 +208,7 @@ kbd {
 .notification-group {
   margin: 0;
   padding: 12px 16px 4px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   color: var(--muted);
 }
@@ -225,32 +231,30 @@ kbd {
   width: 30px;
   height: 30px;
   border-radius: 9px;
-  background: var(--surface-3);
-  color: var(--ink-2);
-}
-.notification-icon.approval {
-  background: var(--violet-soft);
-  color: var(--violet-ink);
-}
-.notification-icon.task {
-  background: var(--teal-soft);
-  color: var(--teal-ink);
-}
-.notification-icon.mention {
-  background: var(--amber-soft);
-  color: var(--amber-ink);
-}
-.notification-icon.feed {
-  background: var(--green-soft);
-  color: var(--green-ink);
+  background: color-mix(in srgb, var(--tone, var(--muted)) var(--tone-tint, 12%), var(--surface));
+  color: var(--tone, var(--ink-2));
 }
 .notification-panel .notification-open strong {
   display: block;
-  font-size: 15px;
+  font-size: 0.9375rem;
   line-height: 1.35;
 }
 .notification-panel .notification-item:not(.unread) .notification-open strong {
   font-weight: 500;
+}
+.notification-open {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.notification-body {
+  display: block;
+  margin: var(--space-1) 0;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.notification-open small {
+  display: block;
 }
 
 /* ---- Skeletons and states ---- */
@@ -320,7 +324,7 @@ kbd {
 .field-error {
   display: block;
   margin-top: 6px;
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--red-ink);
 }
 
@@ -359,7 +363,7 @@ kbd {
   border: 0;
   padding: 0;
   background: transparent;
-  font-size: 16px;
+  font-size: 1rem;
   color: var(--navy);
   box-shadow: none;
   outline: none;
@@ -371,7 +375,7 @@ kbd {
 }
 .palette-section {
   padding: 10px 10px 4px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   color: var(--muted);
 }
@@ -394,6 +398,9 @@ kbd {
 .palette-option.active {
   background: var(--teal-soft);
 }
+.palette-option.active .tone-tile {
+  background: color-mix(in srgb, var(--tone, var(--muted)) calc(var(--tone-tint) + 8%), var(--surface));
+}
 .palette-option.active > svg:first-child {
   color: var(--teal-ink);
 }
@@ -410,10 +417,10 @@ kbd {
 }
 .palette-text strong {
   font-weight: 500;
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 .palette-text small {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--muted);
 }
 .palette-enter {
@@ -422,14 +429,14 @@ kbd {
 .palette-empty {
   padding: 18px 12px;
   color: var(--muted);
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 .palette-foot {
   display: flex;
   gap: 16px;
   padding: 9px 16px;
   border-top: 1px solid var(--border);
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--muted);
 }
 .palette-foot kbd {
@@ -456,7 +463,7 @@ kbd {
   border-radius: 12px;
   background: #13283b;
   color: #eef4f8;
-  font-size: 15px;
+  font-size: 0.9375rem;
   line-height: 1.4;
   box-shadow: 0 14px 40px #0b1e3047;
   border-left: 4px solid #4cc3cc;
@@ -484,7 +491,7 @@ kbd {
   background: none;
   color: #6fd3dc;
   font-weight: 700;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .toast-close {
   display: grid;
@@ -549,12 +556,12 @@ kbd {
   transform: translate(-50%, -50%);
 }
 .tour-card h2 {
-  font-size: 19px;
+  font-size: 1.1875rem;
   margin: 2px 0 8px;
 }
 .tour-card p {
   color: var(--ink-2);
-  font-size: 15px;
+  font-size: 0.9375rem;
   line-height: 1.6;
 }
 .tour-card footer {
@@ -615,7 +622,7 @@ kbd {
     border-radius: 10px;
     background: none;
     color: var(--muted);
-    font-size: 12px;
+    font-size: 0.75rem;
     font-weight: 600;
     text-decoration: none;
   }
@@ -630,7 +637,7 @@ kbd {
     margin: 0;
     min-width: 17px;
     height: 17px;
-    font-size: 12px;
+    font-size: 0.75rem;
     padding: 0 4px;
     background: var(--red);
     color: #fff;
@@ -687,11 +694,90 @@ kbd {
   }
 }
 
+/* ---- Back to top ----
+   Sits in the same column as the assistant's round button (assistant.css), directly above it
+   with one consistent gap, and above the phone's bottom bar. The offsets mirror that file:
+   button bottom 22px / 56px tall on desktop, 76px / 52px on phones, lifted over sticky bars. */
+.back-to-top {
+  --btt-size: 44px;
+  --btt-gap: 12px;
+  --btt-bottom: 22px;
+  position: fixed;
+  right: 28px; /* centred over the 56px assistant button at right: 22px */
+  bottom: var(--btt-bottom);
+  z-index: 69; /* under the assistant button (70) and its panel (71) */
+  display: grid;
+  place-items: center;
+  width: var(--btt-size);
+  height: var(--btt-size);
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--navy);
+  box-shadow: var(--shadow-md);
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    color 0.15s,
+    transform 0.15s;
+}
+.back-to-top:hover {
+  background: var(--surface-2);
+  border-color: var(--teal);
+  color: var(--teal-ink);
+  transform: translateY(-2px);
+}
+.back-to-top:active {
+  transform: translateY(0);
+}
+body:has(.assistant-fab) .back-to-top {
+  --btt-bottom: calc(22px + 56px + var(--btt-gap));
+}
+body:has(.sticky-actions) .back-to-top {
+  --btt-bottom: 96px;
+}
+body:has(.sticky-actions):has(.assistant-fab) .back-to-top {
+  --btt-bottom: calc(96px + 56px + var(--btt-gap));
+}
+/* Toasts rise above the stack instead of covering the button. */
+body:has(.assistant-fab):has(.back-to-top) .toaster {
+  bottom: calc(22px + 56px + 12px + 44px + 12px);
+}
+.back-to-top-enter-from,
+.back-to-top-leave-to {
+  opacity: 0;
+  transform: translateY(8px);
+}
+.back-to-top-enter-active,
+.back-to-top-leave-active {
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease;
+}
+@media (max-width: 900px) {
+  .back-to-top {
+    right: 20px; /* centred over the 52px button at right: 16px */
+    --btt-bottom: calc(76px + env(safe-area-inset-bottom));
+  }
+  body:has(.assistant-fab) .back-to-top {
+    --btt-bottom: calc(76px + 52px + var(--btt-gap) + env(safe-area-inset-bottom));
+  }
+  body:has(.sticky-actions) .back-to-top {
+    --btt-bottom: calc(150px + env(safe-area-inset-bottom));
+  }
+  body:has(.sticky-actions):has(.assistant-fab) .back-to-top {
+    --btt-bottom: calc(150px + 52px + var(--btt-gap) + env(safe-area-inset-bottom));
+  }
+  body:has(.assistant-fab):has(.back-to-top) .toaster {
+    bottom: calc(76px + 52px + 12px + 44px + 12px + env(safe-area-inset-bottom));
+  }
+}
 /* ---- Accessibility ---- */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  :root:not([data-motion='full']) *,
+  :root:not([data-motion='full']) *::before,
+  :root:not([data-motion='full']) *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
@@ -857,7 +943,7 @@ main:focus {
   position: sticky;
   top: 0;
   padding: 12px 10px;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
   color: var(--navy);
   text-align: center;
@@ -871,7 +957,7 @@ main:focus {
 .role-matrix thead th small {
   display: block;
   margin-top: 2px;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
   color: var(--amber-ink);
 }
@@ -886,19 +972,19 @@ main:focus {
 }
 .role-matrix tbody th[scope='row'] strong {
   display: block;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 600;
   color: var(--navy);
 }
 .role-matrix tbody th[scope='row'] small {
   display: block;
   margin-top: 2px;
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--muted);
 }
 .role-matrix .matrix-group th {
   padding: 14px 22px 6px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -963,7 +1049,7 @@ main:focus {
 }
 .theme-choice small {
   color: var(--muted);
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .theme-label {
   display: flex;
@@ -1038,7 +1124,7 @@ main:focus {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 .preview-tools,
 .preview-actions {
@@ -1054,7 +1140,7 @@ main:focus {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--muted);
 }
 .preview-page input {
@@ -1066,7 +1152,7 @@ main:focus {
 .preview-zoom {
   min-width: 46px;
   text-align: center;
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--muted);
 }
 .preview-divider {
@@ -1156,4 +1242,186 @@ main:focus {
   .preview-pages {
     padding: 8px;
   }
+}
+
+/* ---- Navigation icon tones ----
+   One hue per module. --nav-hue-* is the icon stroke (>= 4.3:1 on its tint in both themes),
+   --nav-solid-* the active tile (white icon, >= 5:1). Keep keys in step with NAV_TONES (ui/nav.ts). */
+:root {
+  --tone-tint: 12%;
+  --nav-hue-home: #0369a1;
+  --nav-solid-home: #0369a1;
+  --nav-hue-tasks: #4338ca;
+  --nav-solid-tasks: #4338ca;
+  --nav-hue-approvals: #6d28d9;
+  --nav-solid-approvals: #6d28d9;
+  --nav-hue-cases: #0f766e;
+  --nav-solid-cases: #0f766e;
+  --nav-hue-chat: #15803d;
+  --nav-solid-chat: #15803d;
+  --nav-hue-feed: #be123c;
+  --nav-solid-feed: #be123c;
+  --nav-hue-drive: #b45309;
+  --nav-solid-drive: #b45309;
+  --nav-hue-reports: #c2410c;
+  --nav-solid-reports: #c2410c;
+  --nav-hue-processes: #0e7490;
+  --nav-solid-processes: #0e7490;
+  --nav-hue-assistant: #a21caf;
+  --nav-solid-assistant: #a21caf;
+  --nav-hue-plugins: #4d7c0f;
+  --nav-solid-plugins: #4d7c0f;
+  --nav-hue-packs: #be185d;
+  --nav-solid-packs: #be185d;
+  --nav-hue-settings: #475569;
+  --nav-solid-settings: #475569;
+  --nav-hue-app: #1d4ed8;
+  --nav-solid-app: #1d4ed8;
+  --nav-hue-neutral: #475569;
+  --nav-solid-neutral: #475569;
+}
+:root[data-theme='dark'] {
+  --tone-tint: 16%;
+  --nav-hue-home: #7dd3fc;
+  --nav-hue-tasks: #a5b4fc;
+  --nav-hue-approvals: #c4b5fd;
+  --nav-hue-cases: #5eead4;
+  --nav-hue-chat: #86efac;
+  --nav-hue-feed: #fda4af;
+  --nav-hue-drive: #fcd34d;
+  --nav-hue-reports: #fdba74;
+  --nav-hue-processes: #67e8f9;
+  --nav-hue-assistant: #f0abfc;
+  --nav-hue-plugins: #bef264;
+  --nav-hue-packs: #f9a8d4;
+  --nav-hue-settings: #cbd5e1;
+  --nav-hue-app: #93c5fd;
+  --nav-hue-neutral: #cbd5e1;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --tone-tint: 16%;
+    --nav-hue-home: #7dd3fc;
+    --nav-hue-tasks: #a5b4fc;
+    --nav-hue-approvals: #c4b5fd;
+    --nav-hue-cases: #5eead4;
+    --nav-hue-chat: #86efac;
+    --nav-hue-feed: #fda4af;
+    --nav-hue-drive: #fcd34d;
+    --nav-hue-reports: #fdba74;
+    --nav-hue-processes: #67e8f9;
+    --nav-hue-assistant: #f0abfc;
+    --nav-hue-plugins: #bef264;
+    --nav-hue-packs: #f9a8d4;
+    --nav-hue-settings: #cbd5e1;
+    --nav-hue-app: #93c5fd;
+    --nav-hue-neutral: #cbd5e1;
+  }
+}
+[data-tone='home'] {
+  --tone: var(--nav-hue-home);
+  --tone-solid: var(--nav-solid-home);
+}
+[data-tone='tasks'] {
+  --tone: var(--nav-hue-tasks);
+  --tone-solid: var(--nav-solid-tasks);
+}
+[data-tone='approvals'] {
+  --tone: var(--nav-hue-approvals);
+  --tone-solid: var(--nav-solid-approvals);
+}
+[data-tone='cases'] {
+  --tone: var(--nav-hue-cases);
+  --tone-solid: var(--nav-solid-cases);
+}
+[data-tone='chat'] {
+  --tone: var(--nav-hue-chat);
+  --tone-solid: var(--nav-solid-chat);
+}
+[data-tone='feed'] {
+  --tone: var(--nav-hue-feed);
+  --tone-solid: var(--nav-solid-feed);
+}
+[data-tone='drive'] {
+  --tone: var(--nav-hue-drive);
+  --tone-solid: var(--nav-solid-drive);
+}
+[data-tone='reports'] {
+  --tone: var(--nav-hue-reports);
+  --tone-solid: var(--nav-solid-reports);
+}
+[data-tone='processes'] {
+  --tone: var(--nav-hue-processes);
+  --tone-solid: var(--nav-solid-processes);
+}
+[data-tone='assistant'] {
+  --tone: var(--nav-hue-assistant);
+  --tone-solid: var(--nav-solid-assistant);
+}
+[data-tone='plugins'] {
+  --tone: var(--nav-hue-plugins);
+  --tone-solid: var(--nav-solid-plugins);
+}
+[data-tone='packs'] {
+  --tone: var(--nav-hue-packs);
+  --tone-solid: var(--nav-solid-packs);
+}
+[data-tone='settings'] {
+  --tone: var(--nav-hue-settings);
+  --tone-solid: var(--nav-solid-settings);
+}
+[data-tone='app'] {
+  --tone: var(--nav-hue-app);
+  --tone-solid: var(--nav-solid-app);
+}
+[data-tone='neutral'] {
+  --tone: var(--nav-hue-neutral);
+  --tone-solid: var(--nav-solid-neutral);
+}
+/* A tinted tile with a coloured icon; the solid form marks the active item. */
+.nav-tile,
+.tone-tile {
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--tone, var(--muted)) var(--tone-tint), var(--surface));
+  color: var(--tone, var(--muted));
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.nav-tile {
+  width: 28px;
+  height: 28px;
+}
+.nav-groups .nav-link .nav-tile svg {
+  color: inherit;
+}
+.nav-groups .nav-link:hover .nav-tile {
+  background: color-mix(in srgb, var(--tone, var(--muted)) calc(var(--tone-tint) + 8%), var(--surface));
+}
+.nav-groups .nav-link.router-link-active .nav-tile {
+  background: var(--tone-solid, var(--tone));
+  color: #fff;
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--tone-solid, var(--tone)) 40%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion='full']) .nav-tile,
+  :root:not([data-motion='full']) .tone-tile {
+    transition: none;
+  }
+}
+.palette-option .tone-tile {
+  width: 28px;
+  height: 28px;
+}
+.mobile-nav .tone-tile {
+  width: 32px;
+  height: 26px;
+  border-radius: 13px;
+}
+.mobile-nav a.router-link-active .tone-tile {
+  background: var(--tone-solid, var(--tone));
+  color: #fff;
 }

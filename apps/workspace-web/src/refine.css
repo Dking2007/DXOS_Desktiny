@@ -15,11 +15,11 @@
   vertical-align: -2px;
 }
 body {
-  font-size: 16px;
+  font-size: 1rem;
   line-height: 1.5;
 }
 h1 {
-  font-size: 28px;
+  font-size: 1.75rem;
   letter-spacing: -0.01em;
 }
 td,
@@ -87,7 +87,7 @@ time {
   input,
   select,
   textarea {
-    font-size: 16px;
+    font-size: 1rem;
   }
 }
 
@@ -111,7 +111,7 @@ time {
   padding: 0;
   gap: 10px;
   color: var(--navy);
-  font-size: 18px;
+  font-size: 1.125rem;
   font-weight: 600;
   letter-spacing: -0.02em;
 }
@@ -121,7 +121,7 @@ time {
   border-radius: 7px;
   background: var(--teal);
   color: #fff;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 700;
   box-shadow: none;
 }
@@ -148,7 +148,7 @@ time {
 }
 .nav-label {
   margin: 0 10px 6px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   letter-spacing: 0;
   text-transform: none;
@@ -160,7 +160,7 @@ time {
   gap: 11px;
   border-radius: 8px;
   margin-bottom: 1px;
-  font-size: 15px;
+  font-size: 0.9375rem;
   color: var(--ink-2);
 }
 .nav-link svg {
@@ -185,7 +185,7 @@ time {
   min-width: 0;
   padding: 0;
   font-weight: 600;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .sidebar-bottom {
   padding: 16px 10px 0;
@@ -216,7 +216,7 @@ time {
     color: #fff;
     min-width: 16px;
     padding: 0 4px;
-    font-size: 11px;
+    font-size: 0.6875rem;
   }
 }
 
@@ -322,9 +322,9 @@ time {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  :root:not([data-motion='full']) *,
+  :root:not([data-motion='full']) *::before,
+  :root:not([data-motion='full']) *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
@@ -366,7 +366,7 @@ time {
   display: flex;
   flex-wrap: wrap;
   gap: 6px 22px;
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--muted);
 }
 .task-stages li {
@@ -421,7 +421,7 @@ time {
   gap: 12px 24px;
 }
 .task-facts dt {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--muted);
 }
 .task-facts dd {
@@ -432,7 +432,7 @@ time {
 
 /* Reports: what the numbers cover, said once in plain words. */
 .report-asof {
-  font-size: 14px;
+  font-size: 0.875rem;
   margin: 0 0 14px;
 }
 .report-definitions summary {
@@ -498,7 +498,7 @@ a.user-profile:focus-visible {
   width: 96px;
   height: 96px;
   border-radius: 50%;
-  font-size: 32px;
+  font-size: 2rem;
 }
 .profile-photo-actions {
   display: grid;
@@ -506,7 +506,7 @@ a.user-profile:focus-visible {
   min-width: 0;
 }
 .profile-photo-actions strong {
-  font-size: 18px;
+  font-size: 1.125rem;
   color: var(--navy);
 }
 .profile-photo-actions small {
@@ -520,7 +520,7 @@ a.user-profile:focus-visible {
 }
 .profile-title {
   margin: 0 0 16px;
-  font-size: 16px;
+  font-size: 1rem;
   color: var(--navy);
 }
 .profile-grid {
@@ -551,7 +551,7 @@ a.user-profile:focus-visible {
   margin: 0;
 }
 .profile-facts dt {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--muted);
 }
 .profile-facts dd {
@@ -588,7 +588,7 @@ a.user-profile:focus-visible {
   margin-bottom: 18px;
 }
 .progress-head strong {
-  font-size: 15px;
+  font-size: 0.9375rem;
   color: var(--navy);
 }
 .progress-summary {
@@ -599,7 +599,7 @@ a.user-profile:focus-visible {
   border-radius: 999px;
   background: var(--surface-3);
   color: var(--ink-2);
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
 }
 .progress-summary::before {
@@ -698,7 +698,7 @@ a.user-profile:focus-visible {
   background: none;
 }
 .case-progress .rail-content strong {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
   color: var(--ink-2);
 }
@@ -711,7 +711,7 @@ a.user-profile:focus-visible {
 }
 .case-progress .rail-content small {
   margin-top: 3px;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .case-progress .rail-person {
   color: var(--ink-2);
@@ -723,7 +723,7 @@ a.user-profile:focus-visible {
   padding: 2px 8px;
   border-radius: 6px;
   background: var(--surface-2);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .case-progress .rail-step.current .rail-time {
   background: var(--teal-soft);
@@ -740,7 +740,7 @@ a.user-profile:focus-visible {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .case-progress .rail-step.current .rail-circle {
+  :root:not([data-motion='full']) .case-progress .rail-step.current .rail-circle {
     animation: none;
   }
 }
@@ -751,4 +751,180 @@ a.user-profile:focus-visible {
   .case-progress .rail-step {
     min-width: 160px;
   }
+}
+
+/* ---- Spacing primitives ----
+   Tokens live in apps/shared/src/style.css (--space-*, --gap-icon, --field-gap, --control-h).
+   These rules give every icon+label control the same breathing room, whichever stylesheet
+   first declared it, so pages do not have to pad icons one by one. */
+.segmented button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--gap-icon-sm);
+  padding: 6px var(--space-3);
+  white-space: nowrap;
+}
+.chip,
+.chip-select button,
+.filter-chip,
+.agenda-filter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--gap-icon-sm);
+  white-space: nowrap;
+}
+.chip,
+.chip-select button {
+  padding: 6px var(--space-3);
+}
+.chip-select {
+  gap: var(--space-2);
+}
+.link-button {
+  gap: var(--gap-icon-sm);
+  min-height: 32px;
+}
+.link-button:disabled {
+  text-decoration: none;
+}
+/* An icon placed straight before text in a button keeps its distance even without gap support
+   in the parent (e.g. a plain inline button). */
+:is(.button, .tab, .chip, .link-button, .segmented button) > svg {
+  flex: none;
+}
+.checkbox-label {
+  gap: var(--space-2);
+  line-height: 1.4;
+}
+.checkbox-label input {
+  margin: 0;
+}
+.dropdown :is(button, a):focus-visible {
+  outline-offset: -2px;
+}
+/* Focus on the dark toast surface. */
+.toast :focus-visible {
+  outline-color: #93c5fd;
+}
+.toast-action {
+  min-height: 32px;
+  padding: 0 var(--space-2);
+  border-radius: 6px;
+}
+.toast-close {
+  flex: none;
+  width: 32px;
+  height: 32px;
+}
+/* The collapsed rail keeps its targets square and centred. */
+@media (min-width: 901px) {
+  .app-shell.sidebar-collapsed .nav-link {
+    min-height: 40px;
+  }
+  .app-shell.sidebar-collapsed .sidebar-collapse {
+    width: 40px;
+    min-height: 36px;
+  }
+}
+.sidebar-collapse:focus-visible,
+.nav-link:focus-visible {
+  outline-offset: -2px;
+}
+
+/* ---- Personal settings (Cài đặt cá nhân) ----
+   ui/preferences.ts puts these attributes on <html>; the text size is the root font size, and text
+   in this file, style.css and the shared stylesheet is sized in rem so it follows. */
+.preferences-link.router-link-active {
+  color: var(--teal-strong);
+  background: var(--teal-soft);
+}
+@media (max-width: 640px) {
+  /* The phone reaches it from the menu and the command palette; the top bar has no room. */
+  .preferences-link {
+    display: none;
+  }
+}
+/* Larger text never wraps the top bar onto two lines; long names end in an ellipsis instead. */
+.topbar-location {
+  min-width: 0;
+  white-space: nowrap;
+}
+/* The section name gives way before the page name does. */
+.topbar-crumb {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 4;
+}
+.topbar-location strong {
+  min-width: 8ch;
+}
+.topbar-crumb,
+.topbar-location strong,
+.user-profile strong,
+.user-profile small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.user-profile > div {
+  min-width: 0;
+  max-width: 18ch;
+}
+/* Font: the device's own interface font everywhere except code. */
+:root[data-ui-font='system'] {
+  --font-system: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
+}
+:root[data-ui-font='system'],
+:root[data-ui-font='system'] body *:not(code, pre, kbd, samp, .mono, .var-chip, .code-editor, code *, pre *) {
+  font-family: var(--font-system) !important;
+}
+/* Wider line spacing for running text (WCAG 1.4.12 asks for at least 1.5). */
+:root[data-ui-leading='relaxed'] body {
+  line-height: 1.7;
+}
+:root[data-ui-leading='relaxed'] :is(p, li, dd, blockquote, td) {
+  line-height: 1.7 !important;
+}
+/* More contrast: darker secondary text and visible borders. Light first, then dark, so the dark
+   values win when the device is dark and no theme was chosen. */
+:root[data-contrast='more']:not([data-theme='dark']) {
+  --navy: #020617;
+  --ink-2: #1e293b;
+  --muted: #334155;
+  --border: #94a3b8;
+  --border-soft: #cbd5e1;
+  --border-strong: #64748b;
+}
+:root[data-contrast='more'][data-theme='dark'] {
+  --navy: #f8fafc;
+  --ink-2: #e2e8f0;
+  --muted: #cbd5e1;
+  --border: #4f6378;
+  --border-soft: #3a4d61;
+  --border-strong: #7189a3;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-contrast='more']:not([data-theme='light']) {
+    --navy: #f8fafc;
+    --ink-2: #e2e8f0;
+    --muted: #cbd5e1;
+    --border: #4f6378;
+    --border-soft: #3a4d61;
+    --border-strong: #7189a3;
+  }
+}
+/* Focus ring on every focus, also after a click, and a little thicker. */
+:root[data-focus='always']
+  :is(button, a, input, select, textarea, summary, [tabindex]:not([tabindex='-1']), [contenteditable='true']):focus {
+  outline: 3px solid var(--focus) !important;
+  outline-offset: 2px !important;
+}
+/* Links inside text are underlined, so they do not rely on colour alone. */
+:root[data-links='underline'] :is(p, li, td, dd, small, label, blockquote, .notice, .muted) a:not(.button, .nav-link),
+:root[data-links='underline'] a.link {
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
 }

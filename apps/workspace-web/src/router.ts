@@ -3,9 +3,18 @@
 import { brand, term } from './ui/appearance'
 import { createRouter, createWebHistory } from 'vue-router'
 import { useSession } from './stores/session'
+import { bindPreferencesUser } from './ui/preferences'
 
 export const router = createRouter({
   history: createWebHistory(),
+  // Back/forward returns to where the person was; a new screen opens at its top. Changing only
+  // the query (a tab, a filter, ?create=1) keeps the position.
+  scrollBehavior(to, from, saved) {
+    if (saved) return saved
+    if (to.hash) return { el: to.hash }
+    if (to.path !== from.path) return { top: 0 }
+    return false
+  },
   routes: [
     { path: '/', redirect: '/home' },
     {
@@ -53,6 +62,14 @@ export const router = createRouter({
       path: '/settings',
       component: () => import('./views/SettingsView.vue'),
       meta: { title: 'Thiết lập' },
+      // The look used to be a tab here; it is a personal setting now.
+      beforeEnter: (to) =>
+        to.query.tab === 'appearance' ? { path: '/preferences', query: { moved: 'appearance' } } : true,
+    },
+    {
+      path: '/preferences',
+      component: () => import('./views/PreferencesView.vue'),
+      meta: { title: 'Cài đặt cá nhân' },
     },
     {
       path: '/tasks',
@@ -144,6 +161,7 @@ router.beforeEach(async (to) => {
     }
   }
   if (!session.user) return { path: '/login', query: { next: to.fullPath } }
+  bindPreferencesUser(session.user.id)
   // Hiding a screen is convenience only; the API enforces the same permission.
   if (to.meta.capability && !session.can(String(to.meta.capability))) return { path: '/home' }
   return true

@@ -56,6 +56,32 @@
   --shadow-sm: 0 1px 2px #0f172a0f;
   --shadow-md: 0 1px 3px #0f172a14, 0 4px 12px #0f172a0f;
   --shadow-lg: 0 12px 32px #0f172a29;
+  /* Spacing: one 4px grid for every screen (design-system/desktiny/MASTER.md). */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-xs: var(--space-1);
+  --space-sm: var(--space-2);
+  --space-md: var(--space-4);
+  --space-lg: var(--space-6);
+  --space-xl: var(--space-8);
+  /* Icon and label inside buttons, tabs and chips: a gap, never a margin on the icon. */
+  --gap-icon: 8px;
+  --gap-icon-sm: 6px;
+  /* Forms: label to control, field to field, section to section. */
+  --field-gap: 6px;
+  --field-stack: 16px;
+  --section-gap: 28px;
+  /* Controls share one height so inputs, selects and buttons line up in a row. */
+  --control-h: max(40px, 2.5rem);
+  --control-h-sm: max(36px, 2.25rem);
+  --control-px: 12px;
+  --radius-control: 8px;
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--focus) 30%, transparent);
 }
 * {
   box-sizing: border-box;
@@ -95,13 +121,13 @@ a {
 a:hover {
   text-decoration: underline;
 }
+/* Keyboard focus is always visible: a ring outside buttons and links, border plus halo on fields. */
 button:focus-visible,
 a:focus-visible,
-input:focus-visible,
-textarea:focus-visible,
-select:focus-visible {
-  outline: 3px solid var(--focus);
-  outline-offset: 3px;
+summary:focus-visible,
+[tabindex]:not([tabindex='-1']):focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 h1,
 h2,
@@ -113,15 +139,15 @@ h4 {
   margin: 0;
 }
 h1 {
-  font-size: 28px;
+  font-size: 1.75rem;
   line-height: 1.4;
 }
 h2 {
-  font-size: 19px;
+  font-size: 1.1875rem;
   line-height: 1.5;
 }
 h3 {
-  font-size: 15px;
+  font-size: 0.9375rem;
   line-height: 1.5;
 }
 p {
@@ -142,12 +168,12 @@ code,
 .eyebrow {
   display: block;
   font-family: 'Be Vietnam Pro', sans-serif;
-  font-size: 12px;
+  font-size: 0.75rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   font-weight: 600;
   color: var(--muted);
-  margin-bottom: 9px;
+  margin-bottom: var(--space-2);
 }
 .page-head {
   display: flex;
@@ -159,12 +185,12 @@ code,
 .page-head p {
   color: var(--muted);
   margin-top: 6px;
-  font-size: 16px;
+  font-size: 1rem;
 }
 .page-actions,
 .inline-actions {
   display: flex;
-  gap: 9px;
+  gap: var(--space-2);
   align-items: center;
   flex-wrap: wrap;
 }
@@ -172,15 +198,16 @@ code,
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: var(--gap-icon);
   border: 1px solid transparent;
   background: var(--teal);
   color: #fff;
-  border-radius: 9px;
-  min-height: 40px;
-  padding: 8px 16px;
+  border-radius: var(--radius-control);
+  min-height: var(--control-h);
+  padding: var(--space-2) var(--space-4);
   font-weight: 600;
-  font-size: 15px;
+  font-size: 0.9375rem;
+  line-height: 1.25;
   text-decoration: none;
   white-space: nowrap;
   background-image: linear-gradient(180deg, #ffffff1f, transparent);
@@ -236,17 +263,23 @@ code,
   box-shadow: none;
 }
 .button.small {
-  min-height: 32px;
-  font-size: 14px;
-  padding: 5px 11px;
+  min-height: var(--control-h-sm);
+  font-size: 0.875rem;
+  gap: var(--gap-icon-sm);
+  padding: 6px var(--space-3);
+}
+.button[aria-busy='true'] {
+  cursor: progress;
 }
 .icon-button {
   display: inline-flex;
+  flex: none;
   align-items: center;
   justify-content: center;
-  width: 35px;
-  height: 35px;
-  border-radius: 9px;
+  width: var(--control-h);
+  height: var(--control-h);
+  padding: 0;
+  border-radius: var(--radius-control);
   border: 1px solid transparent;
   background: transparent;
   color: var(--muted);
@@ -269,12 +302,13 @@ code,
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 14px;
-  padding: 20px 23px;
+  gap: var(--space-3) var(--space-4);
+  flex-wrap: wrap;
+  padding: var(--space-5) var(--space-6);
   border-bottom: 1px solid var(--border);
 }
 .card-body {
-  padding: 23px;
+  padding: var(--space-6);
 }
 .stack {
   display: grid;
@@ -296,20 +330,20 @@ table {
 th {
   font-weight: 600;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 0.8125rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  font-size: 12px;
+  font-size: 0.75rem;
   background: var(--surface-2);
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
 }
 td,
 th {
-  padding: 14px 22px;
+  padding: 14px var(--space-5);
 }
 td {
-  font-size: 15px;
+  font-size: 0.9375rem;
   border-bottom: 1px solid var(--border);
   vertical-align: middle;
 }
@@ -337,7 +371,7 @@ tbody tr:hover {
   display: block;
   color: var(--muted);
   margin-top: 3px;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .file-icon {
   height: 37px;
@@ -352,22 +386,23 @@ tbody tr:hover {
 .toolbar {
   display: flex;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--space-3) var(--space-4);
   align-items: center;
   flex-wrap: wrap;
-  padding: 16px 22px;
+  padding: var(--space-4) var(--space-5);
   border-bottom: 1px solid var(--border);
 }
 .search-box {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   color: var(--muted);
   background: var(--surface-2);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   min-width: 230px;
-  padding: 7px 12px;
+  min-height: var(--control-h);
+  padding: 0 var(--control-px);
   transition:
     border-color 0.15s,
     box-shadow 0.15s,
@@ -375,8 +410,11 @@ tbody tr:hover {
 }
 .search-box:focus-within {
   background: var(--surface);
-  border-color: #93b4dc;
-  box-shadow: 0 0 0 4px #1e3a5f1a;
+  border-color: var(--teal);
+  box-shadow: var(--focus-ring);
+}
+.search-box svg {
+  flex: none;
 }
 .search-box input {
   background: transparent;
@@ -388,16 +426,23 @@ tbody tr:hover {
 }
 .tabs {
   display: flex;
-  gap: 3px;
+  gap: var(--space-1);
   flex-wrap: wrap;
 }
+/* A tab may carry an icon and a count: one row, with breathing room between them. */
 .tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--gap-icon);
+  white-space: nowrap;
   border: 0;
   background: transparent;
   color: var(--muted);
-  border-radius: 8px;
-  padding: 7px 13px;
-  font-size: 15px;
+  border-radius: var(--radius-control);
+  padding: var(--space-2) 14px;
+  font-size: 0.9375rem;
+  line-height: 1.3;
   transition:
     background 0.15s,
     color 0.15s;
@@ -417,9 +462,9 @@ tbody tr:hover {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 11px;
+  gap: var(--space-3);
   min-height: 230px;
-  padding: 35px;
+  padding: var(--space-8);
   text-align: center;
   color: var(--muted);
 }
@@ -450,12 +495,13 @@ tbody tr:hover {
 .status-badge {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  font-size: 13px;
+  gap: var(--gap-icon-sm);
+  font-size: 0.8125rem;
   font-weight: 600;
+  line-height: 1.4;
   white-space: nowrap;
   border-radius: 999px;
-  padding: 4px 10px 4px 9px;
+  padding: 3px 10px;
   background: var(--surface-3);
   color: var(--muted);
 }
@@ -503,27 +549,45 @@ tbody tr:hover {
 .field {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: var(--field-gap);
+  min-width: 0;
 }
-.field label {
+.field label,
+.field > legend {
   font-weight: 600;
-  font-size: 15px;
+  font-size: 0.9375rem;
+  line-height: 1.4;
 }
 .field small {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+/* Group boxes read as a field: no browser frame, the legend spaced like a label. */
+fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+legend {
+  padding: 0;
+}
+.field > legend {
+  margin-bottom: var(--field-gap);
 }
 input,
 select,
 textarea {
   width: 100%;
   border: 1px solid var(--border-strong);
-  border-radius: 9px;
+  border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--navy);
-  padding: 9px 12px;
-  font-size: 15px;
-  min-height: 41px;
+  padding: 8px var(--control-px);
+  font-size: 0.9375rem;
+  line-height: 1.4;
+  min-height: var(--control-h);
   transition:
     border-color 0.15s,
     box-shadow 0.15s;
@@ -536,24 +600,57 @@ textarea:hover:not(:disabled) {
 input:focus,
 select:focus,
 textarea:focus {
-  border-color: #5fb6c0;
-  box-shadow: 0 0 0 4px #1e3a5f1a;
+  border-color: var(--teal);
+  box-shadow: var(--focus-ring);
   outline: none;
 }
 .search-box input:focus {
   box-shadow: none;
 }
-input[type='checkbox'] {
+input[type='checkbox'],
+input[type='radio'] {
+  flex: none;
   width: 18px;
   height: 18px;
   min-height: 0;
+  padding: 0;
   accent-color: var(--teal);
+}
+input[type='checkbox']:focus,
+input[type='radio']:focus {
+  box-shadow: none;
+}
+input[type='checkbox']:focus-visible,
+input[type='radio']:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+/* A tick box and its text: one row, a clear gap, a comfortable target. */
+.check-row,
+.field .check-row,
+label:not([class]):has(> input[type='checkbox'], > input[type='radio']) {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 32px;
+  font-size: 0.9375rem;
+  font-weight: 400;
+  line-height: 1.4;
+  cursor: pointer;
+}
+.check-row > input,
+label:not([class]) > input[type='checkbox'],
+label:not([class]) > input[type='radio'] {
+  margin: 0;
 }
 input[type='file'] {
   padding: 7px;
 }
 textarea {
   resize: vertical;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  line-height: 1.5;
 }
 input:disabled,
 textarea:disabled,
@@ -572,7 +669,7 @@ select:disabled {
 .schema-form {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 20px;
+  gap: var(--space-5);
 }
 .full-width {
   grid-column: 1/-1;
@@ -581,26 +678,42 @@ select:disabled {
   min-height: 35px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 .form-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
-  padding-top: 21px;
-  margin-top: 8px;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding-top: var(--space-5);
+  margin-top: var(--space-2);
   border-top: 1px solid var(--border);
 }
 .notice {
   display: flex;
   gap: 10px;
   align-items: flex-start;
-  border-radius: 11px;
-  padding: 13px 15px;
+  border-radius: 10px;
+  padding: var(--space-3) var(--space-4);
   background: var(--teal-soft);
   color: var(--teal-ink);
-  font-size: 15px;
+  font-size: 0.9375rem;
   line-height: 1.5;
+}
+.notice > svg {
+  flex: none;
+  margin-top: 3px;
+}
+/* A notice never touches the form it talks about. Grid and stack containers already space
+   their children with gap, so the margin only applies in normal flow. */
+.notice + :is(.field, .form-grid, .schema-form, form, .stack, .tabs, .toolbar, .table-wrap, .inline-actions),
+:is(.field, .form-grid, .schema-form, .tabs, .toolbar, .table-wrap, .inline-actions) + .notice,
+.notice + .notice {
+  margin-top: var(--space-4);
+}
+:is(.stack, .form-grid, .schema-form, .field, .inline-actions, .page-actions) > .notice,
+:is(.stack, .form-grid, .schema-form) > .notice + * {
+  margin-top: 0;
 }
 .notice.error {
   color: var(--red);
@@ -623,6 +736,7 @@ select:disabled {
   border-radius: 18px;
   width: min(560px, calc(100vw - 32px));
   padding: 0;
+  background: var(--surface);
   color: var(--navy);
   box-shadow: 0 24px 80px #142e4759;
   max-height: calc(100dvh - 48px);
@@ -638,20 +752,41 @@ select:disabled {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 22px 25px;
+  gap: var(--space-4);
+  padding: var(--space-5) var(--space-6);
   border-bottom: 1px solid var(--border);
 }
+.modal-header > div {
+  min-width: 0;
+}
+.modal-header h2 {
+  overflow-wrap: anywhere;
+}
 .modal-header .eyebrow {
-  margin-bottom: 5px;
+  margin-bottom: var(--space-1);
 }
 .modal-body {
-  padding: 24px 25px;
+  padding: var(--space-6);
+}
+/* Whatever a dialog holds (tabs, a notice, a form) is spaced in normal flow. */
+/* (Nested dialogs keep their own centring margin.) */
+.modal-body > :where(* + :not(dialog, [hidden], .sr-only)) {
+  margin-top: var(--space-4);
+}
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-6);
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
 }
 .breadcrumb {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--muted);
   margin-bottom: 18px;
   flex-wrap: wrap;
@@ -662,7 +797,7 @@ select:disabled {
 .section-label {
   display: block;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 0.8125rem;
   margin-bottom: 5px;
 }
 .divider {
@@ -706,7 +841,7 @@ a.list-row:hover {
   background: linear-gradient(140deg, var(--teal-soft), var(--surface-3));
   color: var(--navy);
   font-family: 'Be Vietnam Pro', sans-serif;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
 }
 .pagination {
@@ -719,10 +854,13 @@ a.list-row:hover {
 }
 .tag {
   display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
   background: var(--surface-3);
-  padding: 3px 7px;
+  padding: 3px var(--space-2);
   border-radius: 6px;
-  font-size: 13px;
+  font-size: 0.8125rem;
+  line-height: 1.4;
   color: var(--muted);
 }
 .sr-only {
@@ -750,14 +888,14 @@ a.list-row:hover {
 }
 .detail-meta dt {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .detail-meta dd {
   margin: 0;
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 .error-inline {
-  margin-bottom: 18px;
+  margin-bottom: var(--space-4);
 }
 .processing-rail {
   display: flex;
@@ -795,7 +933,7 @@ a.list-row:hover {
   color: var(--muted);
   z-index: 1;
   flex-shrink: 0;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .rail-step.done .rail-circle {
   background: var(--teal);
@@ -816,13 +954,13 @@ a.list-row:hover {
   background: linear-gradient(transparent 28px, var(--surface-2) 28px);
 }
 .rail-content strong {
-  font-size: 13px;
+  font-size: 0.8125rem;
   display: block;
 }
 .rail-content small {
   display: block;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 0.75rem;
   margin-top: 5px;
 }
 .timeline {
@@ -852,15 +990,15 @@ a.list-row:hover {
   border: 2px solid var(--surface);
 }
 .timeline p {
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 .timeline small {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--muted);
 }
 .code-editor {
   font-family: ui-monospace, monospace;
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.6;
   min-height: 230px;
 }
@@ -868,7 +1006,11 @@ a.list-row:hover {
   position: absolute;
   top: -100px;
   left: 20px;
-  background: #fff;
+  background: var(--surface);
+  color: var(--navy);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  box-shadow: var(--shadow-md);
   padding: 10px 16px;
   z-index: 200;
 }
@@ -883,7 +1025,7 @@ a.list-row:hover {
     align-items: flex-start;
   }
   h1 {
-    font-size: 25px;
+    font-size: 1.5625rem;
   }
 }
 @media (max-width: 640px) {
@@ -904,32 +1046,43 @@ a.list-row:hover {
   .card-header,
   .card-body,
   .toolbar {
-    padding: 18px;
+    padding: var(--space-4);
   }
   td,
   th {
-    padding: 13px 16px;
+    padding: var(--space-3) var(--space-4);
   }
   .search-box {
     width: 100%;
   }
   .modal-header,
-  .modal-body {
-    padding: 20px;
-  }
-  .button {
-    min-height: 41px;
+  .modal-body,
+  .modal-footer {
+    padding: var(--space-4);
   }
   .processing-rail {
     padding: 18px;
   }
 }
+/* Motion: the device's choice unless the person chose otherwise in Cài đặt cá nhân
+   (data-motion="full" keeps it, data-motion="reduce" stills it on any device). */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *:before,
-  *:after {
+  :root:not([data-motion='full']),
+  :root:not([data-motion='full']) *,
+  :root:not([data-motion='full']) *::before,
+  :root:not([data-motion='full']) *::after {
     animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+:root[data-motion='reduce'],
+:root[data-motion='reduce'] *,
+:root[data-motion='reduce'] *::before,
+:root[data-motion='reduce'] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
 }

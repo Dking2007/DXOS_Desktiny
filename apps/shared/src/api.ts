@@ -111,25 +111,40 @@ export function queryString(
 export function newIntent(): string {
   return crypto.randomUUID()
 }
+// Formatters are costly to build and these run for every row of every list on each render;
+// build each once, on first use.
+let dateFormat: Intl.DateTimeFormat | undefined
+let dateTimeFormat: Intl.DateTimeFormat | undefined
+let sizeFormat: Intl.NumberFormat | undefined
+export type DateFormatter = (value: string, withTime: boolean) => string
+let customDateFormatter: DateFormatter | undefined
+/** Lets the app swap in the person's own date/time format (Cài đặt cá nhân); null restores the default. */
+export function setDateFormatter(formatter: DateFormatter | null) {
+  customDateFormatter = formatter ?? undefined
+}
 export function formatDate(value?: string | null, withTime = false): string {
   if (!value) return '—'
+  if (customDateFormatter) return customDateFormatter(value, withTime)
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
-  return new Intl.DateTimeFormat(
-    'vi-VN',
-    withTime
-      ? {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-        }
-      : { day: '2-digit', month: '2-digit', year: 'numeric' },
-  ).format(date)
+  const format = withTime
+    ? (dateTimeFormat ??= new Intl.DateTimeFormat('vi-VN', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      }))
+    : (dateFormat ??= new Intl.DateTimeFormat('vi-VN', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      }))
+  return format.format(date)
 }
 export function formatSize(bytes: number): string {
   if (!bytes) return '0 B'
   const unit = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), 3)
-  return `${(bytes / 1024 ** unit).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} ${['B', 'KB', 'MB', 'GB'][unit]}`
+  sizeFormat ??= new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 1 })
+  return `${sizeFormat.format(bytes / 1024 ** unit)} ${['B', 'KB', 'MB', 'GB'][unit]}`
 }
