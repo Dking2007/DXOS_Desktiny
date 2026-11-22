@@ -43,9 +43,9 @@ const title = computed(() => String(route.meta.title ?? ''))
 </template>
 <style scoped>
 .page-help {
-  width: 32px;
-  height: 32px;
-  margin-left: -6px;
+  width: 36px;
+  height: 36px;
+  margin-left: -4px;
   color: var(--muted);
 }
 .page-help:hover {
@@ -54,7 +54,7 @@ const title = computed(() => String(route.meta.title ?? ''))
 /* The dialog opens from inside the top bar, whose title must not wrap; the help text must. */
 .page-help-body {
   display: grid;
-  gap: 10px;
+  gap: var(--space-3);
   line-height: 1.55;
   white-space: normal;
   overflow-wrap: anywhere;
@@ -64,7 +64,7 @@ const title = computed(() => String(route.meta.title ?? ''))
 }
 .page-help-body h3 {
   margin: 8px 0 0;
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 .page-help-body ol,
 .page-help-body ul {

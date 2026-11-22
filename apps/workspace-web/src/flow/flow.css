@@ -26,7 +26,7 @@
   background: transparent;
   font-family: 'Be Vietnam Pro', sans-serif;
   font-weight: 600;
-  font-size: 17px;
+  font-size: 1.0625rem;
   padding: 6px 10px;
 }
 .flow-name:hover {
@@ -36,16 +36,29 @@
 .flow-ok {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  font-size: 14px;
+  gap: 6px;
+  min-height: 32px;
+  font-size: 0.875rem;
   font-weight: 600;
-  padding: 4px 10px;
+  padding: 4px 12px;
   border-radius: 999px;
 }
 .flow-issues {
   color: var(--red);
   background: var(--red-soft);
+  border: 1px solid var(--red-line);
+  font-family: inherit;
   cursor: pointer;
+  transition:
+    background-color 0.15s,
+    box-shadow 0.15s;
+}
+.flow-issues:hover {
+  box-shadow: var(--shadow-sm);
+  border-color: var(--red);
+}
+.flow-issues:active {
+  transform: translateY(1px);
 }
 .flow-ok {
   color: var(--green-ink);
@@ -68,7 +81,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
   color: var(--muted);
   margin-right: 6px;
@@ -79,7 +92,7 @@
   gap: 10px;
   flex-wrap: wrap;
   padding: 8px 18px;
-  font-size: 14px;
+  font-size: 0.875rem;
   border-bottom: 1px solid var(--border);
 }
 .flow-status > span {
@@ -105,13 +118,13 @@
   align-items: center;
   gap: 6px;
   font-weight: 600;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .scope-select select {
   width: auto;
   min-height: 32px;
   padding: 3px 8px;
-  font-size: 14px;
+  font-size: 0.875rem;
   background: #ffffffcc;
 }
 .run-subject {
@@ -126,7 +139,7 @@
 }
 .run-subject small {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .run-item {
   cursor: pointer;
@@ -145,7 +158,7 @@
   border: 1px solid var(--border);
   border-radius: 9px;
   cursor: pointer;
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 .run-pick.active {
   border-color: var(--teal);
@@ -180,7 +193,7 @@
   overflow-y: auto;
 }
 .flow-palette > p {
-  font-size: 13px;
+  font-size: 0.8125rem;
   margin-bottom: 12px;
   line-height: 1.5;
 }
@@ -222,16 +235,24 @@
   display: block;
 }
 .palette-item strong {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
 }
 .palette-item small {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--muted);
 }
 .flow-canvas {
   position: relative;
   min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* The drawing area; the run drawer sits below it instead of covering the minimap and controls. */
+.flow-stage {
+  position: relative;
+  flex: 1;
   min-height: 0;
 }
 .flow-canvas .vue-flow {
@@ -317,14 +338,14 @@
 }
 .flow-node-text small {
   display: block;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   color: var(--node-color);
 }
 .flow-node-text strong {
   display: block;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 600;
   line-height: 1.3;
   overflow: hidden;
@@ -333,7 +354,7 @@
 }
 .flow-node-text span {
   display: block;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--muted);
   margin-top: 2px;
   overflow: hidden;
@@ -388,7 +409,7 @@
 .branch-tag {
   position: absolute;
   right: -46px;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 700;
   padding: 1px 6px;
   border-radius: 6px;
@@ -412,6 +433,21 @@
   right: auto;
 }
 /* Three exits need a little more height so their tags do not touch. */
+.branch-port {
+  position: absolute;
+  left: calc(100% + 10px);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+}
+.branch-port .branch-tag {
+  position: static;
+}
+.flow-node .branch-add {
+  position: static;
+  transform: none;
+}
 .flow-node.branched {
   min-height: 92px;
 }
@@ -452,7 +488,8 @@
   transition: opacity 0.15s;
 }
 .flow-node:hover .flow-node-add,
-.flow-node.selected .flow-node-add {
+.flow-node.selected .flow-node-add,
+.flow-node-add:focus-visible {
   opacity: 1;
 }
 .flow-node-add:hover {
@@ -486,7 +523,7 @@
   fill: #fff;
 }
 .vue-flow__edge-text {
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 700;
   fill: var(--muted);
 }
@@ -506,68 +543,346 @@
   box-shadow: var(--shadow-sm);
 }
 
-/* Floating bits on the canvas */
-.flow-overlay-bar,
-.flow-toast,
-.flow-general-errors {
+/* Floating bits on the canvas: a centred column at the top, so they stack instead of overlapping. */
+.canvas-top {
   position: absolute;
+  top: 12px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 6;
   display: flex;
+  flex-direction: column;
   align-items: center;
   gap: 8px;
-  padding: 6px 8px 6px 14px;
+  width: max-content;
+  max-width: calc(100% - 32px);
+  pointer-events: none;
+}
+.canvas-top > * {
+  pointer-events: auto;
+  max-width: 100%;
+}
+.flow-overlay-bar,
+.flow-toast,
+.flow-general-errors {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 16px;
   border-radius: 999px;
-  font-size: 14px;
+  font-size: 0.875rem;
+  line-height: 1.45;
   box-shadow: var(--shadow-md);
 }
 .flow-overlay-bar {
-  top: 14px;
-  background: #0f2234;
-  color: #e2e8f0;
+  background: var(--navy);
+  color: var(--surface-3);
 }
 .flow-overlay-bar .button {
-  color: #bfdbfe;
+  color: var(--blue-line);
 }
 .flow-toast {
-  /* Below the result bar, which also sits at the top of the canvas. */
-  top: 62px;
-  background: #187454;
-  color: #fff;
-  padding: 8px 16px;
+  background: var(--navy);
+  color: var(--surface);
+  min-height: 40px;
+}
+.flow-toast:not(:has(.button)) {
+  padding-right: 16px;
+}
+.flow-toast .button {
+  color: var(--blue-line);
+}
+.flow-toast .button:hover {
+  background: #ffffff1f;
 }
 .flow-general-errors {
-  bottom: 16px;
   background: var(--red-soft);
   color: var(--red);
+  border: 1px solid var(--red-line);
   padding: 8px 16px;
-  max-width: 80%;
+  border-radius: 12px;
 }
-.quick-add {
+.flow-general-errors > svg,
+.flow-overlay-bar > svg {
+  flex-shrink: 0;
+}
+
+/* Shared look of the canvas toolbars */
+.canvas-toolbar,
+.selection-bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-md);
+}
+.canvas-toolbar {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 8;
-  width: 300px;
+  left: 12px;
+  bottom: 12px;
+  z-index: 5;
+  flex-wrap: wrap;
+  max-width: calc(100% - 24px);
+}
+.canvas-toolbar .icon-button,
+.selection-bar .icon-button {
+  width: 36px;
+  height: 36px;
+}
+.canvas-toolbar .icon-button:disabled,
+.selection-bar .icon-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background: transparent;
+}
+.canvas-toolbar .icon-button.active {
+  color: var(--teal-ink);
+  background: var(--teal-soft);
+  box-shadow: inset 0 0 0 1px var(--teal-line);
+}
+.selection-bar .icon-button.danger:hover {
+  color: var(--red);
+  background: var(--red-soft);
+}
+.selection-bar > strong {
+  padding: 0 8px 0 10px;
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+.zoom-level {
+  min-width: 52px;
+  height: 36px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+.zoom-level:hover {
+  background: var(--surface-3);
+  color: var(--navy);
+}
+.toolbar-divider {
+  width: 1px;
+  height: 20px;
+  margin: 0 4px;
+  background: var(--border);
+}
+
+/* "+" in the middle of a connection */
+.edge-insert {
+  position: absolute;
+  pointer-events: all;
+  padding: 6px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.edge-insert.visible,
+.edge-insert:hover,
+.edge-insert:focus-within {
+  opacity: 1;
+}
+.edge-insert button {
   display: grid;
-  gap: 6px;
-  padding: 14px;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--teal);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition:
+    transform 0.15s,
+    border-color 0.15s;
+}
+.edge-insert button:hover {
+  border-color: var(--teal);
+  transform: scale(1.1);
+}
+
+/* Step picker, right-click menu and shortcut list */
+.step-picker,
+.canvas-menu,
+.shortcut-help {
+  position: absolute;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 14px;
   box-shadow: var(--shadow-lg);
+  animation: pop-in 0.15s ease-out;
 }
-.quick-add > strong {
-  font-size: 15px;
-  margin-bottom: 4px;
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+.step-picker {
+  z-index: 10;
+  width: 320px;
+  max-height: min(460px, calc(100% - 16px));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+}
+.step-picker > header,
+.shortcut-help > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.step-picker > header strong {
+  font-size: 0.9375rem;
+  padding-left: 4px;
+}
+.step-picker .search-box {
+  min-width: 0;
+}
+.picker-list {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  overflow-y: auto;
+  min-height: 0;
+  padding: 2px;
+}
+.picker-list .section-label {
+  margin: 6px 0 0 4px;
+}
+.picker-list .section-label:first-child {
+  margin-top: 0;
+}
+.picker-item {
+  cursor: pointer;
+}
+.picker-item.active {
+  border-color: var(--node-color);
+  background: var(--surface-2);
+}
+.picker-foot {
+  margin: 0;
+  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.canvas-menu {
+  z-index: 11;
+  min-width: 232px;
+  padding: 6px;
+  display: grid;
+  gap: 2px;
+}
+.canvas-menu button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--navy);
+  font: inherit;
+  font-size: 0.875rem;
+  text-align: left;
+  cursor: pointer;
+}
+.canvas-menu button:hover:not(:disabled),
+.canvas-menu button:focus-visible {
+  background: var(--surface-3);
+  outline: none;
+}
+.canvas-menu button.danger {
+  color: var(--red);
+}
+.canvas-menu button.danger:hover:not(:disabled),
+.canvas-menu button.danger:focus-visible {
+  background: var(--red-soft);
+}
+.canvas-menu button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.canvas-menu button svg {
+  flex-shrink: 0;
+  color: inherit;
+}
+.canvas-menu button .grow {
+  flex: 1;
+}
+.canvas-menu kbd {
+  margin-left: 16px;
+  color: var(--muted);
+}
+.canvas-menu-divider {
+  margin: 4px 6px;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+.shortcut-help {
+  left: 12px;
+  bottom: 64px;
+  z-index: 9;
+  width: min(440px, calc(100% - 24px));
+  max-height: calc(100% - 88px);
+  overflow-y: auto;
+  padding: 14px 18px 16px;
+  display: grid;
+  gap: 16px;
+}
+.shortcut-help > header .grow {
+  flex: 1;
+  font-size: 0.9375rem;
+}
+.shortcut-groups {
+  display: grid;
+  gap: 16px;
+}
+.shortcut-groups dl {
+  display: grid;
+  /* One key column width for every group so the descriptions line up down the whole list. */
+  grid-template-columns: 148px minmax(0, 1fr);
+  gap: 8px 16px;
+  margin: 8px 0 0;
+  align-items: center;
+}
+.shortcut-groups dt {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.shortcut-groups dd {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+.shortcut-help > p {
+  margin: 0;
+  font-size: 0.8125rem;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion='full']) .step-picker,
+  :root:not([data-motion='full']) .canvas-menu,
+  :root:not([data-motion='full']) .shortcut-help {
+    animation: none;
+  }
 }
 .flow-drawer {
-  position: absolute;
-  left: 12px;
-  right: 12px;
-  bottom: 12px;
+  position: relative;
+  flex: 0 0 auto;
+  margin: 0 12px 12px;
   z-index: 7;
   max-height: 46%;
   display: flex;
@@ -583,7 +898,7 @@
   align-items: center;
   padding: 8px 10px 8px 16px;
   border-bottom: 1px solid var(--border);
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 .flow-drawer > header svg {
   vertical-align: -2px;
@@ -602,7 +917,7 @@
   display: grid;
   align-content: start;
   gap: 10px;
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 .drawer-result .button {
   justify-self: start;
@@ -629,7 +944,7 @@
   border-radius: 9px;
   background: none;
   text-align: left;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .run-item:hover {
   background: var(--surface-2);
@@ -642,13 +957,14 @@
   flex: 1;
 }
 
-/* Inspector: slides over the canvas only while a node (or the flow info) is open. */
+/* Inspector: a column of its own while a step (or the flow info) is open, so the canvas shrinks
+   beside it instead of hiding the steps on the right. */
+.flow-body.inspecting {
+  grid-template-columns: 220px minmax(0, 1fr) 340px;
+}
 .flow-inspector {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 340px;
+  position: relative;
+  min-height: 0;
   z-index: 9;
   background: var(--surface);
   border-left: 1px solid var(--border);
@@ -687,7 +1003,7 @@
 }
 .inspector-head small {
   display: block;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   color: var(--node-color);
@@ -696,25 +1012,47 @@
   font-family: 'Be Vietnam Pro', sans-serif;
   font-weight: 600;
 }
+/* Problems, notices and fields each keep 16px of air between them. */
 .inspector-errors {
-  margin: 12px 16px 0;
+  margin: 16px 16px 0;
+  padding: 12px 14px;
+}
+.inspector-errors > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
 }
 .inspector-errors ul {
   margin: 0;
-  padding-left: 16px;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
 }
 .inspector-body {
   display: grid;
   gap: 16px;
   padding: 16px;
 }
+.inspector-body .notice {
+  margin: 0;
+  padding: 12px 14px;
+}
+.inspector-body .field {
+  gap: 6px;
+}
 .inspector-body .field label {
-  font-size: 14px;
+  font-size: 0.875rem;
+}
+.inspector-body .field .checkbox-label + .checkbox-label {
+  margin-top: 2px;
+}
+.inspector-head .icon-button.danger:hover {
+  color: var(--red);
+  background: var(--red-soft);
 }
 .inspector-body input,
 .inspector-body select,
 .inspector-body textarea {
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 .condition-card {
   display: grid;
@@ -748,7 +1086,7 @@
   border-radius: 6px;
   padding: 1px 6px;
   font-family: ui-monospace, Consolas, monospace;
-  font-size: 12px;
+  font-size: 0.75rem;
   margin: 0 4px 4px 0;
   display: inline-block;
 }
@@ -757,11 +1095,11 @@ button.var-chip:hover {
   color: var(--teal);
 }
 .field-help {
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.5;
 }
 .flow-help {
-  font-size: 14px;
+  font-size: 0.875rem;
   line-height: 1.55;
   color: var(--muted);
 }
@@ -776,7 +1114,7 @@ button.var-chip:hover {
   margin-bottom: 4px;
 }
 kbd {
-  font-size: 12px;
+  font-size: 0.75rem;
   padding: 1px 5px;
   border: 1px solid var(--border);
   border-bottom-width: 2px;
@@ -802,13 +1140,13 @@ kbd {
 }
 .how-it-works strong {
   display: block;
-  font-size: 15px;
+  font-size: 0.9375rem;
   margin-bottom: 3px;
 }
 .how-it-works small {
   display: block;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.5;
 }
 .how-step {
@@ -821,10 +1159,10 @@ kbd {
   background: var(--teal-soft);
   color: var(--teal-strong);
   font-weight: 700;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .flow-card-when {
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .flow-card-when.on {
   color: var(--green-ink);
@@ -895,11 +1233,11 @@ kbd {
   box-shadow: var(--shadow-md);
 }
 .template-card strong {
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 .template-card small {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.5;
 }
 .template-dots {
@@ -916,6 +1254,13 @@ kbd {
   .flow-body {
     grid-template-columns: 190px minmax(0, 1fr);
   }
+  .flow-body.inspecting {
+    grid-template-columns: 190px minmax(0, 1fr) 320px;
+  }
+  /* Not enough room beside the toolbar while the inspector is open. */
+  .flow-body.inspecting .vue-flow__minimap {
+    display: none;
+  }
 }
 @media (max-width: 900px) {
   .how-it-works {
@@ -924,14 +1269,26 @@ kbd {
   .flow-editor {
     height: calc(100dvh - 72px);
   }
-  .flow-body {
+  .flow-body,
+  .flow-body.inspecting {
     grid-template-columns: minmax(0, 1fr);
   }
   .flow-palette,
   .vue-flow__minimap {
     display: none;
   }
+  .canvas-toolbar .zoom-level,
+  .canvas-toolbar .toolbar-divider {
+    display: none;
+  }
+  .canvas-toolbar .icon-button {
+    width: 44px;
+    height: 44px;
+  }
   .flow-inspector {
+    position: absolute;
+    bottom: 0;
+    right: 0;
     top: auto;
     left: 0;
     width: auto;
@@ -964,7 +1321,7 @@ kbd {
   border-radius: 12px;
   display: grid;
   place-items: center;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 700;
   color: #fff;
   background: #1e3a5f;
@@ -1001,7 +1358,7 @@ kbd {
   stroke-width: 3;
 }
 @media (prefers-reduced-motion: reduce) {
-  .flow-node.run-waiting::after {
+  :root:not([data-motion='full']) .flow-node.run-waiting::after {
     animation: none;
   }
 }
@@ -1049,7 +1406,7 @@ kbd {
   border-radius: 8px;
   background: var(--amber-soft);
   color: var(--amber-ink);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .pc-files-need.met {
   background: var(--green-soft);
@@ -1061,7 +1418,7 @@ kbd {
   margin: 0;
   padding: 0;
   list-style: none;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .pc-docs li {
   display: flex;
@@ -1118,12 +1475,12 @@ kbd {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .pc-file-open small {
   display: block;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .pc-file-info {
   display: grid;
@@ -1133,7 +1490,7 @@ kbd {
   padding: 8px 12px;
   border-radius: 8px;
   background: var(--surface-2);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .pc-file-info dt {
   color: var(--muted);

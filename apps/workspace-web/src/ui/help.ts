@@ -215,7 +215,7 @@ export const HELP: Record<string, HelpTopic> = {
     tips: ['Nội dung trang do plugin cung cấp; liên hệ quản trị nếu trang không tải được.'],
   },
   '/packs': {
-    purpose: 'Gói ngành: giao diện (tên, logo, màu, trang đăng nhập, từ ngữ, menu) và quy trình mẫu theo ngành, cài và gỡ được.',
+    purpose: 'Gói giao diện: giao diện (tên, logo, màu, trang đăng nhập, từ ngữ, menu) và quy trình mẫu theo ngành, cài và gỡ được.',
     steps: [
       'Gói có sẵn: bấm "Xem và cài", đọc phần xem trước (sẽ thêm gì, đổi gì) rồi "Cài gói".',
       'Gói từ cơ quan khác: "Tải gói lên (.zip)", xem trước rồi cài.',
@@ -241,12 +241,27 @@ export const HELP: Record<string, HelpTopic> = {
     ],
   },
   '/settings': {
-    purpose: 'Cơ cấu tổ chức, vai trò và quyền, nhật ký và giao diện.',
+    purpose: 'Cơ cấu tổ chức, vai trò và quyền, nhật ký hoạt động.',
     steps: [
       'Cơ cấu tổ chức: thêm phòng ban, người dùng, chọn lãnh đạo phòng.',
       'Vai trò và quyền: xem và chỉnh những gì mỗi vai trò được làm.',
       'Nhật ký: tra cứu ai đã làm gì, lúc nào.',
     ],
-    tips: ['Biểu mẫu và bước duyệt được thiết kế trong Quy trình nghiệp vụ.'],
+    tips: [
+      'Biểu mẫu và bước duyệt được thiết kế trong Quy trình nghiệp vụ.',
+      'Sáng/tối, cỡ chữ và trợ năng nằm ở Cài đặt cá nhân, mỗi người tự chọn.',
+    ],
+  },
+  '/preferences': {
+    purpose: 'Cài đặt của riêng bạn: giao diện, cỡ chữ, trợ năng, ngôn ngữ và định dạng ngày giờ.',
+    steps: [
+      'Chọn một lựa chọn là có hiệu lực ngay, không cần bấm Lưu.',
+      'Chữ: phóng to cỡ chữ, đổi phông, giãn dòng; khung Xem trước cho thấy kết quả.',
+      'Trợ năng: giảm chuyển động, tăng tương phản, luôn hiện viền focus, gạch chân liên kết.',
+    ],
+    tips: [
+      'Cài đặt được nhớ theo tài khoản trên trình duyệt này; máy khác cần chọn lại.',
+      '"Khôi phục mặc định" đưa mọi lựa chọn về như ban đầu.',
+    ],
   },
 }

@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dx-platform-kit"
-version = "3.0.0"
+version = "3.1.0"
 license = "Apache-2.0"
 requires-python = ">=3.13"
 dependencies = [

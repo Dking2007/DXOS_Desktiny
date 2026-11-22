@@ -1,39 +1,29 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Desktiny contributors
-import { ref } from 'vue'
+// Light, dark or follow the device. The choice is one of the personal settings (ui/preferences.ts);
+// this module keeps the small API the top bar toggle and the command palette use.
+import { computed, ref } from 'vue'
+import { preferences, setPreference, type ThemeChoice } from './preferences'
 
-export type ThemeChoice = 'light' | 'dark' | 'system'
-const KEY = 'dx-workspace-theme'
+export type { ThemeChoice }
 
-function stored(): ThemeChoice {
-  try {
-    const value = window.localStorage.getItem(KEY)
-    return value === 'light' || value === 'dark' ? value : 'system'
-  } catch {
-    return 'system'
-  }
-}
+export const theme = computed(() => preferences.value.theme)
 
-export const theme = ref<ThemeChoice>(stored())
+// Follows the operating system live, so "system" re-renders the toggle when the OS switches.
+const media = typeof window !== 'undefined' ? window.matchMedia?.('(prefers-color-scheme: dark)') : undefined
+export const systemDark = ref(media?.matches ?? false)
+const onSystemTheme = (event: MediaQueryListEvent) => (systemDark.value = event.matches)
+media?.addEventListener?.('change', onSystemTheme)
+import.meta.hot?.dispose(() => media?.removeEventListener?.('change', onSystemTheme))
 
-// `data-theme` is only set for an explicit choice; "system" falls back to the
-// prefers-color-scheme rules in the stylesheet.
-export function applyTheme(choice: ThemeChoice = theme.value) {
-  theme.value = choice
-  const root = document.documentElement
-  if (choice === 'system') delete root.dataset.theme
-  else root.dataset.theme = choice
-  try {
-    if (choice === 'system') window.localStorage.removeItem(KEY)
-    else window.localStorage.setItem(KEY, choice)
-  } catch {
-    // Private windows may block storage; the choice still applies for this visit.
-  }
+/** `data-theme` is only set for an explicit choice; "system" falls back to prefers-color-scheme. */
+export function applyTheme(choice: ThemeChoice) {
+  setPreference('theme', choice)
 }
 
 export function isDark() {
   if (theme.value !== 'system') return theme.value === 'dark'
-  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false
+  return systemDark.value
 }
 
 export function cycleTheme() {

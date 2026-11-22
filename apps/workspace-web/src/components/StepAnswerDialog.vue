@@ -3,13 +3,15 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
-import { Upload } from 'lucide-vue-next'
+import { FileText, Upload, X } from 'lucide-vue-next'
 import type { ApprovalTask, User } from '@dx/web-shared/types.ts'
 import { errorText, newIntent, type Page } from '@dx/web-shared/api.ts'
 import ModalDialog from '@dx/web-shared/components/ModalDialog.vue'
 import { api } from '../api'
 import { toast } from '../ui/toast'
 import { uploadToDrive } from './attachments'
+import { confirmDiscard } from '../ui/unsaved'
+import { reasonMissing, uploadLabel } from './workForms'
 
 /**
  * Answering a flow's request: what it asks to be handed in, the decision when none was picked on
@@ -51,20 +53,48 @@ const users = useQuery({
 })
 const target = ref('')
 
+const picker = ref<HTMLInputElement>()
+const progress = ref({ done: 0, total: 0 })
 async function pick(event: Event) {
   const input = event.target as HTMLInputElement
   const picked = [...(input.files ?? [])]
   input.value = ''
+  if (!picked.length) return
   busy.value = true
+  error.value = ''
+  progress.value = { done: 0, total: picked.length }
   try {
-    for (const file of picked) uploads.value.push(await uploadToDrive(file))
+    for (const file of picked) {
+      uploads.value.push(await uploadToDrive(file))
+      progress.value = { ...progress.value, done: progress.value.done + 1 }
+    }
   } catch (cause) {
     error.value = errorText(cause)
   } finally {
     busy.value = false
+    progress.value = { done: 0, total: 0 }
   }
 }
+/** Why the send button cannot go through yet; shown as its tooltip. */
+const blocked = computed(() => {
+  if (progress.value.total) return 'Chờ tải tệp xong.'
+  if (props.mode === 'forward') return target.value ? '' : 'Chọn người nhận.'
+  if (reasonMissing(!positive.value, reason.value)) return 'Nêu lý do trước khi gửi.'
+  if (uploads.value.length < needFiles.value) return `Cần đính kèm ít nhất ${needFiles.value} tệp.`
+  return ''
+})
+const dirty = computed(
+  () =>
+    !!reason.value.trim() ||
+    !!target.value ||
+    uploads.value.length > 0 ||
+    Object.values(values.value).some((value) => value !== '' && value != null),
+)
+function close() {
+  if (!busy.value && confirmDiscard(dirty.value)) emit('close')
+}
 async function send() {
+  if (busy.value || blocked.value) return
   busy.value = true
   error.value = ''
   try {
@@ -97,20 +127,20 @@ async function send() {
 }
 </script>
 <template>
-  <ModalDialog :title="title" @close="emit('close')">
+  <ModalDialog :title="title" @close="close">
     <form class="stack" @submit.prevent="send">
       <div v-if="error" class="notice error error-inline" role="alert">{{ error }}</div>
       <template v-if="mode === 'forward'">
         <div class="field">
           <label for="forward-user">Chuyển cho<span class="required"> *</span></label>
-          <select id="forward-user" v-model="target" required>
+          <select id="forward-user" v-model="target" required :disabled="busy">
             <option value="">Chọn người…</option>
             <option v-for="user in users.data.value?.items" :key="user.id" :value="user.id">{{ user.display_name }}</option>
           </select>
         </div>
         <div class="field">
           <label for="forward-reason">Lý do</label>
-          <textarea id="forward-reason" v-model="reason" rows="2" maxlength="500" />
+          <textarea id="forward-reason" v-model="reason" rows="2" maxlength="500" :disabled="busy" />
         </div>
       </template>
       <template v-else>
@@ -131,23 +161,67 @@ async function send() {
           <input v-else :id="`step-${field.key}`" v-model="values[field.key]" :type="field.type" :required="field.required" />
         </div>
         <div v-if="takesFiles" class="field">
-          <label class="button secondary small" style="width: fit-content">
-            <Upload :size="14" />Đính kèm tệp<input type="file" multiple hidden @change="pick" />
-          </label>
+          <span class="step-files-label">Tệp kết quả<span v-if="needFiles" class="required"> *</span></span>
+          <div v-if="uploads.length" class="ai-chips" role="list">
+            <span v-for="file in uploads" :key="file.id" class="file-chip" role="listitem"
+              ><FileText :size="14" aria-hidden="true" /><span class="step-file-name" :title="file.name ?? ''">{{
+                file.name
+              }}</span
+              ><button
+                type="button"
+                class="icon-button step-file-remove"
+                :aria-label="`Bỏ ${file.name ?? 'tệp'}`"
+                title="Bỏ tệp này"
+                :disabled="busy"
+                @click="uploads = uploads.filter((item) => item.id !== file.id)"
+              >
+                <X :size="13" /></button
+            ></span>
+          </div>
+          <button type="button" class="button secondary small step-upload" :disabled="busy" @click="picker?.click()">
+            <Upload :size="14" />{{ progress.total ? uploadLabel(progress.done, progress.total) : 'Đính kèm tệp' }}
+          </button>
+          <input ref="picker" type="file" multiple hidden @change="pick" />
           <small v-if="needFiles" class="muted">Cần ít nhất {{ needFiles }} tệp, đã có {{ uploads.length }}.</small>
-          <small v-for="file in uploads" :key="file.id" class="muted">{{ file.name }}</small>
         </div>
         <div v-if="!positive" class="field">
           <label for="step-reason">Lý do<span class="required"> *</span></label>
-          <textarea id="step-reason" v-model="reason" rows="3" required maxlength="3000" />
+          <textarea id="step-reason" v-model="reason" rows="3" required maxlength="3000" :disabled="busy" />
         </div>
       </template>
       <div class="form-actions">
-        <button type="button" class="button secondary" @click="emit('close')">Hủy</button>
-        <button class="button" :disabled="busy || (mode === 'answer' && uploads.length < needFiles)">
-          {{ mode === 'forward' ? 'Chuyển' : positive ? label(chosen) : 'Gửi' }}
+        <button type="button" class="button secondary" :disabled="busy" @click="close">Hủy</button>
+        <button class="button" :class="{ danger: chosen === 'reject' && mode === 'answer' }" :disabled="busy || !!blocked" :title="blocked">
+          {{
+            busy && !progress.total
+              ? 'Đang gửi…'
+              : mode === 'forward'
+                ? 'Chuyển'
+                : positive
+                  ? label(chosen)
+                  : 'Gửi'
+          }}
         </button>
       </div>
     </form>
   </ModalDialog>
 </template>
+<style scoped>
+.step-files-label {
+  font-weight: 600;
+  font-size: 0.9375rem;
+}
+.step-upload {
+  align-self: flex-start;
+}
+.step-file-name {
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.step-file-remove {
+  width: 28px;
+  height: 28px;
+}
+</style>

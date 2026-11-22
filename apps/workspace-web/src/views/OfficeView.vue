@@ -5,7 +5,6 @@ import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
 import { ArrowLeft, ShieldCheck } from 'lucide-vue-next'
 import { api } from '../api'
-import { errorText } from '@dx/web-shared/api.ts'
 import StatePanel from '@dx/web-shared/components/StatePanel.vue'
 interface Editor {
   destroyEditor(): void
@@ -47,6 +46,9 @@ async function loadScript(url: string) {
 // Opened from a dossier: read through the dossier's rights, read-only.
 const fromCase = typeof route.query.case === 'string' ? route.query.case : ''
 async function open() {
+  // A retry starts a fresh editor rather than stacking a second one on the old.
+  editor?.destroyEditor()
+  editor = undefined
   loading.value = true
   error.value = null
   try {
@@ -58,11 +60,14 @@ async function open() {
       `/drive/files/${route.params.id}/office-sessions${fromCase ? `?case_id=${encodeURIComponent(fromCase)}` : ''}`,
       { method: 'POST' },
     )
+    if (disposed) return
     sessionId.value = result.session_id
     await loadScript(result.document_server_url)
     if (disposed) return
     loading.value = false
     await new Promise((resolve) => requestAnimationFrame(resolve))
+    // Left the page during that frame: an editor created now would never be destroyed.
+    if (disposed) return
     if (!window.DocsAPI)
       throw new Error(
         'Trình soạn thảo chưa khởi tạo. Tải lại trang để thử lại.',
@@ -119,15 +124,17 @@ onBeforeUnmount(() => {
     <div v-show="!loading && !error" class="office-frame">
       <div id="document-editor" />
     </div>
-    <div
-      v-if="!loading"
-      class="notice warning"
-      style="border-radius: 0 0 8px 8px; font-size: 13px"
-    >
+    <div v-if="!loading && !error" class="notice warning office-note">
       <span
         >Sau khi sửa xong, hãy đóng trình soạn thảo và chờ vài giây để hệ thống
-        lưu bản mới trước khi trình hồ sơ.<span v-if="error"> {{ errorText(error) }}</span></span
+        lưu bản mới trước khi trình hồ sơ.</span
       >
     </div>
   </section>
 </template>
+<style scoped>
+.office-note {
+  border-radius: 0 0 8px 8px;
+  font-size: 0.8125rem;
+}
+</style>

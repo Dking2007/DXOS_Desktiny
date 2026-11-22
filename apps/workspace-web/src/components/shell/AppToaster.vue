@@ -14,9 +14,9 @@ import { dismiss, toasts } from '../../ui/toast'
         :class="item.kind"
         :role="item.kind === 'error' ? 'alert' : 'status'"
       >
-        <CircleCheck v-if="item.kind === 'success'" :size="18" />
-        <CircleAlert v-else-if="item.kind === 'error'" :size="18" />
-        <Info v-else :size="18" />
+        <CircleCheck v-if="item.kind === 'success'" :size="18" aria-hidden="true" />
+        <CircleAlert v-else-if="item.kind === 'error'" :size="18" aria-hidden="true" />
+        <Info v-else :size="18" aria-hidden="true" />
         <span>{{ item.text }}</span>
         <button
           v-if="item.action"
@@ -31,8 +31,14 @@ import { dismiss, toasts } from '../../ui/toast'
         >
           {{ item.action.label }}
         </button>
-        <button class="toast-close" type="button" aria-label="Đóng thông báo" @click="dismiss(item.id)">
-          <X :size="15" />
+        <button
+          class="toast-close"
+          type="button"
+          aria-label="Đóng thông báo"
+          title="Đóng thông báo"
+          @click="dismiss(item.id)"
+        >
+          <X :size="15" aria-hidden="true" />
         </button>
       </div>
     </TransitionGroup>

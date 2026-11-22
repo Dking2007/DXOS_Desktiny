@@ -6,6 +6,7 @@ import {
   createApi,
   errorText,
   formatDate,
+  setDateFormatter,
   formatSize,
   queryString,
 } from './api'
@@ -65,5 +66,36 @@ describe('API error and formatting contract', () => {
     expect(formatDate(null)).toBe('—')
     expect(formatSize(0)).toBe('0 B')
     expect(formatSize(1024)).toBe('1 KB')
+  })
+  it('formats dates and sizes the same as a freshly built formatter, call after call', () => {
+    const iso = '2026-03-05T08:07:00Z'
+    const date = new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    const dateTime = new Intl.DateTimeFormat('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+    for (let round = 0; round < 3; round += 1) {
+      expect(formatDate(iso)).toBe(date.format(new Date(iso)))
+      expect(formatDate(iso, true)).toBe(dateTime.format(new Date(iso)))
+    }
+    expect(formatDate(iso, true)).not.toBe(formatDate(iso))
+    expect(formatDate('không phải ngày')).toBe('không phải ngày')
+    expect(formatSize(1536)).toBe(`${(1.5).toLocaleString('vi-VN')} KB`)
+    expect(formatSize(5 * 1024 ** 3)).toBe('5 GB')
+  })
+  it('lets the app register its own date format and restores the default afterwards', () => {
+    const iso = '2026-03-05T08:07:00Z'
+    const stock = formatDate(iso)
+    setDateFormatter((value, withTime) => `custom:${value}:${withTime}`)
+    try {
+      expect(formatDate(iso, true)).toBe(`custom:${iso}:true`)
+      expect(formatDate(null)).toBe('—')
+    } finally {
+      setDateFormatter(null)
+    }
+    expect(formatDate(iso)).toBe(stock)
   })
 })

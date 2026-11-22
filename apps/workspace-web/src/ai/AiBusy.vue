@@ -50,7 +50,7 @@ const visible = computed(() => aiActivity.running > 0 && seconds.value >= 6)
   background: var(--violet-soft);
   color: var(--violet-ink);
   box-shadow: 0 10px 28px #0d2e4526;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .ai-busy strong,
 .ai-busy small {
@@ -71,7 +71,7 @@ const visible = computed(() => aiActivity.running > 0 && seconds.value >= 6)
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .ai-busy-icon {
+  :root:not([data-motion='full']) .ai-busy-icon {
     animation: none;
   }
 }

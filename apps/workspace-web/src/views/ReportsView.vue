@@ -93,9 +93,9 @@ function bars(record: Record<string, number>) {
     <h1 class="sr-only">Báo cáo</h1>
     <div class="page-actions">
       <select v-model="scope" aria-label="Phạm vi" class="compact-select">
-        <option value="all">Mọi việc tôi xem được</option>
-        <option value="managed">Việc tôi giao / điều phối</option>
-        <option value="mine">Việc của tôi</option>
+        <option value="all">Mọi việc bạn xem được</option>
+        <option value="managed">Việc bạn giao / điều phối</option>
+        <option value="mine">Việc của bạn</option>
       </select>
       <select v-model.number="days" aria-label="Khoảng thời gian" class="compact-select">
         <option :value="7">7 ngày</option>
@@ -103,9 +103,19 @@ function bars(record: Record<string, number>) {
         <option :value="90">90 ngày</option>
         <option :value="365">12 tháng</option>
       </select>
-      <a class="button secondary" :href="`/workspace/v1/reports/tasks.csv?scope=${scope}`"
+      <a
+        class="button secondary"
+        :href="`/workspace/v1/reports/tasks.csv?scope=${scope}`"
+        download
+        :title="`Tệp CSV, phạm vi: ${SCOPE_LABEL[scope].toLowerCase()}`"
         ><Download :size="16" />Tải danh sách công việc</a
-      ><a class="button secondary" href="/workspace/v1/reports/cases.csv"><Download :size="16" />Tải danh sách hồ sơ</a>
+      ><a
+        class="button secondary"
+        href="/workspace/v1/reports/cases.csv"
+        download
+        title="Tệp CSV gồm mọi hồ sơ bạn được xem"
+        ><Download :size="16" />Tải danh sách hồ sơ</a
+      >
     </div>
   </header>
   <section v-if="report.isPending.value || report.error.value" class="card">
@@ -153,7 +163,7 @@ function bars(record: Record<string, number>) {
         <section class="card">
           <header class="card-header">
             <h2>Công việc theo trạng thái</h2>
-            <span class="muted" style="font-size: 14px"
+            <span class="muted header-note"
               >Thời gian hoàn tất trung bình: {{ hoursText(data.tasks.average_completion_hours) }}</span
             >
           </header>
@@ -173,13 +183,13 @@ function bars(record: Record<string, number>) {
           <div v-if="data.tasks.by_assignee.length" class="table-wrap">
             <table>
               <thead>
-                <tr><th>Người phụ trách</th><th>Đang mở</th><th>Quá hạn</th></tr>
+                <tr><th>Người phụ trách</th><th class="num">Đang mở</th><th class="num">Quá hạn</th></tr>
               </thead>
               <tbody>
                 <tr v-for="row in data.tasks.by_assignee" :key="row.assignee_id ?? 'none'">
                   <td>{{ row.display_name }}</td>
-                  <td>{{ row.open }}</td>
-                  <td :class="{ 'overdue-text': row.overdue }">{{ row.overdue }}</td>
+                  <td class="num">{{ row.open }}</td>
+                  <td class="num" :class="{ 'overdue-text': row.overdue }">{{ row.overdue }}</td>
                 </tr>
               </tbody>
             </table>
@@ -187,15 +197,16 @@ function bars(record: Record<string, number>) {
           <p v-else class="card-body muted">Không có việc đang mở.</p>
         </section>
       </div>
-      <aside class="stack" style="align-content: start">
+      <aside class="stack report-aside">
         <section class="card">
           <header class="card-header">
             <h2>Hồ sơ theo trạng thái <span class="muted">({{ data.cases.total }})</span></h2>
-            <span class="muted" style="font-size: 14px"
-              ><Undo2 :size="14" /> {{ data.cases.returns_in_period }} lần trả lại</span
+            <span class="muted header-note icon-note"
+              ><Undo2 :size="14" aria-hidden="true" />{{ data.cases.returns_in_period }} lần trả lại</span
             >
           </header>
           <div class="card-body">
+            <p v-if="!data.cases.total" class="muted">Chưa có hồ sơ trong phạm vi.</p>
             <div v-for="row in bars(data.cases.by_status)" :key="row.status" class="bar-row">
               <StatusBadge :status="row.status" />
               <div class="metric-bar"><span :style="{ width: `${row.width}%` }" /></div>
@@ -205,13 +216,13 @@ function bars(record: Record<string, number>) {
         </section>
         <section class="card">
           <div class="card-body stack">
-            <div class="date-line"><HardDrive :size="16" /> Tài liệu của tôi</div>
+            <div class="date-line"><HardDrive :size="16" aria-hidden="true" />Tài liệu của tôi</div>
             <p>
               <strong>{{ data.storage.my_files }}</strong> tệp ·
               {{ formatSize(data.storage.my_bytes) }}
             </p>
             <template v-if="data.automations">
-              <div class="date-line"><Workflow :size="16" /> Tự động hóa</div>
+              <div class="date-line"><Workflow :size="16" aria-hidden="true" />Tự động hóa</div>
               <p>
                 {{ data.automations.enabled_rules }} luồng đang áp dụng ·
                 <span :class="{ 'overdue-text': data.automations.failed_in_period }"
@@ -232,35 +243,35 @@ function bars(record: Record<string, number>) {
         </details>
       </aside>
     </div>
-    <section v-if="data.by_department.length" class="card" style="margin-top: 20px">
+    <section v-if="data.by_department.length" class="card department-card">
       <header class="card-header">
         <h2>Tình hình từng phòng ban</h2>
-        <span class="muted" style="font-size: 14px">Phòng có nhiều việc, hồ sơ quá hạn xếp trên</span>
+        <span class="muted header-note">Phòng có nhiều việc, hồ sơ quá hạn xếp trên</span>
       </header>
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
               <th>Đơn vị</th>
-              <th>Việc đang mở</th>
-              <th>Việc quá hạn</th>
-              <th>Hoàn tất trong kỳ</th>
-              <th>Hồ sơ</th>
-              <th>Đang chờ duyệt</th>
-              <th>Hồ sơ quá hạn</th>
-              <th>Lần trả lại</th>
+              <th class="num">Việc đang mở</th>
+              <th class="num">Việc quá hạn</th>
+              <th class="num">Hoàn tất trong kỳ</th>
+              <th class="num">Hồ sơ</th>
+              <th class="num">Đang chờ duyệt</th>
+              <th class="num">Hồ sơ quá hạn</th>
+              <th class="num">Lần trả lại</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="row in data.by_department" :key="row.department_id ?? 'none'">
               <td>{{ row.name }}</td>
-              <td>{{ row.tasks_open }}</td>
-              <td :class="{ 'overdue-text': row.tasks_overdue }">{{ row.tasks_overdue }}</td>
-              <td>{{ row.tasks_completed }}</td>
-              <td>{{ row.cases_total }}</td>
-              <td>{{ row.cases_waiting }}</td>
-              <td :class="{ 'overdue-text': row.cases_overdue }">{{ row.cases_overdue }}</td>
-              <td>{{ row.returns }}</td>
+              <td class="num">{{ row.tasks_open }}</td>
+              <td class="num" :class="{ 'overdue-text': row.tasks_overdue }">{{ row.tasks_overdue }}</td>
+              <td class="num">{{ row.tasks_completed }}</td>
+              <td class="num">{{ row.cases_total }}</td>
+              <td class="num">{{ row.cases_waiting }}</td>
+              <td class="num" :class="{ 'overdue-text': row.cases_overdue }">{{ row.cases_overdue }}</td>
+              <td class="num">{{ row.returns }}</td>
             </tr>
           </tbody>
         </table>
@@ -269,3 +280,23 @@ function bars(record: Record<string, number>) {
     <ProcessWaitCard v-if="canSeeProcess" :days="days" />
   </template>
 </template>
+<style scoped>
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.header-note {
+  font-size: 0.875rem;
+}
+.icon-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.report-aside {
+  align-content: start;
+}
+.department-card {
+  margin-top: 24px;
+}
+</style>

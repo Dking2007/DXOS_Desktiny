@@ -42,7 +42,49 @@ Danh sách đầy đủ trong [THIRD_PARTY.md](THIRD_PARTY.md) (V3: 310 npm, 63 
 - V3 áp dụng lại gói ngành (PR #37) mà `main` đã revert ở PR #38; nhóm cần thống nhất trước khi merge `release/v3.0.0` vào `main`. Kho chưa có `.gitattributes`, máy Windows đặt `core.autocrlf=true` sẽ hỏng script khởi tạo Postgres (xem docs/V3_CHANGES.md, mục 5).
 - Cập nhật README/docs nói "chưa nghiệm thu" ở nhiều nơi: giữ nguyên, không tuyên bố quá mức.
 
-## 5. Xác nhận
+## 5. Đối chiếu yêu cầu đề thi
+
+Nguồn đã đối chiếu ngày 21/11/2026: [Thể lệ](https://vfossa.vn/tin-tuc/the-le-olp-phan-mem-nguon-mo-nam-2026-760.html)
+(09/06/2026) và [Đề thi](https://vfossa.vn/tin-tuc/de-thi-phan-mem-nguon-mo-olp-2026-798.html) (30/09/2026).
+
+### 5.1 Tiêu chí PoF (50 điểm) và bằng chứng
+
+| Tiêu chí (tối đa) | Lỗi bị trừ theo thể lệ | Bằng chứng trong kho |
+|---|---|---|
+| 1. Quản lý mã nguồn (5) | không web viewer, không truy cập mở, không thực sự dùng | Kho công khai trên GitHub; lịch sử commit của ba thành viên; PR #30–#39 |
+| 2. Giấy phép OSI (10) | thiếu giấy phép trong từng tệp; không tương thích; thiếu thông báo mục đích; thiếu toàn văn | Apache-2.0; header SPDX trong mọi tệp mã (`add_spdx_headers --check`); [LICENSE](LICENSE), [LICENSES/](LICENSES/); README mục Giấy phép nêu lý do và tính tương thích |
+| 3. Release (5) | không có; không theo phiên bản; định dạng không mở | [Releases](https://github.com/Dking2007/DXOS_V2/releases) `v0.2.0`–`v3.0.0`, gói `.tar.gz` kèm `SHA256SUMS` (gói zip do GitHub tự thêm, không phải bản phân phối) |
+| 4. Biên dịch từ mã nguồn (10) | thiếu hướng dẫn; sửa tay header; không cấu hình được; công cụ đóng; không chạy ngoài thư mục nguồn | [BUILD.md](BUILD.md): `make venv deps build test`, cấu hình qua biến môi trường/`.env`, `make install PREFIX=` rồi chạy từ bản đã cài (mục 3) |
+| 5. Thư viện, gói đính kèm (10) | không dùng thư viện hệ thống; đính kèm gói dự án khác; sửa mã gói đính kèm | [THIRD_PARTY.md](THIRD_PARTY.md); phụ thuộc lấy qua npm/PyPI/image chính thức; không có `vendor/` hay mã bên thứ ba trong Git (mục 2) |
+| 6. Tài liệu, giao tiếp (10) | thiếu bug tracker; thiếu changelog; thiếu README | [Issues](https://github.com/Dking2007/DXOS_V2/issues); [CHANGELOG.md](CHANGELOG.md); [README.md](README.md), [docs/installation.md](docs/installation.md) |
+
+### 5.2 Yêu cầu bắt buộc của đề
+
+| Yêu cầu | Thành phần | Trạng thái |
+|---|---|---|
+| Core headless ở Tầng 1, không cung cấp giao diện | `services/core-api`, `core-worker`; chỉ có API `/core/v1/` | Có. Core admin (`apps/core-admin`) là client riêng ở Tầng 2, không phải phần của Core |
+| Identity/SSO | Keycloak, OIDC code flow + PKCE | Có |
+| API Gateway | Nginx (`infra/gateway/nginx.conf`): định tuyến, giới hạn tần suất, CSP, chặn `/internal/` | Có |
+| Dữ liệu có cấu trúc và phi cấu trúc | Schema/record có phiên bản (PostgreSQL); tệp có phiên bản (RustFS, S3) | Có |
+| Workflow | Engine đồ thị (`packages/flowkit`), run, human task | Có |
+| Ít nhất một ứng dụng giao diện trong H-P-D-I | Workspace: H (giao việc, trao đổi), P (hồ sơ, phê duyệt, quy trình), D (báo cáo, một phần) | Có; **I (Trí tuệ) chưa có** |
+
+### 5.3 Bốn nguyên tắc kỹ thuật (đề nêu, không ghi bắt buộc)
+
+| Nguyên tắc | Trạng thái |
+|---|---|
+| Vòng đời dữ liệu, đẩy dữ liệu lịch sử xuống hồ dữ liệu | Chưa có; định hướng |
+| Hội tụ IT/OT, dữ liệu cảm biến | Chưa có; định hướng |
+| Phả hệ, nguồn gốc, chất lượng dữ liệu | Một phần: phiên bản record/tệp, snapshot hồ sơ, audit có chuỗi băm (`audit_chain.py`) |
+| Zero-Trust, GitOps, quét mã độc ở biên | Một phần: OIDC cho mọi API, ACL; **chưa có quét mã độc** |
+
+### 5.4 Nộp bài
+
+Email trước **17:00 06/12/2026** tới `olpvietnam@vaip.vn` và `thuky@vfossa.vn`, tiêu đề
+`BÀI THI PMNM 2026 - [Tên Đội] - [Tên Trường]`, nội dung theo mẫu của BTC (thành viên, người hướng dẫn, đường dẫn kho,
+xác nhận đăng ký qua trường, cam kết bản quyền). Chấm kho mã 07–09/12; chung kết 10/12, trình bày 15 phút.
+
+## 6. Xác nhận
 Chúng tôi đã tự rà soát và khai báo trung thực theo thể lệ OLP PMNM 2026.
 
 Người ký lần 1: ________________  Ngày: ________   ·   Người ký lần 2 (03/12): ________________  Ngày: ________

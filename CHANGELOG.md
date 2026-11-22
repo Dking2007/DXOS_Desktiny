@@ -7,6 +7,80 @@ V2 → V3: [docs/V3_CHANGES.md](docs/V3_CHANGES.md).
 
 ## [Unreleased]
 
+Nhánh `feat/ui-ux-nang-cap`: nâng cấp trải nghiệm người dùng của Workspace. Không đổi API, không thêm migration
+hay thư viện mới; thay đổi phía máy chủ duy nhất là luồng đăng nhập OIDC.
+
+### Added
+- **Cài đặt cá nhân** (`/preferences`, mọi người dùng; 9bf7477): giao diện sáng/tối/theo máy, mật độ hiển thị, thu
+  gọn thanh bên, cỡ chữ 90–125% (toàn bộ cỡ chữ đổi sang `rem`), phông chữ, giãn dòng, giảm chuyển động, tăng tương
+  phản, luôn hiện viền focus, gạch chân liên kết, định dạng ngày (dd/mm/yyyy hoặc yyyy-mm-dd), giờ 24h/12h, ngày đầu
+  tuần, khôi phục mặc định. Áp dụng ngay, lưu theo từng người trên trình duyệt. Ngôn ngữ hiện chỉ có tiếng Việt.
+- **Trình thiết kế quy trình** (c5d4bb9): sao chép/cắt/dán/nhân bản nhiều bước kèm đường nối, hoàn tác/làm lại,
+  chọn tất cả, dịch bước bằng phím mũi tên; menu chuột phải cho bước, nền và đường nối; nút `+` ở cổng ra và giữa
+  đường nối để chèn bước tự nối; sắp xếp tự động trái sang phải; bám lưới; căn chỉnh nhiều bước; bảng phím tắt (`?`).
+- **Cơ cấu tổ chức** (Thiết lập; 345be65): ba chế độ xem Sơ đồ / Cây / Bảng; kéo, thu phóng, vừa khung, xuất SVG/PNG;
+  thống kê phòng ban, thành viên, chưa xếp phòng, phòng chưa có lãnh đạo, độ sâu; bảng chi tiết phòng với thao tác
+  nhanh; cảnh báo dữ liệu lỗi (vòng lặp phòng cha, phòng cha đã mất).
+- **Bộ chọn người** khi giao việc (fd29309): tìm không dấu, nhóm Cá nhân/Đơn vị, chọn nhiều thành thẻ, chọn cả
+  phòng, gợi ý người hay chọn, dùng được bằng bàn phím; vẫn mượt với khoảng 1000 người.
+- Icon điều hướng có màu theo module, tương phản ≥ 3:1 ở cả nền sáng và tối (9bf7477); nút "Lên đầu trang" (9bf7477).
+
+### Changed
+- Chuẩn hóa khoảng cách theo token (`--space-*`, `--gap-icon`, `--field-gap`, `--control-h`): nút, tab, ô nhập,
+  cảnh báo, bảng, hộp thoại không còn dính nhau; viền focus rõ khi dùng bàn phím (9bf7477).
+- Rà soát nút bấm trên các màn hình (fd29309, 0c682f3): chống gửi trùng, trạng thái "Đang …", nút bị khóa có lý do,
+  xác nhận thao tác nguy hiểm, hỏi trước khi bỏ nội dung đã gõ (ModalDialog có `dirty`/`beforeClose`), ẩn thao tác
+  khi thiếu quyền, trạng thái tải/trống/lỗi cho danh sách.
+- Hộp Phát hành quy trình: "Lưu & phát hành" khi canvas chưa lưu, thay cho nút Phát hành bấm được nhưng lỗi.
+- Tab "Giao diện" rời khỏi Thiết lập (quản trị) sang Cài đặt cá nhân; địa chỉ cũ tự chuyển hướng.
+
+### Fixed
+- Đăng nhập để form Keycloak quá 5 phút trả JSON `oidc_state_invalid`: state đăng nhập nay sống 30 phút, callback
+  lỗi chuyển về trang đăng nhập kèm thông báo (f3be40b).
+- Nút thu gọn thanh bên không có tác dụng ở trang thiết kế quy trình (9bf7477).
+- Hồ sơ báo "Đã phê duyệt" khi bước duyệt đã được người khác xử lý; "Nghiệm thu" đóng việc không hỏi; một tệp lỗi
+  làm mất các tệp đã tải lên trước đó (fd29309).
+- Dữ liệu trả về muộn ghi đè dữ liệu mới: tin cũ trộn vào hội thoại khác, gợi ý nhãn AI ghi sang tệp khác, nhận xét
+  AI hiện số liệu kỳ cũ (fd29309, 0c682f3).
+- Rò tài nguyên: tài liệu PDF và URL tạm khi đóng xem trước giữa chừng, trình soạn thảo ONLYOFFICE tạo sau khi rời
+  trang, các hẹn giờ không được hủy (fd29309, 0c682f3, c5d4bb9).
+
+### Performance
+- Canvas không tuần tự hóa sơ đồ trong lúc kéo bước và không vẽ lại cả trang theo từng khung thu phóng (c5d4bb9).
+- Nhắn tin và bảng tin chỉ vẽ lại dòng/bài thay đổi khi gõ phím (0c682f3); bộ định dạng ngày/dung lượng dùng lại
+  thay vì tạo mới mỗi dòng; danh mục ít đổi không tải lại mỗi lần quay lại cửa sổ (9bf7477, c5d4bb9).
+
+## [3.1.0] - 2026-11-21 — plugin đóng gói
+
+Gộp nhánh `feat/plugin-dong-goi` (Raphael-Fug, Mai1174). Thêm migration `workspace_0028`; không xóa hay đổi
+API cũ nên giữ số chính 3. SDK `desktiny-plugin` lên 0.3.0 (thêm định dạng `desktiny-plugin/2`).
+
+### Added
+- **Plugin đóng gói** (`desktiny-plugin/2`, migration `workspace_0028`, [docs/plugins.md](docs/plugins.md)): cài một
+  tệp `.zip` là có tính năng mới, không cần máy chủ riêng.
+  - Desktiny lưu và tự phục vụ trang, script, CSS, ảnh của plugin ở `/workspace/v1/plugin-files/…` khi plugin đang
+    bật, luôn kèm CSP `sandbox` (mở thẳng địa chỉ cũng không chạy với origin của Desktiny); địa chỉ theo SHA-256 của
+    gói.
+  - Plugin mang theo **gói giao diện** (`pack`): xem trước cùng plugin, cài/nâng cấp/gỡ cùng plugin, không gỡ riêng được.
+  - Quản trị › Plugin: nhãn “Đóng gói”, số tệp giao diện, gói giao diện đi kèm; duyệt plugin đóng gói không cấp khoá.
+  - SDK khung tự nhận địa chỉ Desktiny với trang đóng gói; `desktiny-plugin check` kiểm trang và gói giao diện trong thư
+    mục. Plugin mẫu `examples/plugins/mot-cua-mau` (trang tính hạn theo ngày làm việc, phiếu tiếp nhận, quy trình một
+    cửa).
+- Gói giao diện chỉnh được trang đăng nhập: nền chuyển sắc (với ảnh nền là lớp phủ) có kiểm tương phản chữ trắng
+  ≥ 4,5:1 ở trình tạo gói và máy chủ; chữ trên nút đăng nhập, dòng ghi chú dưới nút, bật/tắt hiệu ứng chuyển động;
+  xem trước theo giá trị mới. Gói cũ giữ trang mặc định.
+
+### Docs
+- README: mô tả kiến trúc theo hai tầng của đề thi OLP PMNM 2026 (Core headless ở Tầng 1, ứng dụng giao diện ở Tầng 2);
+  Core admin ghi là client riêng, không thuộc Core; thêm liên kết trực tiếp tới bug tracker và trang Releases.
+- SELF_REVIEW: thêm mục 5 đối chiếu từng tiêu chí PoF, yêu cầu bắt buộc, bốn nguyên tắc kỹ thuật và quy định nộp bài
+  với thể lệ và đề thi gốc trên vfossa.vn (đọc ngày 21/11/2026).
+- Bỏ khỏi kho các ghi chép nội bộ về so sánh với dự án khác; sửa một liên kết hỏng trong `docs/design/`.
+
+### Changed
+- Đổi tên **Gói ngành** thành **Gói giao diện** trên menu, tiêu đề trang, hướng dẫn, thông báo và tài liệu (mã,
+  đường dẫn `/packs`, API và định dạng `desktiny-pack/1` giữ nguyên).
+
 ## [3.0.0] - 2026-11-15 — DXOS V3: gói ngành và plugin kết nối
 
 Bản này gồm gói ngành (PR #37, áp dụng lại sau khi bị revert ở PR #38) và nhánh `feat/plugin-ket-noi`
@@ -44,8 +118,9 @@ phiên bản của chính chúng.
   - Trình thiết kế quy trình: ô tìm bước, nhóm bước thu gọn được; nút Lưu chuyển “Đã lưu” khi không có thay đổi.
 
 ### Added
-- **Mở rộng plugin kết nối** (API bản 2, migration `workspace_0024`–`workspace_0027`, [docs/plugins.md](docs/plugins.md)):
-  - API ghi có phạm vi: `cases.comment`, `cases.fields.write` (chỉ trường khai trong `writes.fields` và được duyệt,
+- **Plugin đóng gói** (`desktiny-plugin/2`, migration `workspace_0028`, [docs/plugins.md](docs/plugins.md)): cài một
+  tệp `.zip` là có tính năng mới, không cần máy chủ riêng.
+  - Dee` (chỉ trường khai trong `writes.fields` và được duyệt,
     cần token phiên), `tasks.write` (cần token phiên), `notifications.send`; `Idempotency-Key` bắt buộc; lịch sử hồ sơ
     hiện “Plugin X” hoặc “A qua plugin X”; nhật ký hoạt động `plugin.write.*`.
   - Tệp: `files.read` (danh sách, nội dung qua Core kèm SHA-256), `cases.attach` (25 MB/tệp, 200 MB/ngày, gắn với
@@ -292,8 +367,8 @@ phiên bản của chính chúng.
   công khai; cổng nội bộ/HTTP phải có trong biến mới `ASSISTANT_ALLOWED_HOSTS`; kiểm lại trước mỗi
   lần gọi, không theo chuyển hướng.
 - `scripts/audit_repo.mjs` và bước CI tương ứng: thoát 1 nếu Git đang theo dõi tệp `.env` (trừ `.example`), khóa/chứng chỉ riêng, bản dump, `infra/identity/generated/`, hoặc image Compose không ghim phiên bản hay dùng `latest`. Chạy trên kho hiện tại: sạch (269 tệp); thử trên kho mẫu có lỗi: 3 vi phạm, thoát 1. Ý tưởng từ gagaduy/OpenDXOS.
-- `packages/pii-vn` (`dx-piivn` 0.1.0): dò CCCD, CMND, số điện thoại di động, số tài khoản, mã số thuế và e-mail trong văn bản, không phụ thuộc thư viện ngoài. CCCD được kiểm mã tỉnh, chữ số thế kỷ và năm sinh; số 12 chữ số ngẫu nhiên qua khoảng 1,6% (test đo, ngưỡng 3%). 12 test, `ruff` sạch. Danh sách mã tỉnh và đầu số di động chưa đối chiếu văn bản chính thức; chưa nối vào Workspace. Xem `docs/danh-gia-3-du-an.md`.
-- Chuỗi băm cho nhật ký audit của Core (`dx_core/audit_chain.py`, migration `core_0003`): mỗi dòng audit mới chứa `seq`, `prev_hash`, `entry_hash` (SHA-256) nên sửa, xóa hoặc đảo dòng bị phát hiện. `GET /core/v1/audit-logs/verify` (quản trị) trả `ok`, số dòng đã kiểm, `head` và dòng đầu tiên bị hỏng. Trên PostgreSQL, trigger chặn `UPDATE`/`DELETE` bảng `audit_logs`. 5 test mới; migration và trigger đã chạy thử trên PostgreSQL 17. Dòng audit cũ (trước migration) được báo là `unchained`, không coi là hợp lệ. Ý tưởng lấy từ dự án PSA-OVNCR/dxos (I4); xem `docs/so-sanh-psa-dxos.md`. Chưa neo `head` ra ngoài và chưa có chuỗi cho audit của Workspace.
+- `packages/pii-vn` (`dx-piivn` 0.1.0): dò CCCD, CMND, số điện thoại di động, số tài khoản, mã số thuế và e-mail trong văn bản, không phụ thuộc thư viện ngoài. CCCD được kiểm mã tỉnh, chữ số thế kỷ và năm sinh; số 12 chữ số ngẫu nhiên qua khoảng 1,6% (test đo, ngưỡng 3%). 12 test, `ruff` sạch. Danh sách mã tỉnh và đầu số di động chưa đối chiếu văn bản chính thức; chưa nối vào Workspace.
+- Chuỗi băm cho nhật ký audit của Core (`dx_core/audit_chain.py`, migration `core_0003`): mỗi dòng audit mới chứa `seq`, `prev_hash`, `entry_hash` (SHA-256) nên sửa, xóa hoặc đảo dòng bị phát hiện. `GET /core/v1/audit-logs/verify` (quản trị) trả `ok`, số dòng đã kiểm, `head` và dòng đầu tiên bị hỏng. Trên PostgreSQL, trigger chặn `UPDATE`/`DELETE` bảng `audit_logs`. 5 test mới; migration và trigger đã chạy thử trên PostgreSQL 17. Dòng audit cũ (trước migration) được báo là `unchained`, không coi là hợp lệ. Ý tưởng lấy từ dự án PSA-OVNCR/dxos (I4). Chưa neo `head` ra ngoài và chưa có chuỗi cho audit của Workspace.
 - `packages/flowkit` (`dx-flowkit` 0.1.0): kiểm tra và chạy thử đồ thị quy trình JSON, tách từ `dx_core.workflow`, không phụ thuộc thư viện ngoài. 56 test; cùng kết quả với mã gốc trên 20.000 ca ngẫu nhiên. `dx_core.workflow` chưa dùng gói này.
 - `plugins/vn-document-format` (0.1.0): plugin ONLYOFFICE kiểm tra thể thức văn bản hành chính theo Nghị định 30/2020/NĐ-CP, Phụ lục I. 29 test; đã chạy thử trong ONLYOFFICE 8.3.3 trên hai tệp mẫu. Có icon, ảnh chụp và CHANGELOG theo hướng dẫn marketplace. Chưa kiểm lề trên 8.3.3 (thiếu hàm đọc lề); chưa gửi lên marketplace.
 - Mục "Đóng góp ngược cho cộng đồng nguồn mở" trong README, ghi trạng thái thật từng việc.
@@ -364,9 +439,10 @@ Trạng thái kho trước khi bước vào V2, tag hồi tố tại `f089bfb`.
 ### Fixed
 - Thứ tự import trong `auth.py` để CI backend qua ruff — `d495abb`.
 
-[Unreleased]: https://github.com/Raphael-Fug/DXOS_V2/compare/v3.0.0...HEAD
-[3.0.0]: https://github.com/Raphael-Fug/DXOS_V2/compare/v0.2.2...v3.0.0
-[0.2.2]: https://github.com/Raphael-Fug/DXOS_V2/compare/v0.2.1...v0.2.2
-[0.2.1]: https://github.com/Raphael-Fug/DXOS_V2/compare/v0.2.0...v0.2.1
-[0.2.0]: https://github.com/Raphael-Fug/DXOS_V2/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/Raphael-Fug/DXOS_V2/releases/tag/v0.1.0
+[Unreleased]: https://github.com/Dking2007/DXOS_V2/compare/v3.1.0...HEAD
+[3.1.0]: https://github.com/Dking2007/DXOS_V2/compare/v3.0.0...v3.1.0
+[3.0.0]: https://github.com/Dking2007/DXOS_V2/compare/v0.2.2...v3.0.0
+[0.2.2]: https://github.com/Dking2007/DXOS_V2/compare/v0.2.1...v0.2.2
+[0.2.1]: https://github.com/Dking2007/DXOS_V2/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/Dking2007/DXOS_V2/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/Dking2007/DXOS_V2/releases/tag/v0.1.0

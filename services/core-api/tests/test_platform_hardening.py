@@ -129,6 +129,24 @@ def test_oidc_callback_rejects_different_access_and_identity_subject(identity, m
     assert client.cookies.get("dx_core_session") is None
 
 
+def test_oidc_callback_without_state_cookie_restarts_sign_in(identity):
+    """A sign-in left open past the state cookie returns to a readable page, not a JSON 401."""
+    auth, _, app, _ = identity
+    client = TestClient(app, base_url=auth.settings.public_base_url)
+    response = client.get("/core/v1/auth/login", follow_redirects=False)
+    state = client.cookies.get("dx_core_session_state")
+    assert "max-age=1800" in response.headers["set-cookie"].lower()
+    client.cookies.clear()
+    response = client.get(
+        "/core/v1/auth/callback", params={"state": state, "code": "valid-code"}, follow_redirects=False
+    )
+    assert response.status_code == 302
+    assert response.headers["location"] == "/console/?login=expired"
+    response = client.get("/core/v1/auth/callback", params={"state": "forged"}, follow_redirects=False)
+    assert response.headers["location"] == "/console/?login=invalid"
+    assert client.cookies.get("dx_core_session") is None
+
+
 def test_refresh_rejects_different_subject(identity, monkeypatch):
     auth, engine, app, encode = identity
     with Session(engine) as db:

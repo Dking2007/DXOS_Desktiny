@@ -3,7 +3,7 @@
 **Định hướng:** Thiết kế, kiểm chứng và vận hành quy trình linh hoạt, tích hợp tài liệu và AI có căn cứ.  
 **Backend:** Python + FastAPI · **Frontend:** Vue.js 3 + TypeScript  
 **Ngày:** 20/10/2026 · **Phiên bản:** 1.0  
-**Trạng thái cập nhật:** Bản P0 cơ bản, một phần P1 và P2 đã có mã: gói nghiệp vụ, kiểm chứng, chạy thử, trace, cổng phát hành, so sánh phiên bản, căn cứ trường, dashboard thời gian chờ, gợi ý kiểm tra định lượng, bộ thử nhiều fixture và thư viện mẫu nội bộ. Xem [hướng dẫn triển khai](docs/process-packages.md). OCR/LLM tự động và sandbox integration vẫn là đề xuất. Chưa chạy kiểm thử tích hợp trên môi trường Compose.
+**Trạng thái cập nhật:** Bản P0 cơ bản, một phần P1 và P2 đã có mã: gói nghiệp vụ, kiểm chứng, chạy thử, trace, cổng phát hành, so sánh phiên bản, căn cứ trường, dashboard thời gian chờ, gợi ý kiểm tra định lượng, bộ thử nhiều fixture và thư viện mẫu nội bộ. Xem [hướng dẫn triển khai](../process-packages.md). OCR/LLM tự động và sandbox integration vẫn là đề xuất. Chưa chạy kiểm thử tích hợp trên môi trường Compose.
 
 ---
 

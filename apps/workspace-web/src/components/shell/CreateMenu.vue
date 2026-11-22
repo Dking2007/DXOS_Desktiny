@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <!-- SPDX-FileCopyrightText: 2026 Desktiny contributors -->
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   FilePlus2,
@@ -13,7 +13,8 @@ import {
   Upload,
 } from 'lucide-vue-next'
 import { useSession } from '../../stores/session'
-import { useDismiss } from '../../ui/popover'
+import { toneForPath } from '../../ui/nav'
+import { moveMenuFocus, useDismiss } from '../../ui/popover'
 
 const session = useSession()
 const route = useRoute()
@@ -21,7 +22,17 @@ const router = useRouter()
 const open = ref(false)
 const root = ref<HTMLElement>()
 const trigger = ref<HTMLButtonElement>()
+const menu = ref<HTMLElement>()
 useDismiss(root, open, trigger)
+
+// Opening from the keyboard puts focus on the first item, as a native menu does.
+async function openFromKey(event: KeyboardEvent) {
+  event.preventDefault()
+  open.value = true
+  await nextTick()
+  const items = menu.value?.querySelectorAll<HTMLElement>('[role="menuitem"]')
+  items?.[event.key === 'ArrowUp' ? items.length - 1 : 0]?.focus()
+}
 
 const ALL = [
   { label: 'Giao việc', hint: 'Giao cho người hoặc phòng, đặt hạn', icon: ListPlus, path: '/tasks', query: { create: '1' }, capability: 'tasks.create' },
@@ -49,14 +60,27 @@ async function go(item: (typeof ALL)[number]) {
       type="button"
       aria-haspopup="menu"
       :aria-expanded="open"
+      aria-controls="create-menu-list"
+      aria-label="Tạo mới"
+      title="Tạo mới"
       @click="open = !open"
+      @keydown.down="openFromKey"
+      @keydown.up="openFromKey"
     >
-      <Plus :size="17" /><span>Tạo mới</span>
+      <Plus :size="17" aria-hidden="true" /><span>Tạo mới</span>
     </button>
-    <div v-if="open" class="dropdown create-dropdown" role="menu" aria-label="Tạo mới">
+    <div
+      v-if="open"
+      id="create-menu-list"
+      ref="menu"
+      class="dropdown create-dropdown"
+      role="menu"
+      aria-label="Tạo mới"
+      @keydown="moveMenuFocus(menu, $event)"
+    >
       <button v-for="item in items" :key="item.label" type="button" role="menuitem" @click="go(item)">
-        <span class="dropdown-icon"><component :is="item.icon" :size="18" /></span>
-        <span><strong>{{ item.label }}</strong><small>{{ item.hint }}</small></span>
+        <span class="dropdown-icon" :data-tone="toneForPath(item.path)" aria-hidden="true"><component :is="item.icon" :size="18" /></span>
+        <span class="dropdown-text"><strong>{{ item.label }}</strong><small>{{ item.hint }}</small></span>
       </button>
     </div>
   </div>

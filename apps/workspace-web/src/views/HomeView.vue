@@ -194,7 +194,7 @@ const summary = computed(() => {
         <h3 :class="{ danger: group.key === 'overdue' }">{{ group.label }} <span>{{ group.items.length }}</span></h3>
         <div v-for="item in group.items" :key="`${item.kind}:${item.id}`" class="agenda-row" :class="{ overdue: item.overdue }">
           <span class="agenda-icon" :class="item.kind"><component :is="KIND_ICONS[item.kind]" :size="17" /></span>
-          <RouterLink :to="item.link" class="agenda-main">
+          <RouterLink :to="item.link" class="agenda-main" :title="item.title">
             <strong>{{ item.title }}</strong>
             <small
               >{{ item.detail }}<template v-if="item.due_at"> · <span :class="{ 'overdue-text': item.overdue }">{{ dueText(item) }}</span></template></small
@@ -209,12 +209,14 @@ const summary = computed(() => {
             :aria-label="`${ACTIONS[item.action].label}: ${item.title}`"
             @click="act(item)"
           >
-            <component :is="ACTIONS[item.action].icon" :size="15" />{{ ACTIONS[item.action].label }}
+            <component :is="ACTIONS[item.action].icon" :size="15" />{{
+              busyId === item.id ? 'Đang nhận…' : ACTIONS[item.action].label
+            }}
           </button>
         </div>
       </div>
     </section>
-    <aside v-if="sideBlocks.length" class="stack" style="align-content: start">
+    <aside v-if="sideBlocks.length" class="stack home-aside">
       <section v-if="shows('quick.start')" class="card" :style="{ order: placeOf('quick.start') }">
         <header class="card-header"><h2>Bắt đầu nhanh</h2></header>
         <RouterLink v-if="session.can('tasks.create')" to="/tasks?create=1" class="home-launcher"
@@ -256,7 +258,9 @@ const summary = computed(() => {
         />
         <div v-for="item in cases.data.value?.items" :key="item.id" class="list-row">
           <div class="grow">
-            <RouterLink :to="`/cases/${item.id}`" class="row-link">{{ item.title }}</RouterLink
+            <RouterLink :to="`/cases/${item.id}`" class="row-link home-case-title" :title="item.title">{{
+              item.title
+            }}</RouterLink
             ><small>{{ formatDate(item.updated_at || item.created_at) }}</small>
           </div>
           <StatusBadge :status="item.status" />
@@ -268,3 +272,13 @@ const summary = computed(() => {
     <PluginFrames place="home.widget" />
   </div>
 </template>
+<style scoped>
+.home-aside {
+  align-content: start;
+}
+.home-case-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+</style>

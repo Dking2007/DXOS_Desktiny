@@ -1,13 +1,14 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <!-- SPDX-FileCopyrightText: 2026 Desktiny contributors -->
 <script setup lang="ts">
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
 import {
   Bookmark,
   BookmarkCheck,
   Building2,
   ChevronDown,
   Globe2,
+  Loader2,
   Megaphone,
   MessageCircle,
   MoreHorizontal,
@@ -27,14 +28,23 @@ import MediaViewer from './MediaViewer.vue'
 import PostMediaGrid from './PostMediaGrid.vue'
 
 
-const props = defineProps<{ post: Post; comments?: PostComment[]; busy: boolean }>()
+const props = defineProps<{
+  post: Post
+  comments?: PostComment[]
+  busy: boolean
+  /**
+   * Sends a comment; resolves true on success so the draft is kept when it fails. Takes the post
+   * so the feed can pass one stable function: a fresh closure per card would re-render every card
+   * on each keystroke in the composer.
+   */
+  sendComment: (post: Post, text: string) => Promise<boolean>
+}>()
 const emit = defineEmits<{
   react: [kind: string]
   save: []
   pin: []
   remove: []
   toggleComments: []
-  comment: [text: string]
   removeComment: [item: PostComment]
 }>()
 const session = useSession()
@@ -65,6 +75,7 @@ function hoverPicker(show: boolean) {
   window.clearTimeout(hoverTimer)
   hoverTimer = window.setTimeout(() => (picker.value = show), show ? 350 : 250)
 }
+onBeforeUnmount(() => window.clearTimeout(hoverTimer))
 function choose(kind: string) {
   picker.value = false
   emit('react', kind)
@@ -81,11 +92,16 @@ async function openComments() {
   await nextTick()
   commentInput.value?.focus()
 }
-function sendComment() {
+const commenting = ref(false)
+async function submitComment() {
   const text = draft.value.trim()
-  if (!text) return
-  emit('comment', text)
-  draft.value = ''
+  if (!text || commenting.value) return
+  commenting.value = true
+  try {
+    if (await props.sendComment(props.post, text)) draft.value = ''
+  } finally {
+    commenting.value = false
+  }
 }
 const me = computed(() => session.user?.display_name ?? '')
 </script>
@@ -116,6 +132,7 @@ const me = computed(() => session.user?.display_name ?? '')
           class="icon-button"
           type="button"
           aria-label="Thao tác khác"
+          title="Thao tác khác"
           aria-haspopup="menu"
           :aria-expanded="menu"
           @click="menu = !menu"
@@ -176,6 +193,7 @@ const me = computed(() => session.user?.display_name ?? '')
           type="button"
           class="feed-react-more"
           aria-label="Chọn cảm xúc khác"
+          title="Chọn cảm xúc khác"
           :aria-expanded="picker"
           @click="picker = !picker"
         >
@@ -221,14 +239,37 @@ const me = computed(() => session.user?.display_name ?? '')
         </div>
         <small class="feed-comment-meta">
           <time :datetime="item.created_at" :title="formatDate(item.created_at, true)">{{ relativeTime(item.created_at) }}</time>
-          <button v-if="item.can_delete" type="button" class="link-button" @click="emit('removeComment', item)">Xóa</button>
+          <button
+            v-if="item.can_delete"
+            type="button"
+            class="link-button"
+            :disabled="busy"
+            :aria-label="`Xóa bình luận của ${item.author_name}`"
+            @click="emit('removeComment', item)"
+          >
+            Xóa
+          </button>
         </small>
       </div>
-      <form class="feed-comment-form" @submit.prevent="sendComment">
+      <form class="feed-comment-form" @submit.prevent="submitComment">
         <span class="feed-avatar small" :style="{ '--hue': avatarHue(me) }" aria-hidden="true">{{ initials(me) }}<AvatarPhoto :url="session.user?.avatar_url" /></span>
-        <input ref="commentInput" v-model="draft" placeholder="Viết bình luận…" aria-label="Viết bình luận" maxlength="3000" />
-        <button class="icon-button" type="submit" aria-label="Gửi bình luận" :disabled="busy || !draft.trim()">
-          <SendHorizontal :size="17" />
+        <input
+          ref="commentInput"
+          v-model="draft"
+          placeholder="Viết bình luận…"
+          aria-label="Viết bình luận"
+          maxlength="3000"
+          :readonly="commenting"
+        />
+        <button
+          class="icon-button"
+          type="submit"
+          :aria-label="commenting ? 'Đang gửi bình luận' : 'Gửi bình luận'"
+          :title="draft.trim() ? 'Gửi bình luận (Enter)' : 'Nhập bình luận để gửi'"
+          :aria-busy="commenting"
+          :disabled="busy || commenting || !draft.trim()"
+        >
+          <Loader2 v-if="commenting" :size="17" class="spin" /><SendHorizontal v-else :size="17" />
         </button>
       </form>
     </div>

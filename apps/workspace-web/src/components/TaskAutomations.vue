@@ -37,6 +37,13 @@ const shown = computed(() =>
   (listing.data.value?.available ?? []).filter((item) => listing.data.value?.can_manage || item.attached),
 )
 const always = computed(() => (admin.value ? (listing.data.value?.always ?? []) : []))
+/** Says why a switch cannot be used, shown as its tooltip. */
+function switchHint(item: Item) {
+  if (props.closed) return 'Công việc đã đóng, không đổi luồng được nữa.'
+  if (!listing.data.value?.can_manage) return 'Chỉ người giao hoặc điều phối việc được đổi luồng.'
+  if (!item.enabled && !item.attached) return 'Luồng đang tắt, bật luồng trong Quy trình nghiệp vụ trước.'
+  return item.attached ? 'Đang gắn · bấm để gỡ' : 'Chưa gắn · bấm để gắn'
+}
 async function toggle(item: Item) {
   busy.value = item.id
   error.value = null
@@ -56,7 +63,7 @@ async function toggle(item: Item) {
 <template>
   <section v-if="listing.data.value && (shown.length || always.length)" class="card">
     <header class="card-header">
-      <h3><Workflow :size="16" style="vertical-align: -3px" /> Luồng tự động</h3>
+      <h3 class="flows-title"><Workflow :size="16" aria-hidden="true" />Luồng tự động</h3>
     </header>
     <div class="card-body task-flows">
       <p v-if="shown.length" class="muted task-flows-hint">
@@ -76,7 +83,7 @@ async function toggle(item: Item) {
           >
           <small v-if="item.description" class="muted">{{ item.description }}</small>
         </div>
-        <label class="switch" :title="item.attached ? 'Đang gắn' : 'Chưa gắn'"
+        <label class="switch" :title="switchHint(item)"
           ><input
             type="checkbox"
             :checked="item.attached"
@@ -91,7 +98,14 @@ async function toggle(item: Item) {
           >{{ item.name }} · khi {{ item.trigger_label.toLowerCase() }}</small
         >
       </div>
-      <div v-if="error" class="notice error">{{ errorText(error) }}</div>
+      <div v-if="error" class="notice error" role="alert">{{ errorText(error) }}</div>
     </div>
   </section>
 </template>
+<style scoped>
+.flows-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+</style>
