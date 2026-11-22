@@ -3,7 +3,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
-import { Lock, RotateCcw, Save } from 'lucide-vue-next'
+import { CircleAlert, LoaderCircle, Lock, RotateCcw, Save } from 'lucide-vue-next'
 import type { Page } from '@dx/web-shared/api.ts'
 import StatePanel from '@dx/web-shared/components/StatePanel.vue'
 import { api } from '../api'
@@ -18,6 +18,7 @@ interface Role {
   permissions: string[]
   revision: number
 }
+const emit = defineEmits<{ dirty: [value: boolean] }>()
 const session = useSession()
 const queryClient = useQueryClient()
 const roles = useQuery({
@@ -30,19 +31,29 @@ const sorted = computed(() =>
 )
 // Working copy per role; compared with the server copy to show what changed.
 const draft = ref<Record<string, string[]>>({})
+const copy = (items: Role[]) => Object.fromEntries(items.map((role) => [role.key, [...role.permissions]]))
+const differs = (role: Role) =>
+  [...(draft.value[role.key] ?? [])].sort().join() !== [...role.permissions].sort().join()
 watch(
   () => roles.data.value,
-  (data) => {
-    if (data) draft.value = Object.fromEntries(data.items.map((role) => [role.key, [...role.permissions]]))
+  (data, before) => {
+    if (!data) return
+    // A background refetch must not wipe ticks the person has not saved yet.
+    if (before && before.items.some(differs)) {
+      for (const role of data.items) if (!(role.key in draft.value)) draft.value[role.key] = [...role.permissions]
+      return
+    }
+    draft.value = copy(data.items)
   },
   { immediate: true },
 )
 function changed(role: Role) {
-  const now = [...(draft.value[role.key] ?? [])].sort().join()
-  return now !== [...role.permissions].sort().join()
+  return differs(role)
 }
 const dirty = computed(() => sorted.value.some(changed))
+const changedCount = computed(() => sorted.value.filter(changed).length)
 useUnsavedGuard(dirty)
+watch(dirty, (value) => emit('dirty', value), { immediate: true })
 function has(role: string, permission: string) {
   return draft.value[role]?.includes(permission) ?? false
 }
@@ -64,6 +75,7 @@ const groups = computed(() =>
 )
 const busy = ref(false)
 async function save() {
+  if (busy.value || !dirty.value) return
   busy.value = true
   try {
     for (const role of sorted.value.filter(changed))
@@ -76,7 +88,10 @@ async function save() {
         }),
       })
     toast.success('Đã lưu phân quyền. Người dùng thấy thay đổi ở lần tải trang kế tiếp.')
-    await queryClient.invalidateQueries({ queryKey: ['roles'] })
+    // Take the saved state as the new baseline so the refetch replaces the draft.
+    const saved = await api.request<Page<Role>>('/roles')
+    draft.value = copy(saved.items)
+    queryClient.setQueryData(['roles'], saved)
     await session.load()
   } catch (error) {
     toast.error(error)
@@ -86,17 +101,17 @@ async function save() {
   }
 }
 function reset() {
-  if (roles.data.value)
-    draft.value = Object.fromEntries(roles.data.value.items.map((role) => [role.key, [...role.permissions]]))
+  if (!roles.data.value || !window.confirm('Bỏ mọi thay đổi phân quyền chưa lưu?')) return
+  draft.value = copy(roles.data.value.items)
 }
 </script>
 <template>
-  <section class="card">
+  <section class="card role-card">
     <header class="card-header">
-      <div>
+      <div class="role-card-title">
         <span class="eyebrow">VAI TRÒ & QUYỀN</span>
         <h2>Mỗi vai trò được làm gì?</h2>
-        <p class="muted" style="font-size: 15px; margin-top: 5px">
+        <p class="muted">
           Đánh dấu ô để cấp quyền cho cả vai trò. Quyền xem từng hồ sơ, tài liệu vẫn được kiểm tra riêng.
         </p>
       </div>
@@ -139,14 +154,39 @@ function reset() {
         </tbody>
       </table>
     </div>
-    <div v-if="dirty" class="sticky-actions">
-      <span>Có thay đổi phân quyền chưa lưu.</span>
+    <div v-if="dirty" class="sticky-actions" role="region" aria-label="Thay đổi phân quyền chưa lưu">
+      <span
+        ><CircleAlert :size="18" aria-hidden="true" />Có thay đổi chưa lưu ở {{ changedCount }} vai trò.</span
+      >
       <button class="button secondary" type="button" :disabled="busy" @click="reset">
-        <RotateCcw :size="15" />Hoàn tác
+        <RotateCcw :size="16" />Hoàn tác
       </button>
-      <button class="button" type="button" :disabled="busy" @click="save">
-        <Save :size="16" />{{ busy ? 'Đang lưu…' : 'Lưu phân quyền' }}
+      <button class="button" type="button" :disabled="busy" :aria-busy="busy" @click="save">
+        <LoaderCircle v-if="busy" :size="16" class="spin" aria-hidden="true" /><Save v-else :size="16" />{{
+          busy ? 'Đang lưu…' : 'Lưu phân quyền'
+        }}
       </button>
     </div>
   </section>
 </template>
+<style scoped>
+/* overflow: clip (not hidden) keeps the card's rounded corners without breaking the sticky save bar. */
+.role-card {
+  overflow: clip;
+}
+.role-card-title {
+  display: grid;
+  gap: 4px;
+}
+.role-card-title .eyebrow {
+  margin-bottom: 0;
+}
+.role-card-title p {
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+.role-card .sticky-actions {
+  gap: 12px;
+  padding: 12px 16px 12px 20px;
+}
+</style>

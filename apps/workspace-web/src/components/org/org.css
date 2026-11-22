@@ -1,0 +1,153 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/* SPDX-FileCopyrightText: 2026 Desktiny contributors */
+/* Pieces shared by the organisation views (chart, tree, drawer). Colours come from the theme
+   tokens only, so light and dark both work. Spacing follows the 4px grid. */
+
+.org-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  min-height: 22px;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.org-badge.warn {
+  color: var(--amber-ink);
+  background: var(--amber-soft);
+  border-color: var(--amber-line);
+}
+.org-badge.danger {
+  color: var(--red-ink);
+  background: var(--red-soft);
+  border-color: var(--red-line);
+}
+.org-badge.ok {
+  color: var(--green-ink);
+  background: var(--green-soft);
+  border-color: var(--green-line);
+}
+.org-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.org-avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  position: relative;
+  overflow: hidden;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--teal-soft);
+  color: var(--teal-ink);
+  font-family: 'Be Vietnam Pro', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.org-avatar.lg {
+  width: 36px;
+  height: 36px;
+  font-size: 0.8125rem;
+}
+.org-avatar.empty {
+  background: var(--surface-3);
+  color: var(--muted);
+}
+.org-avatars {
+  display: flex;
+}
+.org-avatars .org-avatar {
+  box-shadow: 0 0 0 2px var(--surface);
+}
+.org-avatars .org-avatar + .org-avatar {
+  margin-left: -8px;
+}
+
+.org-mark {
+  padding: 0 1px;
+  border-radius: 3px;
+  background: var(--amber-soft);
+  color: inherit;
+  box-shadow: inset 0 -2px var(--amber);
+}
+
+.org-ellipsis {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Two to four mutually exclusive choices, such as the chart / tree / table switch. */
+.org-segmented {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+.org-segmented button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    box-shadow 0.15s;
+}
+.org-segmented button:hover {
+  color: var(--navy);
+}
+.org-segmented button[aria-pressed='true'] {
+  background: var(--surface);
+  color: var(--teal-ink);
+  box-shadow:
+    var(--shadow-sm),
+    inset 0 0 0 1px var(--border);
+}
+@media (pointer: coarse) {
+  .org-segmented button {
+    min-height: 44px;
+  }
+}
+
+/* A person in a list: photo, name, role. */
+.org-person {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.org-person-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.org-person-text strong {
+  font-weight: 600;
+  color: var(--navy);
+}
+.org-person-text small {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
