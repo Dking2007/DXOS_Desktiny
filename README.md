@@ -188,8 +188,8 @@ không tồn tại để làm tài liệu trông đầy đủ. Xem [checklist](d
   in_progress → submitted → completed`, nhánh `blocked/returned/cancelled`; trả lại, báo
   vướng mắc, hủy và đổi hạn bắt buộc lý do và được ghi lịch sử. Checklist phải xong mới
   nộp được; việc cha chỉ nghiệm thu khi mọi việc con đã xong/hủy. Lãnh đạo phòng giao
-  trong phòng mình, ban giám đốc giao liên phòng. UI có danh sách, Kanban và nhóm theo hạn
-  (chưa có lịch dạng tháng hay Gantt).
+  trong phòng mình, ban giám đốc giao liên phòng. UI có dạng giấy (mặc định, mỗi việc một tờ) và
+  danh sách dạng bảng (chưa có lịch dạng tháng hay Gantt).
 - **Nhắn tin** (`/chat`): hội thoại riêng, nhóm, kênh phòng ban, trao đổi gắn công việc/hồ
   sơ; reply, nhắc tên, cảm xúc, sửa/xóa tin của mình, read cursor, chống gửi trùng bằng
   `client_message_id`. Khi thêm thành viên chọn được cho xem toàn lịch sử hay chỉ từ lúc
