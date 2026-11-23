@@ -17,6 +17,9 @@ hay thư viện mới; thay đổi phía máy chủ duy nhất là luồng đăn
 - **Hoạt động của công việc** vẽ thành sơ đồ quy trình (cùng kiểu trình thiết kế quy trình): mỗi bước là một nút có
   icon, người làm và giờ, nối bằng mũi tên theo màu trạng thái; cập nhật phụ nét đứt. Nút "Phóng to" mở sơ đồ ngang,
   tự xuống hàng theo bề rộng, kéo và thu phóng được.
+- **Công việc dạng giấy** (kiểu xem mặc định, lựa chọn được nhớ trên trình duyệt): mỗi việc là một tờ giấy kẻ dòng
+  có băng dính màu theo mức ưu tiên, góc gấp, mô tả ngắn, nhãn, tiến độ checklist, người nhận và hạn; dấu mộc
+  "Quá hạn", "Trả lại", "Hoàn tất", "Đã hủy". Tờ giấy nghiêng nhẹ, nhấc lên khi rê chuột (đứng thẳng khi giảm chuyển động).
 - **Cài đặt cá nhân** (`/preferences`, mọi người dùng; 9bf7477): giao diện sáng/tối/theo máy, mật độ hiển thị, thu
   gọn thanh bên, cỡ chữ 90–125% (toàn bộ cỡ chữ đổi sang `rem`), phông chữ, giãn dòng, giảm chuyển động, tăng tương
   phản, luôn hiện viền focus, gạch chân liên kết, định dạng ngày (dd/mm/yyyy hoặc yyyy-mm-dd), giờ 24h/12h, ngày đầu
@@ -38,6 +41,8 @@ hay thư viện mới; thay đổi phía máy chủ duy nhất là luồng đăn
   ở `/` và `/console/` thay vì 502. Muốn dùng Core admin khi chỉ chạy Core: thêm `--profile console`. README,
   `docs/installation.md`, `docs/operations.md`, `SELF_REVIEW.md` hướng dẫn thử Core bằng `examples/core-client` và
   `/core/v1/docs`; test triển khai kiểm `--profile core` không có ứng dụng giao diện nào.
+- Trang Công việc bỏ kiểu xem Kanban và "Theo hạn"; còn dạng giấy (mặc định) và danh sách dạng bảng. Lọc theo trạng
+  thái và "Quá hạn" vẫn có trong bộ lọc.
 - Chuẩn hóa khoảng cách theo token (`--space-*`, `--gap-icon`, `--field-gap`, `--control-h`): nút, tab, ô nhập,
   cảnh báo, bảng, hộp thoại không còn dính nhau; viền focus rõ khi dùng bàn phím (9bf7477).
 - Rà soát nút bấm trên các màn hình (fd29309, 0c682f3): chống gửi trùng, trạng thái "Đang …", nút bị khóa có lý do,
