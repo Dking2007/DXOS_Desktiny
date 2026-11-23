@@ -35,6 +35,8 @@ hay thư viện mới; thay đổi phía máy chủ duy nhất là luồng đăn
 - Tab "Giao diện" rời khỏi Thiết lập (quản trị) sang Cài đặt cá nhân; địa chỉ cũ tự chuyển hướng.
 
 ### Fixed
+- Bản cài bằng `make install` không nạp được gói giao diện dựng sẵn: mã tìm ở `$PREFIX/packs` trong khi gói được
+  chép vào `$PREFIX/share/desktiny/packs`. `.env.example` thêm `DATABASE_URL` và `PACKS_DIR` (tuỳ chọn) cho bản cài.
 - Đăng nhập để form Keycloak quá 5 phút trả JSON `oidc_state_invalid`: state đăng nhập nay sống 30 phút, callback
   lỗi chuyển về trang đăng nhập kèm thông báo (f3be40b).
 - Nút thu gọn thanh bên không có tác dụng ở trang thiết kế quy trình (9bf7477).
