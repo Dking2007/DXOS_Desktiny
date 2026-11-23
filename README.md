@@ -62,7 +62,7 @@ python scripts/seed.py --confirm-demo
 ```
 
 - Workspace: <http://localhost:8080/>
-- Core admin: <http://localhost:8080/console/>
+- Core admin (công cụ kỹ thuật, client của Core API): <http://localhost:8080/console/>
 - Keycloak console kỹ thuật: <http://localhost:8080/identity/admin/>
 - Đăng nhập SSO bằng tài khoản do bootstrap tạo: `director`, `manager`, `staff`,
   `manager-b`, `staff-b`, `technical-admin`. Tên không phải mật khẩu.
@@ -94,10 +94,17 @@ mock lưu tài liệu thay thế. Giữ logo/notice; kiểm edition/license khi 
 docker compose --env-file .env -f infra/compose/compose.yaml --profile core up --build -d
 ```
 
-Truy cập `/console/`; trang Workspace `/` không có khi profile này đứng riêng.
-Client `core-example` được bootstrap cấp namespace `equipment`, khác `workspace`;
-secret nằm trong `.env` dưới `CORE_EXAMPLE_CLIENT_SECRET`. Dùng ví dụ ở
-[`examples/core-client`](examples/core-client) để thử schema/record/file/workflow.
+Core **không có giao diện**: profile này chỉ chạy Core API, worker, Keycloak, gateway và kho lưu trữ. Gateway
+chỉ phục vụ API `/core/v1/` (tài liệu OpenAPI ở <http://localhost:8080/core/v1/docs>) và Keycloak `/identity/`;
+`/` và `/console/` trả 404. Thử Core bằng client ngoài [`examples/core-client`](examples/core-client): client
+`core-example` được bootstrap cấp namespace `equipment`, khác `workspace`; secret nằm trong `.env` dưới
+`CORE_EXAMPLE_CLIENT_SECRET`. Ví dụ tạo schema, bản ghi, tệp và workflow qua gateway.
+
+Muốn có công cụ quản trị kỹ thuật Core admin (một client riêng của Core API, ở Tầng 2), thêm `--profile console`:
+
+```bash
+docker compose --env-file .env -f infra/compose/compose.yaml --profile core --profile console up --build -d
+```
 Không bật password/direct grant để tiện gọi API; dùng code flow hoặc service client
 đúng capability.
 
