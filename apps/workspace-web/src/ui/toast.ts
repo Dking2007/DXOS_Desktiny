@@ -23,8 +23,8 @@ function push(kind: ToastKind, text: string, action?: Toast['action']) {
   const id = next++
   toasts.push({ id, kind, text, action })
   if (toasts.length > 4) toasts.shift()
-  // Errors stay a little longer: people need time to read what went wrong.
-  setTimeout(() => dismiss(id), kind === 'error' ? 8000 : 4000)
+  // Errors and toasts with an action (e.g. undo) stay longer: people need time to read and react.
+  setTimeout(() => dismiss(id), kind === 'error' || action ? 8000 : 4000)
   return id
 }
 

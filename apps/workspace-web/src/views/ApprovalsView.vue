@@ -9,11 +9,14 @@ import {
   ArrowRight,
   ClipboardCheck,
   ChevronRight,
+  RefreshCw,
   UserRoundCheck,
 } from 'lucide-vue-next'
 import { api } from '../api'
 import { toast } from '../ui/toast'
 import { useSession } from '../stores/session'
+import { confirmDiscard } from '../ui/unsaved'
+import { delegationProblem } from '../components/workForms'
 import { errorText, formatDate, queryString } from '@dx/web-shared/api.ts'
 import type { Page } from '@dx/web-shared/api.ts'
 import type { ApprovalTask, User } from '@dx/web-shared/types.ts'
@@ -67,7 +70,33 @@ const startsAt = ref('')
 const endsAt = ref('')
 const delegateReason = ref('')
 const delegationError = ref<unknown>(null)
+const delegating = ref(false)
+function openDelegate() {
+  delegateId.value = ''
+  startsAt.value = ''
+  endsAt.value = ''
+  delegateReason.value = ''
+  delegationError.value = null
+  showDelegate.value = true
+}
+const delegateDirty = computed(
+  () => !!delegateId.value || !!startsAt.value || !!endsAt.value || !!delegateReason.value.trim(),
+)
+function closeDelegate() {
+  if (!delegating.value && confirmDiscard(delegateDirty.value)) showDelegate.value = false
+}
+/** The period is checked as it is typed; the same rules the server applies. */
+const periodProblem = computed(() => (endsAt.value ? delegationProblem(startsAt.value, endsAt.value) : ''))
+const delegateBlocked = computed(() =>
+  !delegateId.value
+    ? 'Chọn người duyệt thay.'
+    : !endsAt.value
+      ? 'Chọn thời điểm kết thúc.'
+      : periodProblem.value || (!delegateReason.value.trim() ? 'Nêu lý do ủy quyền.' : ''),
+)
 async function createDelegation() {
+  if (delegating.value || delegateBlocked.value) return
+  delegating.value = true
   delegationError.value = null
   try {
     await api.request('/delegations', {
@@ -85,15 +114,23 @@ async function createDelegation() {
     await queryClient.invalidateQueries({ queryKey: ['delegations'] })
   } catch (cause) {
     delegationError.value = cause
+  } finally {
+    delegating.value = false
   }
 }
+const revoking = ref('')
 async function revoke(item: Delegation) {
-  if (!window.confirm('Thu hồi ủy quyền này?')) return
+  if (revoking.value) return
+  if (!window.confirm(`Thu hồi ủy quyền cho ${item.delegate_name}? Từ lúc này ${item.delegate_name} không duyệt thay bạn nữa.`))
+    return
+  revoking.value = item.id
   try {
     await api.request(`/delegations/${item.id}/revoke`, { method: 'POST' })
     toast.success('Đã thu hồi ủy quyền')
   } catch (cause) {
     toast.error(cause)
+  } finally {
+    revoking.value = ''
   }
   await queryClient.invalidateQueries({ queryKey: ['delegations'] })
 }
@@ -129,7 +166,9 @@ async function answered() {
         :disabled="tasks.isFetching.value"
         @click="tasks.refetch()"
       >
-        Làm mới
+        <RefreshCw :size="15" :class="{ spin: tasks.isFetching.value }" aria-hidden="true" />{{
+          tasks.isFetching.value ? 'Đang tải…' : 'Làm mới'
+        }}
       </button>
     </header>
     <StatePanel
@@ -159,11 +198,21 @@ async function answered() {
               <div class="primary-cell">
                 <span class="file-icon"><ClipboardCheck :size="20" /></span>
                 <div>
-                  <RouterLink v-if="task.case_id" class="row-link" :to="`/cases/${task.case_id}`">{{
-                    task.case_title || 'Hồ sơ cần phê duyệt'
-                  }}</RouterLink>
-                  <RouterLink v-else-if="task.subject?.link" class="row-link" :to="task.subject.link">{{ task.case_title }}</RouterLink>
-                  <span v-else>{{ task.case_title }}</span>
+                  <RouterLink
+                    v-if="task.case_id"
+                    class="row-link approval-title"
+                    :to="`/cases/${task.case_id}`"
+                    :title="task.case_title || ''"
+                    >{{ task.case_title || 'Hồ sơ cần phê duyệt' }}</RouterLink
+                  >
+                  <RouterLink
+                    v-else-if="task.subject?.link"
+                    class="row-link approval-title"
+                    :to="task.subject.link"
+                    :title="task.case_title || ''"
+                    >{{ task.case_title }}</RouterLink
+                  >
+                  <span v-else class="approval-title">{{ task.case_title }}</span>
                   <small v-if="!task.case_id || task.case_number" class="mono">{{
                     task.case_id
                       ? `HS-${String(task.case_number).padStart(6, '0')}`
@@ -178,8 +227,8 @@ async function answered() {
               </div>
             </td>
             <td>{{ task.label || task.step_label || 'Phê duyệt' }}</td>
-            <td class="muted">{{ formatDate(task.created_at, true) }}</td>
-            <td :class="{ 'overdue-text': stepLate(task) }">
+            <td class="muted nowrap">{{ formatDate(task.created_at, true) }}</td>
+            <td class="nowrap" :class="{ 'overdue-text': stepLate(task) }">
               {{ task.due_at ? formatDate(task.due_at, true) : '—' }}<template v-if="stepLate(task)"> · quá hạn</template>
             </td>
             <td>
@@ -214,17 +263,25 @@ async function answered() {
       </button>
     </div>
   </section>
-  <section class="card" style="margin-top: 22px">
+  <section class="card delegation-card">
     <header class="card-header">
-      <div>
+      <div class="card-title-block">
         <h2>Ủy quyền phê duyệt</h2>
         <small class="muted">Nhờ đồng nghiệp duyệt thay khi bạn vắng mặt.</small>
       </div>
-      <button class="button secondary small" @click="showDelegate = true">
+      <button class="button secondary small" @click="openDelegate">
         <UserRoundCheck :size="15" />Ủy quyền
       </button>
     </header>
-    <div class="card-body delegation-groups">
+    <StatePanel
+      v-if="delegations.isPending.value || delegations.error.value"
+      :loading="delegations.isPending.value"
+      :error="delegations.error.value"
+      compact
+      :rows="2"
+      @retry="delegations.refetch()"
+    />
+    <div v-else class="card-body delegation-groups">
       <div v-for="group in delegationGroups" :key="group.key" class="delegation-group">
         <span class="section-label">{{ group.title }}</span>
         <p v-if="!group.items.length" class="muted">{{ group.empty }}</p>
@@ -244,9 +301,10 @@ async function answered() {
           <button
             v-if="item.delegator_id === session.user?.id && ['active', 'scheduled'].includes(item.state)"
             class="button secondary small"
+            :disabled="!!revoking"
             @click="revoke(item)"
           >
-            Thu hồi
+            {{ revoking === item.id ? 'Đang thu hồi…' : 'Thu hồi' }}
           </button>
         </div>
       </div>
@@ -266,14 +324,14 @@ async function answered() {
       </details>
     </div>
   </section>
-  <ModalDialog v-if="showDelegate" title="Ủy quyền phê duyệt" @close="showDelegate = false">
-    <div v-if="delegationError" class="notice error error-inline">
+  <ModalDialog v-if="showDelegate" title="Ủy quyền phê duyệt" @close="closeDelegate">
+    <div v-if="delegationError" class="notice error error-inline" role="alert">
       {{ errorText(delegationError) }}
     </div>
     <form class="stack" @submit.prevent="createDelegation">
       <div class="field">
         <label for="delegate">Người duyệt thay</label
-        ><select id="delegate" v-model="delegateId" required>
+        ><select id="delegate" v-model="delegateId" required :disabled="delegating">
           <option value="">Chọn đồng nghiệp</option>
           <option
             v-for="user in users.data.value?.items.filter((u) => u.id !== session.user?.id)"
@@ -287,24 +345,62 @@ async function answered() {
       <div class="form-grid">
         <div class="field">
           <label for="delegate-start">Từ</label
-          ><input id="delegate-start" v-model="startsAt" type="datetime-local" />
+          ><input id="delegate-start" v-model="startsAt" type="datetime-local" :disabled="delegating" />
           <small>Để trống = ngay bây giờ.</small>
         </div>
         <div class="field">
           <label for="delegate-end">Đến<span class="required"> *</span></label
-          ><input id="delegate-end" v-model="endsAt" type="datetime-local" required />
-          <small>Tối đa 90 ngày.</small>
+          ><input
+            id="delegate-end"
+            v-model="endsAt"
+            type="datetime-local"
+            required
+            :disabled="delegating"
+            :aria-invalid="!!periodProblem"
+            aria-describedby="delegate-end-hint"
+          />
+          <small v-if="periodProblem" id="delegate-end-hint" class="field-error">{{ periodProblem }}</small>
+          <small v-else id="delegate-end-hint">Tối đa 90 ngày.</small>
         </div>
       </div>
       <div class="field">
         <label for="delegate-reason">Lý do<span class="required"> *</span></label
-        ><input id="delegate-reason" v-model="delegateReason" required maxlength="1000" />
+        ><input
+          id="delegate-reason"
+          v-model="delegateReason"
+          required
+          maxlength="1000"
+          placeholder="Ví dụ: Nghỉ phép từ 25 đến 29/11"
+          :disabled="delegating"
+        />
       </div>
       <div class="form-actions">
-        <button type="button" class="button secondary" @click="showDelegate = false">
+        <button type="button" class="button secondary" :disabled="delegating" @click="closeDelegate">
           Hủy</button
-        ><button class="button">Ủy quyền</button>
+        ><button class="button" :disabled="delegating || !!delegateBlocked" :title="delegateBlocked">
+          {{ delegating ? 'Đang ủy quyền…' : 'Ủy quyền' }}
+        </button>
       </div>
     </form>
   </ModalDialog>
 </template>
+<style scoped>
+.delegation-card {
+  margin-top: 24px;
+}
+.card-title-block {
+  display: grid;
+  gap: 4px;
+}
+.approval-title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.nowrap {
+  white-space: nowrap;
+}
+</style>

@@ -4,7 +4,7 @@
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
-import { Bookmark, Megaphone, Newspaper, PenLine, UserRound } from 'lucide-vue-next'
+import { Bookmark, Loader2, Megaphone, Newspaper, PenLine, UserRound } from 'lucide-vue-next'
 import { api } from '../api'
 import { toast } from '../ui/toast'
 import { useUnsavedGuard } from '../ui/unsaved'
@@ -16,6 +16,7 @@ import StatePanel from '@dx/web-shared/components/StatePanel.vue'
 import PostCard from '../feed/PostCard.vue'
 import PostComposer from '../feed/PostComposer.vue'
 import { relativeTime } from '../feed/text'
+import { scrollBehavior } from '../ui/preferences'
 import '../feed/feed.css'
 
 const queryClient = useQueryClient()
@@ -65,6 +66,7 @@ watch(
 )
 
 const busy = ref(false)
+const publishing = ref(false)
 async function act(work: () => Promise<unknown>, done?: string) {
   busy.value = true
   try {
@@ -80,6 +82,8 @@ async function act(work: () => Promise<unknown>, done?: string) {
   }
 }
 async function publish(audience: 'organization' | 'department', official: boolean, attachmentIds: string[]) {
+  if (publishing.value) return
+  publishing.value = true
   const ok = await act(
     () =>
       api.request('/posts', {
@@ -88,6 +92,7 @@ async function publish(audience: 'organization' | 'department', official: boolea
       }),
     official ? 'Đã đăng thông báo chính thức' : 'Đã đăng bài',
   )
+  publishing.value = false
   if (ok) {
     body.value = ''
     composer.value?.reset()
@@ -138,13 +143,14 @@ function toggleComments(post: Post) {
     comments.value = next
   } else void loadComments(post)
 }
-async function comment(post: Post, text: string) {
-  await act(async () => {
+function comment(post: Post, text: string) {
+  return act(async () => {
     await api.request(`/posts/${post.id}/comments`, { method: 'POST', body: JSON.stringify({ body: text }) })
     await loadComments(post)
   })
 }
 async function removeComment(post: Post, item: PostComment) {
+  if (!window.confirm('Xóa bình luận này?')) return
   await act(async () => {
     await api.request(`/post-comments/${item.id}`, { method: 'DELETE' })
     await loadComments(post)
@@ -159,7 +165,7 @@ async function openAnnouncement(post: Post) {
   setFilter('official')
   await posts.refetch()
   await nextTick()
-  document.getElementById(`post-${post.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  document.getElementById(`post-${post.id}`)?.scrollIntoView({ behavior: scrollBehavior(), block: 'start' })
 }
 </script>
 <template>
@@ -168,7 +174,14 @@ async function openAnnouncement(post: Post) {
   </header>
   <div class="feed-page">
     <div class="feed-main">
-      <PostComposer v-if="session.can('feed.post')" ref="composer" v-model="body" :busy="busy" @publish="publish" />
+      <PostComposer
+        v-if="session.can('feed.post')"
+        ref="composer"
+        v-model="body"
+        :busy="busy"
+        :publishing="publishing"
+        @publish="publish"
+      />
       <nav class="feed-filters" aria-label="Lọc bài viết">
         <button
           v-for="item in FILTERS"
@@ -178,7 +191,7 @@ async function openAnnouncement(post: Post) {
           :aria-pressed="filter === item.value"
           @click="setFilter(item.value)"
         >
-          <component :is="item.icon" :size="15" />{{ item.label }}
+          <component :is="item.icon" :size="15" aria-hidden="true" />{{ item.label }}
         </button>
       </nav>
       <section v-if="posts.isPending.value || posts.error.value || !items.length" class="card">
@@ -219,23 +232,34 @@ async function openAnnouncement(post: Post) {
         :post="post"
         :comments="comments[post.id]"
         :busy="busy"
+        :send-comment="comment"
         @react="(kind) => react(post, kind)"
         @save="toggleSave(post)"
         @pin="togglePin(post)"
         @remove="remove(post)"
         @toggle-comments="toggleComments(post)"
-        @comment="(text) => comment(post, text)"
         @remove-comment="(item) => removeComment(post, item)"
       />
       <div v-if="posts.data.value?.has_more || cursor" class="feed-pager">
-        <button v-if="cursor" class="button secondary small" type="button" @click="cursor = null">Về bài mới nhất</button>
+        <button
+          v-if="cursor"
+          class="button secondary small"
+          type="button"
+          :disabled="posts.isFetching.value"
+          @click="cursor = null"
+        >
+          Về bài mới nhất
+        </button>
         <button
           v-if="posts.data.value?.has_more"
           class="button secondary small"
           type="button"
+          :disabled="posts.isFetching.value"
           @click="cursor = posts.data.value?.next_cursor ?? null"
         >
-          Xem bài cũ hơn
+          <Loader2 v-if="posts.isFetching.value && cursor" :size="14" class="spin" />{{
+            posts.isFetching.value && cursor ? 'Đang tải…' : 'Xem bài cũ hơn'
+          }}
         </button>
       </div>
     </div>

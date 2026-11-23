@@ -6,10 +6,13 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
-import { ArrowDown, ArrowUp, Check, ImagePlus, Moon, Plus, Save, Sun, Trash2, X } from 'lucide-vue-next'
+import { ArrowDown, ArrowUp, Check, ImagePlus, Loader2, Moon, Plus, Save, Sun, Trash2, X } from 'lucide-vue-next'
 import { api } from '../../api'
 import { errorText } from '@dx/web-shared/api.ts'
 import type { Page } from '@dx/web-shared/api.ts'
+import StatePanel from '@dx/web-shared/components/StatePanel.vue'
+import { useUnsavedGuard } from '../../ui/unsaved'
+import { packMetaProblem } from './validate'
 import { DEFAULT_COLORS, contrast, contrastReport, term } from '../../ui/appearance'
 import type { AppearanceLook } from '../../ui/appearance'
 import { NAV_GROUPS } from '../../ui/nav'
@@ -187,14 +190,42 @@ function linkLabel(key: string) {
   return link ? term(link.label, appearance.value.terminology) : key
 }
 
+const metaProblem = computed(() =>
+  packMetaProblem({ packId: packId.value, name: name.value, version: version.value }),
+)
+/** Why "Lưu gói" cannot be pressed yet, or '' when it can. */
+const saveBlocked = computed(() => {
+  if (metaProblem.value) return metaProblem.value
+  if (withLook.value && failing.value.length) return 'Còn cặp màu khó đọc; chỉnh lại trước khi lưu.'
+  if (withLook.value && loginGroundIssue.value) return loginGroundIssue.value
+  return ''
+})
+// Edits are compared with what was opened, so closing or leaving asks before throwing them away.
+function snapshot() {
+  return JSON.stringify([packId.value, name.value, version.value, description.value, withLook.value, appearance.value, include])
+}
+const initial = snapshot()
+const savedOnce = ref(false)
+const dirty = computed(() => !savedOnce.value && snapshot() !== initial)
+const { confirmDiscard } = useUnsavedGuard(dirty)
+function close() {
+  if (confirmDiscard()) emit('close')
+}
+
+const uploading = ref<'' | 'logo' | 'favicon' | 'background'>('')
 async function upload(role: 'logo' | 'favicon' | 'background', event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   input.value = ''
   if (!file) return
+  if (role === 'background' && file.size > 2 * 1024 * 1024) {
+    toast.error('Ảnh nền tối đa 2 MB.')
+    return
+  }
   const body = new FormData()
   body.append('role', role)
   body.append('file', file)
+  uploading.value = role
   try {
     const result = await api.request<{ path: string; url: string; cleaned: boolean }>(
       `/packs/${encodeURIComponent(packId.value)}/assets`,
@@ -206,6 +237,8 @@ async function upload(role: 'logo' | 'favicon' | 'background', event: Event) {
     if (result.cleaned) toast.success('Đã bỏ phần có thể chạy mã khỏi tệp SVG.')
   } catch (cause) {
     toast.error(cause)
+  } finally {
+    uploading.value = ''
   }
 }
 function clearAsset(role: 'logo' | 'favicon' | 'background') {
@@ -215,22 +248,19 @@ function clearAsset(role: 'logo' | 'favicon' | 'background') {
 }
 
 async function save() {
+  if (busy.value) return
   error.value = null
-  if (withLook.value && failing.value.length) {
-    error.value = new Error('Còn cặp màu khó đọc; chỉnh lại trước khi lưu.')
-    return
-  }
-  if (withLook.value && loginGroundIssue.value) {
-    error.value = new Error(loginGroundIssue.value)
+  if (saveBlocked.value) {
+    error.value = new Error(saveBlocked.value)
     return
   }
   busy.value = true
   try {
-    await api.request(`/packs/${encodeURIComponent(packId.value)}`, {
+    await api.request(`/packs/${encodeURIComponent(packId.value.trim())}`, {
       method: 'PUT',
       body: JSON.stringify({
-        name: name.value,
-        version: version.value,
+        name: name.value.trim(),
+        version: version.value.trim(),
         description: description.value,
         appearance: withLook.value ? appearance.value : null,
         include,
@@ -238,7 +268,8 @@ async function save() {
       }),
     })
     toast.success('Đã lưu gói của cơ quan.')
-    emit('saved', packId.value)
+    savedOnce.value = true
+    emit('saved', packId.value.trim())
   } catch (cause) {
     error.value = cause
   } finally {
@@ -272,32 +303,65 @@ const previewLinks = computed(() =>
         <small class="muted">Lưu thành một gói riêng; chọn “Dùng giao diện này” ở danh sách gói để áp dụng.</small>
       </div>
       <div class="inline-actions">
-        <button class="button secondary small" type="button" @click="emit('close')"><X :size="15" />Đóng</button>
-        <button class="button small" type="button" :disabled="busy" @click="save">
-          <Save :size="15" />{{ busy ? 'Đang lưu…' : 'Lưu gói' }}
+        <button class="button secondary small" type="button" :disabled="busy" @click="close"><X :size="15" />Đóng</button>
+        <button
+          class="button small"
+          type="button"
+          :disabled="busy || !!saveBlocked"
+          :title="saveBlocked || (dirty ? 'Lưu thay đổi' : 'Chưa có thay đổi')"
+          :aria-busy="busy"
+          @click="save"
+        >
+          <Loader2 v-if="busy" :size="15" class="spin" /><Save v-else :size="15" />{{ busy ? 'Đang lưu…' : 'Lưu gói' }}
         </button>
       </div>
     </header>
-    <div v-if="error" class="notice error" style="margin: 0 18px 12px">{{ errorText(error) }}</div>
+    <div v-if="error" class="notice error pack-error" role="alert">{{ errorText(error) }}</div>
     <div class="card-body pack-meta form-grid">
       <div class="field">
         <label for="pack-id">Mã gói</label
-        ><input id="pack-id" v-model="packId" :disabled="!isNew" pattern="local\.[a-z0-9][a-z0-9-]*" required />
-        <small>Dạng local.ten-goi, chữ thường không dấu.</small>
+        ><input
+          id="pack-id"
+          v-model="packId"
+          :disabled="!isNew"
+          pattern="local\.[a-z0-9][a-z0-9-]*"
+          required
+          spellcheck="false"
+          :aria-invalid="metaProblem.startsWith('Mã gói') || undefined"
+          aria-describedby="pack-id-hint"
+        />
+        <small id="pack-id-hint" :class="{ 'overdue-text': metaProblem.startsWith('Mã gói') }"
+          >Dạng local.ten-goi, chữ thường không dấu.</small
+        >
       </div>
       <div class="field">
-        <label for="pack-name">Tên gói</label><input id="pack-name" v-model="name" maxlength="120" required />
+        <label for="pack-name">Tên gói</label
+        ><input id="pack-name" v-model="name" maxlength="120" required :aria-invalid="metaProblem === 'Nhập tên gói.' || undefined" />
       </div>
       <div class="field">
-        <label for="pack-version">Phiên bản</label><input id="pack-version" v-model="version" pattern="\d+\.\d+\.\d+" />
+        <label for="pack-version">Phiên bản</label
+        ><input
+          id="pack-version"
+          v-model="version"
+          pattern="\d+\.\d+\.\d+"
+          :aria-invalid="metaProblem.startsWith('Phiên bản') || undefined"
+        />
       </div>
       <div class="field">
         <label for="pack-desc">Mô tả</label><input id="pack-desc" v-model="description" maxlength="1000" />
       </div>
     </div>
     <div class="tabs pack-tabs" role="tablist">
-      <button class="tab" :class="{ active: tab === 'look' }" role="tab" @click="tab = 'look'">Giao diện</button>
-      <button class="tab" :class="{ active: tab === 'business' }" role="tab" @click="tab = 'business'">
+      <button class="tab" :class="{ active: tab === 'look' }" role="tab" :aria-selected="tab === 'look'" @click="tab = 'look'">
+        Giao diện
+      </button>
+      <button
+        class="tab"
+        :class="{ active: tab === 'business' }"
+        role="tab"
+        :aria-selected="tab === 'business'"
+        @click="tab = 'business'"
+      >
         Nghiệp vụ<span
           v-if="include.processes.length + include.automations.length + include.knowledge.length"
           class="tab-count"
@@ -333,11 +397,17 @@ const previewLinks = computed(() =>
                   <strong>{{ role === 'logo' ? 'Logo' : 'Biểu tượng tab (favicon)' }}</strong>
                   <small>PNG, WebP hoặc SVG; SVG được lọc bỏ mã.</small>
                   <div class="inline-actions">
-                    <label class="button secondary small"
-                      >Chọn tệp<input
+                    <label
+                      class="button secondary small pack-file"
+                      :class="{ disabled: !!uploading || !!metaProblem }"
+                      :title="metaProblem ? 'Nhập mã gói hợp lệ trước khi tải ảnh' : ''"
+                      ><Loader2 v-if="uploading === role" :size="14" class="spin" />{{
+                        uploading === role ? 'Đang tải…' : 'Chọn tệp'
+                      }}<input
                         type="file"
                         accept="image/png,image/webp,image/svg+xml"
                         class="sr-only"
+                        :disabled="!!uploading || !!metaProblem"
                         @change="upload(role, $event)"
                     /></label>
                     <button v-if="form[role]" class="button ghost small" type="button" @click="clearAsset(role)">
@@ -353,8 +423,8 @@ const previewLinks = computed(() =>
             <legend>Màu sắc</legend>
             <div class="pack-colors">
               <span />
-              <small class="muted"><Sun :size="13" /> Sáng</small>
-              <small class="muted"><Moon :size="13" /> Tối</small>
+              <small class="muted pack-theme-label"><Sun :size="13" aria-hidden="true" />Sáng</small>
+              <small class="muted pack-theme-label"><Moon :size="13" aria-hidden="true" />Tối</small>
               <template v-for="key in editedKeys" :key="key">
                 <span class="pack-color-label">{{ labelOf(key) }}</span>
                 <span v-for="theme in ['light', 'dark'] as const" :key="theme" class="pack-color">
@@ -377,7 +447,7 @@ const previewLinks = computed(() =>
                 </span>
               </template>
             </div>
-            <div class="inline-actions" style="margin-top: 8px">
+            <div class="inline-actions pack-extra-color">
               <select v-model="extraColor" class="compact-select" aria-label="Thêm màu khác">
                 <option value="">Thêm màu khác…</option>
                 <option v-for="key in limits.colors.filter((k) => !editedKeys.includes(k))" :key="key" :value="key">
@@ -389,7 +459,9 @@ const previewLinks = computed(() =>
               </button>
             </div>
             <div class="pack-contrast" :class="{ bad: failing.length }">
-              <strong v-if="!failing.length"><Check :size="15" /> Mọi cặp màu đều dễ đọc (tương phản ≥ 4,5:1).</strong>
+              <strong v-if="!failing.length" class="pack-contrast-ok"
+                ><Check :size="15" aria-hidden="true" />Mọi cặp màu đều dễ đọc (tương phản ≥ 4,5:1).</strong
+              >
               <template v-else>
                 <strong>Cặp màu khó đọc, cần chỉnh trước khi lưu:</strong>
                 <span v-for="item in failing" :key="item.theme + item.label"
@@ -493,13 +565,24 @@ const previewLinks = computed(() =>
               /></span>
               <div>
                 <strong>Ảnh nền</strong><small>PNG, JPEG hoặc WebP, tối đa 2 MB.</small>
-                <label class="button secondary small"
-                  >Chọn ảnh<input
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp"
-                    class="sr-only"
-                    @change="upload('background', $event)"
-                /></label>
+                <div class="inline-actions">
+                  <label
+                    class="button secondary small pack-file"
+                    :class="{ disabled: !!uploading || !!metaProblem }"
+                    :title="metaProblem ? 'Nhập mã gói hợp lệ trước khi tải ảnh' : ''"
+                    ><Loader2 v-if="uploading === 'background'" :size="14" class="spin" />{{
+                      uploading === 'background' ? 'Đang tải…' : 'Chọn ảnh'
+                    }}<input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      class="sr-only"
+                      :disabled="!!uploading || !!metaProblem"
+                      @change="upload('background', $event)"
+                  /></label>
+                  <button v-if="form.login.background" class="button ghost small" type="button" @click="clearAsset('background')">
+                    Bỏ
+                  </button>
+                </div>
               </div>
             </div>
           </fieldset>
@@ -513,6 +596,7 @@ const previewLinks = computed(() =>
                 class="icon-button"
                 type="button"
                 aria-label="Bỏ cặp từ"
+                title="Bỏ cặp từ"
                 @click="terms.splice(index, 1)"
               >
                 <Trash2 :size="15" />
@@ -544,9 +628,23 @@ const previewLinks = computed(() =>
                     @change="toggle(hidden, key)"
                   />{{ linkLabel(key) }}</label
                 >
-                <button class="icon-button" type="button" aria-label="Lên" @click="move(menuOrder, index, -1)">
+                <button
+                  class="icon-button"
+                  type="button"
+                  :aria-label="`Đưa ${linkLabel(key)} lên`"
+                  title="Lên"
+                  :disabled="index === 0"
+                  @click="move(menuOrder, index, -1)"
+                >
                   <ArrowUp :size="14" /></button
-                ><button class="icon-button" type="button" aria-label="Xuống" @click="move(menuOrder, index, 1)">
+                ><button
+                  class="icon-button"
+                  type="button"
+                  :aria-label="`Đưa ${linkLabel(key)} xuống`"
+                  title="Xuống"
+                  :disabled="index === menuOrder.length - 1"
+                  @click="move(menuOrder, index, 1)"
+                >
                   <ArrowDown :size="14" />
                 </button>
               </li>
@@ -567,14 +665,18 @@ const previewLinks = computed(() =>
                   <button
                     class="icon-button"
                     type="button"
-                    aria-label="Lên"
+                    :aria-label="`Đưa ${label} lên`"
+                    title="Lên"
+                    :disabled="homeBlocks.indexOf(key) === 0"
                     @click="move(homeBlocks, homeBlocks.indexOf(key), -1)"
                   >
                     <ArrowUp :size="14" /></button
                   ><button
                     class="icon-button"
                     type="button"
-                    aria-label="Xuống"
+                    :aria-label="`Đưa ${label} xuống`"
+                    title="Xuống"
+                    :disabled="homeBlocks.indexOf(key) === homeBlocks.length - 1"
                     @click="move(homeBlocks, homeBlocks.indexOf(key), 1)"
                   >
                     <ArrowDown :size="14" />
@@ -589,10 +691,20 @@ const previewLinks = computed(() =>
       <aside class="pack-preview" :style="previewVars" aria-label="Xem trước giao diện">
         <div class="pack-preview-head">
           <strong>Xem trước</strong>
-          <div class="segmented">
-            <button type="button" :class="{ active: previewTheme === 'light' }" @click="previewTheme = 'light'">
+          <div class="segmented" role="group" aria-label="Chế độ xem trước">
+            <button
+              type="button"
+              :class="{ active: previewTheme === 'light' }"
+              :aria-pressed="previewTheme === 'light'"
+              @click="previewTheme = 'light'"
+            >
               <Sun :size="14" />Sáng</button
-            ><button type="button" :class="{ active: previewTheme === 'dark' }" @click="previewTheme = 'dark'">
+            ><button
+              type="button"
+              :class="{ active: previewTheme === 'dark' }"
+              :aria-pressed="previewTheme === 'dark'"
+              @click="previewTheme = 'dark'"
+            >
               <Moon :size="14" />Tối
             </button>
           </div>
@@ -651,6 +763,17 @@ const previewLinks = computed(() =>
       <div class="pack-pick">
         <section>
           <span class="section-label">Quy trình hồ sơ</span>
+          <StatePanel
+            v-if="rules.isPending.value || rules.error.value || !(rules.data.value?.items ?? []).some((r) => r.kind === 'process')"
+            compact
+            :rows="2"
+            :loading="rules.isPending.value"
+            :error="rules.error.value"
+            :empty="true"
+            title="Chưa có quy trình"
+            description="Tạo quy trình ở mục Quy trình rồi quay lại chọn."
+            @retry="rules.refetch()"
+          />
           <label
             v-for="rule in (rules.data.value?.items ?? []).filter((r) => r.kind === 'process')"
             :key="rule.id"
@@ -664,6 +787,13 @@ const previewLinks = computed(() =>
         </section>
         <section>
           <span class="section-label">Luồng tự động</span>
+          <StatePanel
+            v-if="!rules.isPending.value && !rules.error.value && !(rules.data.value?.items ?? []).some((r) => r.kind !== 'process')"
+            compact
+            :empty="true"
+            title="Chưa có luồng tự động"
+            description="Luồng tự động đã tạo sẽ hiện ở đây để chọn."
+          />
           <label
             v-for="rule in (rules.data.value?.items ?? []).filter((r) => r.kind !== 'process')"
             :key="rule.id"
@@ -677,6 +807,17 @@ const previewLinks = computed(() =>
         </section>
         <section>
           <span class="section-label">Bài kiến thức cho trợ lý AI</span>
+          <StatePanel
+            v-if="articles.isPending.value || articles.error.value || !articles.data.value?.items.length"
+            compact
+            :rows="2"
+            :loading="articles.isPending.value"
+            :error="articles.error.value"
+            :empty="true"
+            title="Chưa có bài kiến thức"
+            description="Thêm bài ở Quản trị › Trợ lý AI."
+            @retry="articles.refetch()"
+          />
           <label v-for="article in articles.data.value?.items ?? []" :key="article.id" class="checkbox-label"
             ><input
               type="checkbox"
@@ -693,14 +834,34 @@ const previewLinks = computed(() =>
 .pack-meta {
   padding-top: 0;
 }
+.pack-error {
+  margin: 0 20px 16px;
+}
+.pack-file:has(input:focus-visible) {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+.pack-file.disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
+.pack-theme-label,
+.pack-contrast-ok {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.pack-extra-color {
+  margin-top: 8px;
+}
 .pack-tabs {
   padding: 0 18px;
 }
 .pack-look {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
-  gap: 22px;
-  padding: 18px;
+  gap: 24px;
+  padding: 20px;
   align-items: start;
 }
 .pack-form {
@@ -709,9 +870,10 @@ const previewLinks = computed(() =>
 }
 fieldset {
   display: grid;
-  gap: 10px;
+  gap: 16px;
+  min-width: 0;
   margin: 0;
-  padding: 14px 16px;
+  padding: 16px 20px 20px;
   border: 1px solid var(--border);
   border-radius: 12px;
 }
@@ -731,7 +893,8 @@ legend {
 }
 .pack-asset > div {
   display: grid;
-  gap: 4px;
+  gap: 6px;
+  min-width: 0;
 }
 .pack-asset small {
   color: var(--muted);
@@ -759,12 +922,12 @@ legend {
 .pack-colors {
   display: grid;
   grid-template-columns: minmax(140px, 1fr) auto auto;
-  gap: 6px 14px;
+  gap: 8px 16px;
   align-items: center;
 }
 .pack-color {
   display: inline-flex;
-  gap: 6px;
+  gap: 8px;
   align-items: center;
 }
 .pack-color input[type='color'] {
@@ -778,14 +941,14 @@ legend {
   opacity: 0.6;
 }
 .pack-color-label {
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .pack-contrast {
   display: grid;
-  gap: 2px;
-  padding: 10px 12px;
+  gap: 4px;
+  padding: 12px 16px;
   border-radius: 10px;
-  font-size: 13.5px;
+  font-size: 0.8438rem;
   color: var(--green-ink);
   background: var(--green-soft);
 }
@@ -804,7 +967,7 @@ legend {
 }
 .pack-order {
   display: grid;
-  gap: 4px;
+  gap: 6px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -831,7 +994,7 @@ legend {
 }
 .pack-pick section {
   display: grid;
-  gap: 6px;
+  gap: 8px;
   align-content: start;
 }
 .pack-preview {
@@ -848,6 +1011,7 @@ legend {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
 }
 .segmented {
   display: inline-flex;
@@ -857,13 +1021,14 @@ legend {
 }
 .segmented button {
   display: inline-flex;
-  gap: 4px;
+  gap: 6px;
   align-items: center;
-  padding: 4px 10px;
+  min-height: 32px;
+  padding: 4px 12px;
   border: 0;
   background: none;
   color: inherit;
-  font-size: 13px;
+  font-size: 0.8125rem;
   cursor: pointer;
 }
 .segmented button.active {
@@ -880,7 +1045,7 @@ legend {
   border-radius: 12px;
   color: var(--navy);
   background: var(--canvas);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .pv-font-be-vietnam-pro {
   font-family: 'Be Vietnam Pro', sans-serif;
@@ -911,7 +1076,7 @@ legend {
 }
 .pv-brand small {
   color: var(--muted);
-  font-size: 10px;
+  font-size: 0.625rem;
 }
 .pv-mark {
   display: grid;
@@ -1020,7 +1185,7 @@ legend {
   color: #e8eef8;
   background: linear-gradient(160deg, #183670, #081634);
   text-align: center;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .pv-login-flat {
   background: linear-gradient(160deg, var(--teal-strong), var(--teal));
@@ -1029,7 +1194,7 @@ legend {
   background: repeating-linear-gradient(45deg, #2b3f5c, #2b3f5c 8px, #24364f 8px, #24364f 16px);
 }
 .pv-login b {
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .pv-login-note {
   margin-top: 4px;
@@ -1056,6 +1221,28 @@ legend {
   }
   .pack-preview {
     position: static;
+  }
+}
+@media (max-width: 640px) {
+  .pack-look {
+    padding: 16px;
+  }
+  fieldset {
+    padding: 12px 14px 16px;
+  }
+  /* The colour label takes its own row so the two swatches fit side by side. */
+  .pack-colors {
+    grid-template-columns: 1fr 1fr;
+  }
+  .pack-colors > span:first-child {
+    display: none;
+  }
+  .pack-color-label {
+    grid-column: 1 / -1;
+    margin-top: 4px;
+  }
+  .pv-app {
+    grid-template-columns: 104px 1fr;
   }
 }
 </style>

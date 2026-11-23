@@ -22,7 +22,7 @@ import {
 import { fold } from '@dx/web-shared/text.ts'
 import { api } from '../../api'
 import { useSession } from '../../stores/session'
-import { visibleGroups } from '../../ui/nav'
+import { navTone, toneForPath, visibleGroups, type NavTone } from '../../ui/nav'
 import { cycleTheme } from '../../ui/theme'
 import { assistantOpen } from '../../assistant/state'
 
@@ -38,6 +38,7 @@ interface Command {
   label: string
   hint: string
   icon: Component
+  tone: NavTone
   section: string
   run: () => void
 }
@@ -75,6 +76,7 @@ const HIT_ICONS: Record<string, Component> = {
   post: Newspaper,
   message: MessageSquare,
 }
+const HIT_TONES: Record<string, NavTone> = { task: 'tasks', case: 'cases', file: 'drive', post: 'feed', message: 'chat' }
 const HIT_LABELS: Record<string, string> = {
   task: 'Công việc',
   case: 'Hồ sơ',
@@ -95,7 +97,7 @@ const staticCommands = computed<Command[]>(() => {
   ]
   for (const [label, to, icon, section, capability] of create)
     if (!capability || session.can(capability))
-      commands.push({ key: to, label, hint: '', icon, section, run: go(to) })
+      commands.push({ key: to, label, hint: '', icon, tone: toneForPath(to), section, run: go(to) })
   for (const group of visibleGroups(session.can))
     for (const link of group.links)
       commands.push({
@@ -103,6 +105,7 @@ const staticCommands = computed<Command[]>(() => {
         label: `Mở ${link.label}`,
         hint: link.hint,
         icon: link.icon,
+        tone: link.tone ?? navTone(link.key),
         section: 'Đi tới',
         run: go(link.to),
       })
@@ -111,6 +114,7 @@ const staticCommands = computed<Command[]>(() => {
     label: 'Hỏi trợ lý AI',
     hint: 'Quy trình nghiệp vụ, cách dùng phần mềm',
     icon: Sparkles,
+    tone: 'assistant',
     section: 'Tùy chỉnh',
     run: () => (assistantOpen.value = true),
   })
@@ -119,6 +123,7 @@ const staticCommands = computed<Command[]>(() => {
     label: 'Đổi giao diện sáng / tối',
     hint: '',
     icon: Moon,
+    tone: 'neutral',
     section: 'Tùy chỉnh',
     run: cycleTheme,
   })
@@ -139,6 +144,7 @@ const results = computed<Command[]>(() => {
           label: hit.title,
           hint: hit.snippet,
           icon: HIT_ICONS[type] ?? Search,
+          tone: HIT_TONES[type] ?? 'neutral',
           section: HIT_LABELS[type] ?? 'Kết quả',
           run: () => router.push(hit.link),
         })
@@ -149,6 +155,7 @@ const results = computed<Command[]>(() => {
       label: `Tìm “${text.value.trim()}” trong toàn bộ`,
       hint: '',
       icon: Search,
+      tone: 'neutral',
       section: 'Tìm kiếm',
       run: () => router.push({ path: '/search', query: { q: text.value.trim() } }),
     })
@@ -210,7 +217,10 @@ function onGlobalKey(event: KeyboardEvent) {
   }
 }
 onMounted(() => document.addEventListener('keydown', onGlobalKey))
-onBeforeUnmount(() => document.removeEventListener('keydown', onGlobalKey))
+onBeforeUnmount(() => {
+  document.removeEventListener('keydown', onGlobalKey)
+  window.clearTimeout(timer)
+})
 defineExpose({ show })
 </script>
 <template>
@@ -261,7 +271,7 @@ defineExpose({ show })
           @mousemove="active = index"
           @click="run(item)"
         >
-          <component :is="item.icon" :size="17" />
+          <span class="tone-tile" :data-tone="item.tone" aria-hidden="true"><component :is="item.icon" :size="16" :stroke-width="1.9" /></span>
           <span class="palette-text"
             ><strong>{{ item.label }}</strong><small v-if="item.hint">{{ item.hint }}</small></span
           >

@@ -29,7 +29,9 @@ const asking = ref(false)
 const answers = ref<Answer[]>([])
 const askError = ref('')
 
-onMounted(async () => {
+async function summarize() {
+  loading.value = true
+  summaryError.value = ''
   try {
     summary.value = await api.request<Summary>(`/ai/files/${props.file.id}/summary`, { method: 'POST' })
   } catch (error) {
@@ -37,7 +39,8 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
-})
+}
+onMounted(summarize)
 async function ask() {
   const text = question.value.trim()
   if (!text) return
@@ -63,14 +66,17 @@ async function ask() {
       <section class="ai-card" aria-live="polite">
         <header><span class="ai-title"><Sparkles :size="16" />Tóm tắt{{ summary?.kind ? ` · ${summary.kind}` : '' }}</span></header>
         <p v-if="loading" class="muted">AI đang đọc tài liệu…</p>
-        <p v-else-if="summaryError" class="muted">{{ summaryError }}</p>
+        <div v-else-if="summaryError" class="summary-error" role="alert">
+          <p class="muted">{{ summaryError }}</p>
+          <button type="button" class="button secondary small" @click="summarize">Thử lại</button>
+        </div>
         <ul v-else-if="summary">
           <li v-for="(point, index) in summary.points" :key="index">
             {{ point.text }}<small v-if="point.page" class="muted"> ({{ summary.unit }} {{ point.page }})</small>
           </li>
         </ul>
       </section>
-      <form class="inline-actions" @submit.prevent="ask">
+      <form class="inline-actions ask-row" @submit.prevent="ask">
         <label class="sr-only" for="doc-question">Câu hỏi về tài liệu</label>
         <input
           id="doc-question"
@@ -84,7 +90,7 @@ async function ask() {
           <Send :size="15" />{{ asking ? 'Đang tìm…' : 'Hỏi' }}
         </button>
       </form>
-      <div v-if="askError" class="notice error">{{ askError }}</div>
+      <div v-if="askError" class="notice error" role="alert">{{ askError }}</div>
       <section v-for="(item, index) in answers" :key="index" class="ai-card">
         <header><span class="ai-title"><MessageSquareText :size="16" />{{ item.question }}</span></header>
         <p>{{ item.answer }}</p>
@@ -102,3 +108,23 @@ async function ask() {
     </div>
   </ModalDialog>
 </template>
+<style scoped>
+.summary-error {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+}
+.ask-row {
+  flex-wrap: nowrap;
+}
+.ask-row input {
+  flex: 1;
+  min-width: 0;
+}
+@media (max-width: 640px) {
+  .ask-row {
+    flex-wrap: wrap;
+  }
+}
+</style>

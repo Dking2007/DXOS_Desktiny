@@ -36,7 +36,7 @@ export function startTour() {
 const COMMON: TourStep[] = [
   {
     title: 'Chào mừng đến Desktiny',
-    body: 'Vài bước ngắn để bạn biết mọi thứ nằm ở đâu. Bạn có thể bỏ qua và xem lại bất cứ lúc nào trong Thiết lập › Giao diện.',
+    body: 'Vài bước ngắn để bạn biết mọi thứ nằm ở đâu. Bạn có thể bỏ qua và xem lại bất cứ lúc nào trong Cài đặt cá nhân › Hướng dẫn.',
   },
   {
     target: 'nav',

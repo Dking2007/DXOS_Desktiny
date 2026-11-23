@@ -2,6 +2,8 @@
 // SPDX-FileCopyrightText: 2026 Desktiny contributors
 // Formatting helpers for the feed: relative times, safe links and avatar colours.
 
+import { formatDate, formatTime } from '../ui/preferences'
+
 export const REACTIONS = [
   { kind: 'like', emoji: '👍', name: 'Thích' },
   { kind: 'love', emoji: '❤️', name: 'Yêu thích' },
@@ -16,7 +18,7 @@ export function relativeTime(value: string, now = new Date()): string {
   if (Number.isNaN(seconds)) return value
   if (seconds < 60) return 'Vừa xong'
   if (seconds < 3600) return `${Math.floor(seconds / 60)} phút trước`
-  const time = date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+  const time = formatTime(date)
   const startOfToday = new Date(now)
   startOfToday.setHours(0, 0, 0, 0)
   if (date >= startOfToday) return `${Math.floor(seconds / 3600)} giờ trước`
@@ -24,7 +26,7 @@ export function relativeTime(value: string, now = new Date()): string {
   startOfYesterday.setDate(startOfYesterday.getDate() - 1)
   if (date >= startOfYesterday) return `Hôm qua lúc ${time}`
   const sameYear = date.getFullYear() === now.getFullYear()
-  return date.toLocaleDateString('vi-VN', sameYear ? { day: 'numeric', month: 'long' } : { day: '2-digit', month: '2-digit', year: 'numeric' })
+  return sameYear ? date.toLocaleDateString('vi-VN', { day: 'numeric', month: 'long' }) : formatDate(date)
 }
 
 export interface TextPart {

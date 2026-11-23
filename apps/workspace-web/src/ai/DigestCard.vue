@@ -32,7 +32,7 @@ async function write() {
 }
 </script>
 <template>
-  <section class="ai-card" style="margin-bottom: 20px" aria-live="polite">
+  <section class="ai-card digest-card" aria-live="polite">
     <header>
       <span class="ai-title"><Sparkles :size="16" />Bản tin việc hôm nay</span>
       <button class="button secondary small ai-action" :disabled="busy" @click="write">
@@ -48,3 +48,8 @@ async function write() {
     </p>
   </section>
 </template>
+<style scoped>
+.digest-card {
+  margin-bottom: 20px;
+}
+</style>

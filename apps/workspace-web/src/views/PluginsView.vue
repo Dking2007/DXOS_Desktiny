@@ -12,6 +12,7 @@ import {
   KeyRound,
   Activity,
   ListChecks,
+  Loader2,
   Power,
   Settings2,
   Puzzle,
@@ -111,6 +112,11 @@ const listing = useQuery({
   queryFn: () => api.request<{ items: PluginRow[]; allowed_hosts: string[] }>('/plugins'),
 })
 const busy = ref(false)
+/** Which action is running (`<plugin id>:<action>`), so only its own button shows the spinner. */
+const working = ref('')
+function isWorking(row: { id: string }, action: string) {
+  return working.value === `${row.id}:${action}`
+}
 const preview = ref<
   (PluginSummary & { upgrade_from: string | null; files: number; pack_preview: PackPreview | null }) | null
 >(null)
@@ -159,9 +165,21 @@ function openSettings(row: PluginRow) {
   configuring.value = row
   draft.value = { ...row.settings.values }
 }
+/** Required settings still empty (a secret already stored counts as filled). */
+const missingSettings = computed(() => {
+  const row = configuring.value
+  if (!row) return [] as string[]
+  return row.settings_schema.required.filter((key) => {
+    const field = row.settings_schema.properties[key]
+    if (!field || field.type === 'boolean') return false
+    if (field.secret && row.settings.secrets_set.includes(key)) return false
+    const value = draft.value[key]
+    return value === undefined || value === null || String(value).trim() === ''
+  })
+})
 async function saveSettings() {
   const row = configuring.value
-  if (!row) return
+  if (!row || busy.value || missingSettings.value.length) return
   busy.value = true
   try {
     // A secret left empty keeps its value; only what was typed is sent.
@@ -185,6 +203,7 @@ async function saveSettings() {
 }
 async function checkHealth(row: PluginRow) {
   busy.value = true
+  working.value = `${row.id}:health`
   try {
     const result = await api.request<PluginRow>(`/plugins/${encodeURIComponent(row.id)}/health`, { method: 'POST' })
     if (result.health.ok) toast.success(`Plugin trả lời sau ${result.health.latency_ms} ms.`)
@@ -194,6 +213,7 @@ async function checkHealth(row: PluginRow) {
     toast.error(cause)
   } finally {
     busy.value = false
+    working.value = ''
   }
 }
 const DELIVERY = {
@@ -229,6 +249,10 @@ async function pick(event: Event) {
   const file = input.files?.[0]
   input.value = ''
   if (!file) return
+  if (!/\.(zip|json)$/i.test(file.name)) {
+    toast.error('Chỉ cài được tệp .zip (plugin đóng gói) hoặc .json (bản kê plugin kết nối).')
+    return
+  }
   previewFile.value = file
   preview.value = null
   previewError.value = null
@@ -239,7 +263,7 @@ async function pick(event: Event) {
   }
 }
 async function install() {
-  if (!previewFile.value) return
+  if (!previewFile.value || busy.value) return
   busy.value = true
   try {
     const row = await api.request<PluginRow & { notes?: string[] }>('/plugins', {
@@ -275,7 +299,7 @@ function toggleIn(list: string[], key: string) {
   else list.push(key)
 }
 async function approve() {
-  if (!approving.value) return
+  if (!approving.value || busy.value) return
   busy.value = true
   try {
     const result = await api.request<PluginRow & { issued: Issued | null }>(
@@ -303,7 +327,20 @@ async function approve() {
   }
 }
 async function act(row: PluginRow, path: 'enabled' | 'rotate', body: Record<string, unknown> = {}) {
+  if (busy.value) return
+  if (
+    path === 'rotate' &&
+    !window.confirm(`Đổi khoá của “${row.name}”? Khoá và token cũ hết hiệu lực ngay; máy chủ plugin cần cập nhật khoá mới.`)
+  )
+    return
+  if (
+    path === 'enabled' &&
+    body.enabled === false &&
+    !window.confirm(`Tắt “${row.name}”? Mọi token của plugin hết hiệu lực, khung giao diện và bước quy trình tạm dừng.`)
+  )
+    return
   busy.value = true
+  working.value = `${row.id}:${path}`
   try {
     const result = await api.request<PluginRow & { issued?: Issued }>(
       `/plugins/${encodeURIComponent(row.id)}/${path}`,
@@ -316,10 +353,11 @@ async function act(row: PluginRow, path: 'enabled' | 'rotate', body: Record<stri
     toast.error(cause)
   } finally {
     busy.value = false
+    working.value = ''
   }
 }
 async function remove() {
-  if (!removing.value) return
+  if (!removing.value || busy.value) return
   busy.value = true
   try {
     await api.request(`/plugins/${encodeURIComponent(removing.value.id)}`, { method: 'DELETE' })
@@ -332,7 +370,10 @@ async function remove() {
     busy.value = false
   }
 }
+const retrying = ref('')
 async function retry(delivery: Delivery) {
+  if (retrying.value) return
+  retrying.value = delivery.id
   try {
     await api.request(`/plugins/${encodeURIComponent(logOf.value!.id)}/deliveries/${delivery.id}/retry`, {
       method: 'POST',
@@ -341,7 +382,13 @@ async function retry(delivery: Delivery) {
     await deliveries.refetch()
   } catch (cause) {
     toast.error(cause)
+  } finally {
+    retrying.value = ''
   }
+}
+// A dialog whose request is still running stays open, so its result is not lost.
+function closeUnlessBusy(close: () => void) {
+  if (!busy.value) close()
 }
 async function copy(text: string) {
   try {
@@ -356,11 +403,12 @@ async function copy(text: string) {
   <header class="page-head compact">
     <h1 class="sr-only">Plugin</h1>
     <div class="page-actions">
-      <label class="button"
+      <label class="button plugin-upload" :class="{ disabled: busy }" title="Chọn tệp .zip hoặc bản kê .json của plugin"
         ><Upload :size="17" />Cài plugin (.zip)<input
           type="file"
           accept=".json,.zip,application/json,application/zip"
           class="sr-only"
+          :disabled="busy"
           @change="pick"
       /></label>
     </div>
@@ -372,14 +420,14 @@ async function copy(text: string) {
     @retry="listing.refetch()"
   />
   <template v-else-if="listing.data.value">
-    <div v-if="!listing.data.value.allowed_hosts.length" class="notice warning" style="margin-bottom: 18px">
+    <div v-if="!listing.data.value.allowed_hosts.length" class="notice warning plugin-hosts">
       <AlertTriangle :size="18" /><span
         >Triển khai chưa cho phép máy chủ plugin nào. Bộ phận kỹ thuật cần khai tên máy chủ của plugin trong
         <code>PLUGIN_ALLOWED_HOSTS</code> (và địa chỉ của nó trong <code>PLUGIN_FRAME_SOURCES</code> nếu plugin có khung
         giao diện).</span
       >
     </div>
-    <p v-else class="muted" style="margin: 0 0 14px">
+    <p v-else class="muted plugin-hosts">
       Máy chủ plugin được phép: <code>{{ listing.data.value.allowed_hosts.join(', ') }}</code>
     </p>
     <section class="card">
@@ -490,10 +538,14 @@ async function copy(text: string) {
           <button
             v-else
             class="button secondary small"
-            :disabled="busy"
+            :disabled="busy || (row.state !== 'enabled' && !row.host_allowed)"
+            :title="row.state !== 'enabled' && !row.host_allowed ? 'Máy chủ plugin chưa được phép; không bật được' : ''"
+            :aria-busy="isWorking(row, 'enabled')"
             @click="act(row, 'enabled', { enabled: row.state !== 'enabled' })"
           >
-            <Power :size="15" />{{ row.state === 'enabled' ? 'Tắt' : 'Bật' }}
+            <Loader2 v-if="isWorking(row, 'enabled')" :size="15" class="spin" /><Power v-else :size="15" />{{
+              isWorking(row, 'enabled') ? (row.state === 'enabled' ? 'Đang tắt…' : 'Đang bật…') : row.state === 'enabled' ? 'Tắt' : 'Bật'
+            }}
           </button>
           <button v-if="row.state !== 'pending'" class="button ghost small" :disabled="busy" @click="openApprove(row)">
             <ShieldCheck :size="15" />Quyền
@@ -502,9 +554,12 @@ async function copy(text: string) {
             v-if="row.state !== 'pending' && !row.packaged"
             class="button ghost small"
             :disabled="busy"
+            :aria-busy="isWorking(row, 'rotate')"
             @click="act(row, 'rotate')"
           >
-            <KeyRound :size="15" />Đổi khoá
+            <Loader2 v-if="isWorking(row, 'rotate')" :size="15" class="spin" /><KeyRound v-else :size="15" />{{
+              isWorking(row, 'rotate') ? 'Đang đổi…' : 'Đổi khoá'
+            }}
           </button>
           <RouterLink
             v-for="(page, index) in row.state === 'enabled' ? row.ui : []"
@@ -522,24 +577,36 @@ async function copy(text: string) {
           >
             <Settings2 :size="15" />Cấu hình
           </button>
-          <button v-if="row.health.endpoint" class="button ghost small" :disabled="busy" @click="checkHealth(row)">
-            <Activity :size="15" />Kiểm tra
+          <button
+            v-if="row.health.endpoint"
+            class="button ghost small"
+            :disabled="busy"
+            :aria-busy="isWorking(row, 'health')"
+            title="Gọi thử điểm kiểm tra sức khoẻ của plugin"
+            @click="checkHealth(row)"
+          >
+            <Loader2 v-if="isWorking(row, 'health')" :size="15" class="spin" /><Activity v-else :size="15" />{{
+              isWorking(row, 'health') ? 'Đang kiểm tra…' : 'Kiểm tra'
+            }}
           </button>
           <button class="button ghost small" @click="logOf = row"><ListChecks :size="15" />Nhật ký</button>
-          <button class="button ghost small" @click="removing = row"><Trash2 :size="15" />Gỡ</button>
+          <button class="button ghost small plugin-remove" :disabled="busy" @click="removing = row"><Trash2 :size="15" />Gỡ</button>
         </div>
       </article>
     </section>
-    <p class="muted" style="margin-top: 16px; font-size: 13.5px">
+    <p class="muted plugin-footnote">
       Trang của plugin chạy trong khung cách ly, không đọc được phiên hay dữ liệu của Desktiny. Sự kiện và lời gọi bước
       quy trình được ký HMAC; plugin chỉ đọc được hồ sơ nó đã được báo, hoặc theo quyền của người đang xem khung. Cách
       viết plugin: <code>docs/plugins.md</code>.
     </p>
   </template>
 
-  <ModalDialog v-if="previewFile" title="Cài plugin" wide @close="previewFile = null">
-    <div v-if="previewError" class="notice error error-inline">{{ errorText(previewError) }}</div>
+  <ModalDialog v-if="previewFile" title="Cài plugin" wide @close="closeUnlessBusy(() => (previewFile = null))">
+    <div v-if="previewError" class="notice error error-inline" role="alert">{{ errorText(previewError) }}</div>
     <StatePanel v-else-if="!preview" :loading="true" />
+    <div v-if="previewError && !preview" class="form-actions">
+      <button type="button" class="button secondary" @click="previewFile = null">Đóng</button>
+    </div>
     <div v-if="preview" class="stack">
       <div>
         <strong>{{ preview.name }}</strong>
@@ -608,18 +675,27 @@ async function copy(text: string) {
       </div>
       <small class="muted">Plugin được cài ở trạng thái chờ duyệt; nó chưa nhận gì cho tới khi bạn duyệt quyền.</small>
       <div class="form-actions">
-        <button type="button" class="button secondary" @click="previewFile = null">Huỷ</button
-        ><button type="button" class="button" :disabled="busy || !preview.host_allowed" @click="install">
-          {{ preview.upgrade_from ? 'Nâng cấp' : 'Cài plugin' }}
+        <button type="button" class="button secondary" :disabled="busy" @click="previewFile = null">Huỷ</button
+        ><button
+          type="button"
+          class="button"
+          :disabled="busy || !preview.host_allowed"
+          :title="preview.host_allowed ? '' : 'Máy chủ của plugin chưa được phép'"
+          :aria-busy="busy"
+          @click="install"
+        >
+          <Loader2 v-if="busy" :size="16" class="spin" />{{
+            busy ? (preview.upgrade_from ? 'Đang nâng cấp…' : 'Đang cài…') : preview.upgrade_from ? 'Nâng cấp' : 'Cài plugin'
+          }}
         </button>
       </div>
     </div>
   </ModalDialog>
 
-  <ModalDialog v-if="approving" :title="`Duyệt quyền: ${approving.name}`" @close="approving = null">
+  <ModalDialog v-if="approving" :title="`Duyệt quyền: ${approving.name}`" @close="closeUnlessBusy(() => (approving = null))">
     <div class="stack">
       <p class="muted">Chỉ cấp những gì plugin thật sự cần. Bỏ chọn mục nào thì plugin không có mục đó.</p>
-      <div v-if="approving.permissions.length">
+      <div v-if="approving.permissions.length" class="plugin-group">
         <span class="section-label">Quyền dữ liệu</span>
         <label v-for="item in approving.permissions" :key="item.key" class="checkbox-label"
           ><input
@@ -629,7 +705,7 @@ async function copy(text: string) {
           />{{ item.label }}</label
         >
       </div>
-      <div v-if="approving.fields.length && chosen.permissions.includes('cases.fields.write')">
+      <div v-if="approving.fields.length && chosen.permissions.includes('cases.fields.write')" class="plugin-group">
         <span class="section-label">Trường biểu mẫu plugin được ghi</span>
         <label v-for="key in approving.fields" :key="key" class="checkbox-label"
           ><input type="checkbox" :checked="chosen.fields.includes(key)" @change="toggleIn(chosen.fields, key)" /><span
@@ -638,7 +714,7 @@ async function copy(text: string) {
           ></label
         >
       </div>
-      <div v-if="chosen.permissions.includes('cases.list')">
+      <div v-if="chosen.permissions.includes('cases.list')" class="plugin-group">
         <span class="section-label">Quy trình plugin được liệt kê hồ sơ</span>
         <p v-if="forms.isPending.value" class="muted">Đang tải quy trình…</p>
         <label
@@ -653,7 +729,7 @@ async function copy(text: string) {
         >
         <small class="muted">Plugin chỉ liệt kê (và đọc) hồ sơ của các quy trình được chọn; không chọn thì không thấy hồ sơ nào.</small>
       </div>
-      <div v-if="approving.assistant_tools.length">
+      <div v-if="approving.assistant_tools.length" class="plugin-group">
         <span class="section-label">Công cụ trợ lý AI được hỏi (chỉ đọc, theo quyền người hỏi)</span>
         <label v-for="tool in approving.assistant_tools" :key="tool.name" class="checkbox-label"
           ><input
@@ -664,7 +740,7 @@ async function copy(text: string) {
         >
         <small class="muted">Trợ lý chỉ dùng khi tính năng “Trợ lý dùng công cụ của plugin” được bật ở Cài đặt AI.</small>
       </div>
-      <div v-if="approving.frame_permissions.length">
+      <div v-if="approving.frame_permissions.length" class="plugin-group">
         <span class="section-label">Quyền thiết bị cho khung giao diện</span>
         <label v-for="item in approving.frame_permissions" :key="item.key" class="checkbox-label"
           ><input
@@ -674,7 +750,7 @@ async function copy(text: string) {
           />{{ item.label }}</label
         >
       </div>
-      <div v-if="approving.events.length">
+      <div v-if="approving.events.length" class="plugin-group">
         <span class="section-label">Sự kiện được gửi</span>
         <label v-for="item in approving.events" :key="item.key" class="checkbox-label"
           ><input
@@ -685,15 +761,17 @@ async function copy(text: string) {
         >
       </div>
       <div class="form-actions">
-        <button type="button" class="button secondary" @click="approving = null">Huỷ</button
-        ><button type="button" class="button" :disabled="busy" @click="approve">
-          <ShieldCheck :size="16" />Duyệt và bật
+        <button type="button" class="button secondary" :disabled="busy" @click="approving = null">Huỷ</button
+        ><button type="button" class="button" :disabled="busy" :aria-busy="busy" @click="approve">
+          <Loader2 v-if="busy" :size="16" class="spin" /><ShieldCheck v-else :size="16" />{{
+            busy ? 'Đang duyệt…' : 'Duyệt và bật'
+          }}
         </button>
       </div>
     </div>
   </ModalDialog>
 
-  <ModalDialog v-if="configuring" :title="`Cấu hình: ${configuring.name}`" @close="configuring = null">
+  <ModalDialog v-if="configuring" :title="`Cấu hình: ${configuring.name}`" @close="closeUnlessBusy(() => (configuring = null))">
     <form class="stack" @submit.prevent="saveSettings">
       <p class="muted">Giá trị dành cho cơ quan này. Ô bí mật được mã hoá khi lưu và không hiện lại.</p>
       <div v-for="(field, key) in configuring.settings_schema.properties" :key="key" class="field">
@@ -713,6 +791,7 @@ async function copy(text: string) {
           :id="`setting-${key}`"
           v-model.number="draft[key]"
           type="number"
+          :aria-required="configuring.settings_schema.required.includes(String(key))"
         />
         <input
           v-else
@@ -720,6 +799,7 @@ async function copy(text: string) {
           v-model="draft[key]"
           :type="field.secret ? 'password' : 'text'"
           autocomplete="off"
+          :aria-required="configuring.settings_schema.required.includes(String(key))"
           :placeholder="
             field.secret && configuring.settings.secrets_set.includes(String(key)) ? 'Đã đặt; để trống để giữ' : ''
           "
@@ -727,8 +807,16 @@ async function copy(text: string) {
         <small v-if="field.description">{{ field.description }}</small>
       </div>
       <div class="form-actions">
-        <button type="button" class="button secondary" @click="configuring = null">Huỷ</button
-        ><button type="submit" class="button" :disabled="busy">Lưu cấu hình</button>
+        <button type="button" class="button secondary" :disabled="busy" @click="configuring = null">Huỷ</button
+        ><button
+          type="submit"
+          class="button"
+          :disabled="busy || missingSettings.length > 0"
+          :title="missingSettings.length ? 'Điền các ô bắt buộc (*) trước khi lưu' : ''"
+          :aria-busy="busy"
+        >
+          <Loader2 v-if="busy" :size="16" class="spin" />{{ busy ? 'Đang lưu…' : 'Lưu cấu hình' }}
+        </button>
       </div>
     </form>
   </ModalDialog>
@@ -745,7 +833,7 @@ async function copy(text: string) {
         <label>Khoá ký (kiểm chữ ký sự kiện và bước quy trình)</label>
         <div class="plugin-secret">
           <code>{{ issued.values.secret }}</code
-          ><button class="icon-button" type="button" aria-label="Sao chép khoá ký" @click="copy(issued.values.secret!)">
+          ><button class="icon-button" type="button" aria-label="Sao chép khoá ký" title="Sao chép" @click="copy(issued.values.secret!)">
             <Copy :size="15" />
           </button>
         </div>
@@ -754,7 +842,7 @@ async function copy(text: string) {
         <label>Token gọi API plugin</label>
         <div class="plugin-secret">
           <code>{{ issued.values.token }}</code
-          ><button class="icon-button" type="button" aria-label="Sao chép token" @click="copy(issued.values.token)">
+          ><button class="icon-button" type="button" aria-label="Sao chép token" title="Sao chép" @click="copy(issued.values.token)">
             <Copy :size="15" />
           </button>
         </div>
@@ -765,7 +853,7 @@ async function copy(text: string) {
     </div>
   </ModalDialog>
 
-  <ModalDialog v-if="removing" title="Gỡ plugin" @close="removing = null">
+  <ModalDialog v-if="removing" title="Gỡ plugin" @close="closeUnlessBusy(() => (removing = null))">
     <div class="stack">
       <p>
         Gỡ <strong>{{ removing.name }}</strong>? Mọi token của plugin hết hiệu lực ngay; khung giao diện biến mất; bước
@@ -776,18 +864,23 @@ async function copy(text: string) {
         đã có hồ sơ chỉ ngừng sử dụng.
       </p>
       <div class="form-actions">
-        <button type="button" class="button secondary" @click="removing = null">Huỷ</button
-        ><button type="button" class="button danger" :disabled="busy" @click="remove">Gỡ plugin</button>
+        <button type="button" class="button secondary" :disabled="busy" @click="removing = null">Huỷ</button
+        ><button type="button" class="button danger" :disabled="busy" :aria-busy="busy" @click="remove">
+          <Loader2 v-if="busy" :size="16" class="spin" />{{ busy ? 'Đang gỡ…' : 'Gỡ plugin' }}
+        </button>
       </div>
     </div>
   </ModalDialog>
 
   <ModalDialog v-if="logOf" :title="`Nhật ký: ${logOf.name}`" wide @close="logOf = null">
     <StatePanel
-      v-if="deliveries.isPending.value || !deliveries.data.value?.items.length"
+      v-if="deliveries.isPending.value || deliveries.error.value || !deliveries.data.value?.items.length"
       :loading="deliveries.isPending.value"
+      :error="deliveries.error.value"
       :empty="true"
       title="Chưa có trao đổi nào"
+      description="Sự kiện, lời gọi API và bước quy trình của plugin sẽ được ghi tại đây."
+      @retry="deliveries.refetch()"
     />
     <div v-else class="table-wrap">
       <table>
@@ -814,15 +907,16 @@ async function copy(text: string) {
               }}</span
               ><small v-if="item.status_code" class="muted"> · {{ item.status_code }}</small
               ><small v-if="item.attempts > 1" class="muted"> · {{ item.attempts }} lần</small>
-              <small v-if="item.error" class="muted" style="display: block">{{ item.error }}</small>
+              <small v-if="item.error" class="muted plugin-log-error">{{ item.error }}</small>
             </td>
             <td>
               <button
                 v-if="item.kind === 'event' && ['failed', 'unknown', 'cancelled'].includes(item.state)"
                 class="button ghost small"
+                :disabled="!!retrying"
                 @click="retry(item)"
               >
-                <RefreshCw :size="14" />Gửi lại
+                <RefreshCw :size="14" :class="{ spin: retrying === item.id }" />{{ retrying === item.id ? 'Đang gửi…' : 'Gửi lại' }}
               </button>
             </td>
           </tr>
@@ -832,12 +926,39 @@ async function copy(text: string) {
   </ModalDialog>
 </template>
 <style scoped>
+.plugin-upload:has(input:focus-visible) {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+.plugin-upload.disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
+.plugin-hosts {
+  margin: 0 0 16px;
+}
+.plugin-footnote {
+  margin-top: 16px;
+  font-size: 0.8438rem;
+  line-height: 1.55;
+}
+.plugin-log-error {
+  display: block;
+  margin-top: 4px;
+}
+.plugin-group {
+  display: grid;
+  gap: 8px;
+}
+.plugin-group > small {
+  margin-top: 2px;
+}
 .plugin-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 14px;
+  gap: 16px;
   align-items: flex-start;
-  padding: 16px 18px;
+  padding: 20px;
   border-top: 1px solid var(--border-soft);
 }
 .plugin-row:first-child {
@@ -845,7 +966,7 @@ async function copy(text: string) {
 }
 .plugin-row .grow {
   display: grid;
-  gap: 4px;
+  gap: 6px;
   flex: 1;
   min-width: 240px;
 }
@@ -886,14 +1007,17 @@ async function copy(text: string) {
 }
 .plugin-facts {
   display: grid;
-  gap: 4px;
-  margin: 4px 0 0;
+  gap: 8px;
+  margin: 6px 0 0;
   padding: 0;
   list-style: none;
-  font-size: 13.5px;
+  font-size: 0.8438rem;
+}
+.plugin-facts strong {
+  margin-right: 6px;
 }
 .plugin-facts .chip {
-  margin: 0 4px 2px 0;
+  margin: 0 6px 4px 0;
 }
 .plugin-facts .chip.off {
   text-decoration: line-through;
@@ -902,21 +1026,39 @@ async function copy(text: string) {
 .plugin-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
+}
+.plugin-remove:hover:not(:disabled) {
+  color: var(--red-ink);
+}
+@media (max-width: 640px) {
+  .plugin-row {
+    padding: 16px;
+  }
+  .plugin-row .grow {
+    min-width: 0;
+    flex-basis: calc(100% - 60px);
+  }
+  .plugin-row small.mono {
+    overflow-wrap: anywhere;
+  }
+  .plugin-actions {
+    width: 100%;
+  }
 }
 .plugin-asks {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 14px;
+  gap: 16px;
 }
 .plugin-asks ul {
-  margin: 4px 0 0;
+  margin: 6px 0 0;
   padding-left: 18px;
 }
 .plugin-pack {
   display: grid;
-  gap: 6px;
-  padding: 12px 14px;
+  gap: 8px;
+  padding: 16px;
   border: 1px solid var(--border);
   border-radius: 10px;
 }
@@ -926,7 +1068,7 @@ async function copy(text: string) {
 }
 .plugin-secret {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   align-items: center;
 }
 .plugin-secret code {

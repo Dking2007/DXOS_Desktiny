@@ -1,9 +1,9 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <!-- SPDX-FileCopyrightText: 2026 Desktiny contributors -->
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
-import { EyeOff, FileUp, PackageOpen, Pencil, Plus, Search, Trash2, Workflow } from 'lucide-vue-next'
+import { EyeOff, FileUp, Loader2, PackageOpen, Pencil, Plus, Search, Trash2, Workflow } from 'lucide-vue-next'
 import type { AssistantAdmin, AssistantArticle } from '@dx/web-shared/types.ts'
 import type { Page } from '@dx/web-shared/api.ts'
 import { errorText, formatDate } from '@dx/web-shared/api.ts'
@@ -24,6 +24,7 @@ watch(q, (value) => {
   window.clearTimeout(timer)
   timer = window.setTimeout(() => (debounced.value = value.trim()), 250)
 })
+onBeforeUnmount(() => window.clearTimeout(timer))
 const category = ref('')
 const list = useQuery({
   queryKey: computed(() => ['assistant-articles', debounced.value, category.value]),
@@ -59,7 +60,11 @@ function openNew() {
   editorOpen.value = true
   opened.value = state()
 }
+/** The article whose edit/delete request is running, so its row's buttons wait. */
+const rowBusy = ref('')
 async function openEdit(item: AssistantArticle) {
+  if (rowBusy.value) return
+  rowBusy.value = item.id
   try {
     const full = await api.request<AssistantArticle>(`/assistant/articles/${item.id}`)
     editing.value = full
@@ -72,6 +77,8 @@ async function openEdit(item: AssistantArticle) {
     opened.value = state()
   } catch (cause) {
     toast.error(cause)
+  } finally {
+    rowBusy.value = ''
   }
 }
 function closeEditor() {
@@ -82,6 +89,10 @@ async function importFile(event: Event) {
   const file = input.files?.[0]
   input.value = ''
   if (!file) return
+  if (!/\.(md|txt)$/i.test(file.name) && !file.type.startsWith('text/')) {
+    toast.error('Chỉ nhập được tệp văn bản .md hoặc .txt.')
+    return
+  }
   if (file.size > 200_000) {
     toast.error('Tệp lớn hơn 200 KB. Hãy chia thành nhiều bài nhỏ theo từng chủ đề.')
     return
@@ -91,6 +102,7 @@ async function importFile(event: Event) {
   if (!title.value) title.value = file.name.replace(/\.(md|txt)$/i, '').replace(/[-_]+/g, ' ')
 }
 async function saveArticle() {
+  if (busy.value) return
   busy.value = true
   error.value = ''
   try {
@@ -111,13 +123,17 @@ async function saveArticle() {
   }
 }
 async function remove(item: AssistantArticle) {
+  if (rowBusy.value) return
   if (!window.confirm(`Xóa bài “${item.title}”? Trợ lý sẽ không dùng bài này nữa.`)) return
+  rowBusy.value = item.id
   try {
     await api.request(`/assistant/articles/${item.id}`, { method: 'DELETE' })
     toast.success('Đã xóa bài kiến thức')
     await refresh()
   } catch (cause) {
     toast.error(cause)
+  } finally {
+    rowBusy.value = ''
   }
 }
 
@@ -137,6 +153,7 @@ const packages = useQuery({
 })
 const importing = ref('')
 async function importPackage(item: PackageSource) {
+  if (importing.value) return
   importing.value = item.package_id
   try {
     await api.request('/assistant/articles/from-package', {
@@ -158,7 +175,7 @@ const probe = ref('')
 const probing = ref(false)
 const probeResult = ref<{ article_id: string; title: string; text: string }[] | null>(null)
 async function runProbe() {
-  if (!probe.value.trim()) return
+  if (!probe.value.trim() || probing.value) return
   probing.value = true
   try {
     probeResult.value = (
@@ -180,7 +197,7 @@ async function runProbe() {
       <header class="card-header knowledge-head">
         <div>
           <h2>Kiến thức của trợ lý</h2>
-          <p class="muted" style="font-size: 15px; margin-top: 4px">
+          <p class="muted knowledge-intro">
             Mỗi bài nên nói về một chủ đề. Trợ lý tìm đoạn liên quan nhất cho từng câu hỏi.
           </p>
         </div>
@@ -220,27 +237,51 @@ async function runProbe() {
           >
           <p>{{ item.excerpt }}</p>
         </div>
-        <button class="icon-button" type="button" :aria-label="`Sửa ${item.title}`" title="Sửa" @click="openEdit(item)">
-          <Pencil :size="16" />
-        </button>
-        <button class="icon-button" type="button" :aria-label="`Xóa ${item.title}`" title="Xóa" @click="remove(item)">
-          <Trash2 :size="16" />
-        </button>
+        <div class="knowledge-actions">
+          <button
+            class="icon-button"
+            type="button"
+            :aria-label="`Sửa ${item.title}`"
+            title="Sửa"
+            :disabled="!!rowBusy"
+            :aria-busy="rowBusy === item.id"
+            @click="openEdit(item)"
+          >
+            <Loader2 v-if="rowBusy === item.id" :size="16" class="spin" /><Pencil v-else :size="16" />
+          </button>
+          <button
+            class="icon-button knowledge-delete"
+            type="button"
+            :aria-label="`Xóa ${item.title}`"
+            title="Xóa"
+            :disabled="!!rowBusy"
+            @click="remove(item)"
+          >
+            <Trash2 :size="16" />
+          </button>
+        </div>
       </article>
     </section>
-    <aside class="stack" style="align-content: start">
+    <aside class="stack knowledge-aside">
       <section class="card">
         <header class="card-header"><h3>Thử tìm kiến thức</h3></header>
         <form class="card-body stack" @submit.prevent="runProbe">
-          <p class="muted" style="font-size: 14px">
+          <p class="muted knowledge-small">
             Gõ một câu hỏi để xem trợ lý sẽ đọc những đoạn nào. Không gọi dịch vụ AI, không tốn chi phí.
           </p>
           <div class="search-box">
             <Search :size="16" /><input v-model="probe" placeholder="Ví dụ: xin nghỉ phép thế nào" aria-label="Câu hỏi thử" />
           </div>
-          <button class="button secondary small" :disabled="probing || !probe.trim()">Thử tìm</button>
+          <button
+            class="button secondary small knowledge-probe"
+            :disabled="probing || !probe.trim()"
+            :title="probe.trim() ? '' : 'Nhập câu hỏi để thử'"
+            :aria-busy="probing"
+          >
+            <Loader2 v-if="probing" :size="14" class="spin" /><Search v-else :size="14" />{{ probing ? 'Đang tìm…' : 'Thử tìm' }}
+          </button>
           <template v-if="probeResult">
-            <p v-if="!probeResult.length" class="muted" style="font-size: 14px">
+            <p v-if="!probeResult.length" class="muted knowledge-small">
               Không tìm thấy đoạn nào. Trợ lý sẽ trả lời là chưa có hướng dẫn.
             </p>
             <div v-for="(item, index) in probeResult" :key="index" class="probe-hit">
@@ -290,12 +331,19 @@ async function runProbe() {
       </label>
       <div class="form-actions">
         <button type="button" class="button secondary" :disabled="busy" @click="closeEditor">Hủy</button>
-        <button class="button" :disabled="busy || !title.trim() || !body.trim()">{{ busy ? 'Đang lưu…' : 'Lưu bài' }}</button>
+        <button
+          class="button"
+          :disabled="busy || !title.trim() || !body.trim()"
+          :title="!title.trim() ? 'Nhập tiêu đề' : !body.trim() ? 'Nhập nội dung' : ''"
+          :aria-busy="busy"
+        >
+          <Loader2 v-if="busy" :size="16" class="spin" />{{ busy ? 'Đang lưu…' : 'Lưu bài' }}
+        </button>
       </div>
     </form>
   </ModalDialog>
   <ModalDialog v-if="packagesOpen" title="Nhập kiến thức từ quy trình" @close="packagesOpen = false">
-    <p class="muted" style="margin-bottom: 14px">
+    <p class="muted knowledge-packages-intro">
       Tạo bài mô tả quy trình (thông tin cần điền, tài liệu, các bước duyệt) từ phiên bản đang áp dụng của mỗi gói.
       Khi quy trình đổi phiên bản, bấm “Cập nhật” để làm mới bài.
     </p>
@@ -313,9 +361,44 @@ async function runProbe() {
         <strong>{{ item.name }}</strong>
         <small>Phiên bản {{ item.version_no }}<template v-if="item.imported_at"> · đã nhập {{ formatDate(item.imported_at, true) }}</template></small>
       </div>
-      <button class="button small" :class="{ secondary: item.article_id }" type="button" :disabled="!!importing" @click="importPackage(item)">
-        {{ importing === item.package_id ? 'Đang nhập…' : item.article_id ? 'Cập nhật' : 'Nhập' }}
+      <button
+        class="button small"
+        :class="{ secondary: item.article_id }"
+        type="button"
+        :disabled="!!importing"
+        :aria-busy="importing === item.package_id"
+        @click="importPackage(item)"
+      >
+        <Loader2 v-if="importing === item.package_id" :size="14" class="spin" />{{
+          importing === item.package_id ? 'Đang nhập…' : item.article_id ? 'Cập nhật' : 'Nhập'
+        }}
       </button>
     </div>
   </ModalDialog>
 </template>
+<style scoped>
+.knowledge-intro {
+  margin-top: 6px;
+  font-size: 0.9375rem;
+}
+.knowledge-small {
+  font-size: 0.875rem;
+}
+.knowledge-aside {
+  align-content: start;
+}
+.knowledge-probe {
+  justify-self: start;
+}
+.knowledge-packages-intro {
+  margin-bottom: 16px;
+}
+.knowledge-actions {
+  display: flex;
+  gap: 4px;
+  flex: none;
+}
+.knowledge-delete:hover:not(:disabled) {
+  color: var(--red-ink);
+}
+</style>

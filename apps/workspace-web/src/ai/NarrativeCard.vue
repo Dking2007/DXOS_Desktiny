@@ -17,12 +17,15 @@ watch(
   () => (result.value = null),
 )
 async function write() {
+  const { days, scope } = props
   busy.value = true
   try {
-    result.value = await api.request('/ai/reports/narrative', {
+    const written = await api.request<{ text: string; created_at: string }>('/ai/reports/narrative', {
       method: 'POST',
-      body: JSON.stringify({ days: props.days, scope: props.scope }),
+      body: JSON.stringify({ days, scope }),
     })
+    // The period or scope changed while the AI wrote: this text describes figures no longer shown.
+    if (days === props.days && scope === props.scope) result.value = written
   } catch (error) {
     toast.error(error)
   } finally {
@@ -31,7 +34,7 @@ async function write() {
 }
 </script>
 <template>
-  <section class="ai-card" style="margin-bottom: 20px" aria-live="polite">
+  <section class="ai-card narrative-card" aria-live="polite">
     <header>
       <span class="ai-title"><Sparkles :size="16" />Nhận xét điều hành</span>
       <button class="button secondary small ai-action" :disabled="busy" @click="write">
@@ -45,3 +48,8 @@ async function write() {
     </p>
   </section>
 </template>
+<style scoped>
+.narrative-card {
+  margin-bottom: 20px;
+}
+</style>

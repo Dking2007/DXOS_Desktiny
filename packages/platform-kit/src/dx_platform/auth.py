@@ -22,6 +22,11 @@ from .security import SecretBox, random_token, token_hash
 
 logger = logging.getLogger("dx.auth")
 
+# How long a started sign-in stays valid. Keycloak keeps its login form open for 30 minutes
+# (realm "Login timeout"); a shorter state made people who paused on that form come back to an
+# error even though they typed the right password.
+LOGIN_STATE_TTL_SECONDS = 1800
+
 
 class AuthBase(DeclarativeBase):
     pass
@@ -247,7 +252,10 @@ class Auth:
                 db.execute(delete(LoginState).where(LoginState.expires < time.time()))
                 db.add(
                     LoginState(
-                        id=token_hash(state), nonce=nonce, verifier=verifier, expires=time.time() + 300
+                        id=token_hash(state),
+                        nonce=nonce,
+                        verifier=verifier,
+                        expires=time.time() + LOGIN_STATE_TTL_SECONDS,
                     )
                 )
                 db.commit()
@@ -278,24 +286,32 @@ class Auth:
                 httponly=True,
                 secure=self.settings.cookie_secure,
                 samesite="lax",
-                max_age=300,
+                max_age=LOGIN_STATE_TTL_SECONDS,
                 path="/",
             )
+            return response
+
+        def start_over(reason: str):
+            # A browser that lands here is a person mid sign-in (a stale tab, the back button, a
+            # form left open too long): send them to the sign-in page with a readable notice
+            # instead of a bare JSON error. Nothing is exchanged, so this leaks nothing.
+            logger.info("oidc callback rejected: %s", reason)
+            target = "/console/" if self.settings.service_name == "core" else "/login"
+            response = RedirectResponse(f"{target}?login={reason}", status_code=302)
+            response.delete_cookie(self.cookie + "_state", path="/")
             return response
 
         @router.get("/callback")
         def callback(request: Request, state: str = "", code: str = ""):
             expected = request.cookies.get(self.cookie + "_state", "")
             if not expected or not state or not code or not hmac.compare_digest(state, expected):
-                raise AppError(
-                    401, "oidc_state_invalid", "Phiên đăng nhập không hợp lệ. Bắt đầu đăng nhập lại."
-                )
+                return start_over("expired" if state and code and not expected else "invalid")
             with Session(self.engine) as db:
                 row = db.scalar(
                     select(LoginState).where(LoginState.id == token_hash(state)).with_for_update()
                 )
                 if not row or row.expires < time.time():
-                    raise AppError(401, "oidc_state_expired", "Phiên đăng nhập đã hết hạn.")
+                    return start_over("expired")
                 verifier, nonce = row.verifier, row.nonce
                 db.delete(row)
                 db.commit()

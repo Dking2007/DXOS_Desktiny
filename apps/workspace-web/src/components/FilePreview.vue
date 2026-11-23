@@ -42,32 +42,46 @@ const pagesEl = ref<HTMLElement>()
 const dialog = ref<HTMLDialogElement>()
 let previous: Element | null = null
 let renderToken = 0
+/** Closed while the file was still loading: whatever arrives late is released, not shown. */
+let disposed = false
+const abort = new AbortController()
 
 async function load() {
   loading.value = true
   error.value = ''
   try {
     const url = await props.source()
+    if (disposed) return
     // fetch() reads the bytes whatever Content-Disposition says; nothing is served
     // inline from our origin, and PDFs are drawn by pdf.js rather than the browser.
-    const response = await fetch(url, { credentials: 'same-origin' })
+    const response = await fetch(url, { credentials: 'same-origin', signal: abort.signal })
     if (!response.ok) throw new Error('Không tải được tệp. Liên kết có thể đã hết hạn, hãy mở lại.')
     const blob = await response.blob()
+    if (disposed) return
     if (kind.value === 'text') {
       truncated.value = blob.size > TEXT_PREVIEW_LIMIT
       text.value = await blob.slice(0, TEXT_PREVIEW_LIMIT).text()
     } else if (kind.value === 'pdf') {
       const pdfjs = await import('./pdf')
-      pdf.value = await pdfjs.openPdf(await blob.arrayBuffer())
+      const doc = await pdfjs.openPdf(await blob.arrayBuffer())
+      // The dialog closed while pdf.js parsed: free the document and its worker-side state.
+      if (disposed) {
+        void doc.destroy()
+        return
+      }
+      void pdf.value?.destroy()
+      pdf.value = doc
       pageCount.value = pdf.value.numPages
       loading.value = false
       await nextTick()
       await renderPdf()
     } else {
       const type = kind.value === 'image' ? blob.type || 'image/png' : blob.type
+      if (objectUrl.value) URL.revokeObjectURL(objectUrl.value)
       objectUrl.value = URL.createObjectURL(new Blob([blob], { type }))
     }
   } catch (cause) {
+    if (disposed) return
     error.value = errorText(cause)
   } finally {
     loading.value = false
@@ -114,7 +128,13 @@ function goTo(number: number) {
   page.value = Math.min(Math.max(1, number), pageCount.value)
   pagesEl.value?.querySelector(`[data-page="${page.value}"]`)?.scrollIntoView({ block: 'start' })
 }
+// Reading every page's position forces layout, so do it at most once per frame while scrolling.
+let scrollFrame = 0
 function onScroll() {
+  if (!scrollFrame) scrollFrame = requestAnimationFrame(updatePage)
+}
+function updatePage() {
+  scrollFrame = 0
   const host = pagesEl.value
   if (!host) return
   const top = host.getBoundingClientRect().top
@@ -141,14 +161,19 @@ function onResize() {
 
 onMounted(async () => {
   previous = document.activeElement
-  await nextTick()
-  dialog.value?.showModal()
   window.addEventListener('resize', onResize)
+  await nextTick()
+  if (disposed) return
+  dialog.value?.showModal()
   if (kind.value) await load()
   else loading.value = false
 })
 onBeforeUnmount(() => {
+  disposed = true
   renderToken++
+  abort.abort()
+  window.clearTimeout(resizeTimer)
+  cancelAnimationFrame(scrollFrame)
   window.removeEventListener('resize', onResize)
   if (objectUrl.value) URL.revokeObjectURL(objectUrl.value)
   void pdf.value?.destroy()
@@ -166,7 +191,7 @@ onBeforeUnmount(() => {
     <header class="preview-bar">
       <strong class="preview-name" :title="name">{{ name }}</strong>
       <div v-if="kind === 'pdf' && pageCount" class="preview-tools" role="group" aria-label="Điều khiển PDF">
-        <button class="icon-button" type="button" aria-label="Trang trước" :disabled="page <= 1" @click="goTo(page - 1)">
+        <button class="icon-button" type="button" aria-label="Trang trước" title="Trang trước (←)" :disabled="page <= 1" @click="goTo(page - 1)">
           <ChevronLeft :size="18" />
         </button>
         <label class="preview-page"
@@ -179,14 +204,14 @@ onBeforeUnmount(() => {
             @change="goTo(Number(($event.target as HTMLInputElement).value))"
           />/ {{ pageCount }}</label
         >
-        <button class="icon-button" type="button" aria-label="Trang sau" :disabled="page >= pageCount" @click="goTo(page + 1)">
+        <button class="icon-button" type="button" aria-label="Trang sau" title="Trang sau (→)" :disabled="page >= pageCount" @click="goTo(page + 1)">
           <ChevronRight :size="18" />
         </button>
         <span class="preview-divider" />
-        <button class="icon-button" type="button" aria-label="Thu nhỏ" @click="setZoom(zoom - 0.25)"><ZoomOut :size="18" /></button>
+        <button class="icon-button" type="button" aria-label="Thu nhỏ" title="Thu nhỏ (−)" :disabled="zoom <= 0.25" @click="setZoom(zoom - 0.25)"><ZoomOut :size="18" /></button>
         <span class="preview-zoom">{{ Math.round(zoom * 100) }}%</span>
-        <button class="icon-button" type="button" aria-label="Phóng to" @click="setZoom(zoom + 0.25)"><ZoomIn :size="18" /></button>
-        <button class="icon-button" type="button" aria-label="Vừa khung" title="Vừa khung" :class="{ active: fitWidth }" @click="fit">
+        <button class="icon-button" type="button" aria-label="Phóng to" title="Phóng to (+)" :disabled="zoom >= 4" @click="setZoom(zoom + 0.25)"><ZoomIn :size="18" /></button>
+        <button class="icon-button" type="button" aria-label="Vừa khung" title="Vừa khung" :class="{ active: fitWidth }" :aria-pressed="fitWidth" @click="fit">
           <Maximize2 :size="17" />
         </button>
       </div>

@@ -101,7 +101,7 @@ async function read(fileId: string) {
 
   <section v-if="canEdit && (on('case_check') || (on('case_extract') && files.length))" class="ai-card">
     <header><span class="ai-title"><Sparkles :size="16" />AI hỗ trợ lập hồ sơ</span></header>
-    <div v-if="on('case_extract') && files.length" class="stack" style="gap: 6px">
+    <div v-if="on('case_extract') && files.length" class="stack extract-block">
       <small class="muted">Đọc tài liệu đính kèm và đề xuất giá trị cho các trường, kèm trang và câu trích để bạn xác nhận.</small>
       <div class="ai-chips">
         <button
@@ -111,18 +111,20 @@ async function read(fileId: string) {
           :disabled="!!reading"
           @click="read(file.id)"
         >
-          <FileSearch :size="14" />{{ reading === file.id ? 'Đang đọc…' : `Đọc “${file.name}”` }}
+          <FileSearch :size="14" /><span class="file-label" :title="file.name ?? ''">{{
+            reading === file.id ? 'Đang đọc…' : `Đọc “${file.name}”`
+          }}</span>
         </button>
       </div>
       <ul v-if="skipped.length" class="ai-note">
         <li v-for="item in skipped" :key="item.key + item.reason">Bỏ qua {{ item.key }}: {{ item.reason }}</li>
       </ul>
     </div>
-    <div v-if="on('case_check')" style="margin-top: 10px">
+    <div v-if="on('case_check')" class="check-block">
       <button class="button secondary small ai-action" :disabled="checking" @click="check">
         <ListChecks :size="14" />{{ checking ? 'Đang soát…' : 'Soát hồ sơ trước khi trình' }}
       </button>
-      <div v-if="issues" style="margin-top: 8px">
+      <div v-if="issues" class="check-result">
         <p v-if="!issues.length">Không thấy điểm nào đáng lưu ý.</p>
         <div v-for="(issue, index) in issues" :key="index" class="ai-issue">
           <span class="level" :class="issue.level">{{ LEVELS[issue.level] }}</span>
@@ -132,3 +134,20 @@ async function read(fileId: string) {
     </div>
   </section>
 </template>
+<style scoped>
+.extract-block {
+  gap: 8px;
+}
+.file-label {
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.check-block {
+  margin-top: 12px;
+}
+.check-result {
+  margin-top: 10px;
+}
+</style>

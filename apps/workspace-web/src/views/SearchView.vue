@@ -56,6 +56,14 @@ const meaning = useQuery({
   retry: false,
 })
 const TYPE_LABEL = { file: 'Tài liệu', task: 'Công việc', case: 'Hồ sơ' }
+const semanticOn = computed(() => ai.on('semantic_search') && ai.semanticReady.value)
+/** Neither the word search nor the meaning search found anything. */
+const nothing = computed(
+  () =>
+    !!result.data.value &&
+    !result.data.value.total &&
+    (!semanticOn.value || (!meaning.isPending.value && !meaning.data.value?.items.length)),
+)
 const groups = [
   { key: 'task', label: 'Công việc', icon: ListChecks },
   { key: 'case', label: 'Hồ sơ', icon: Files },
@@ -76,7 +84,7 @@ const groups = [
       <Search :size="15" />{{ q.length >= 2 ? 'Đổi từ khóa' : 'Mở ô tìm kiếm' }}
     </button>
   </div>
-  <section v-if="q.length < 2" class="card" style="margin-top: 20px">
+  <section v-if="q.length < 2" class="card search-section">
     <StatePanel
       :empty="true"
       title="Nhập ít nhất 2 ký tự"
@@ -84,14 +92,22 @@ const groups = [
     />
   </section>
   <template v-else>
-    <section v-if="result.isPending.value || result.error.value" class="card" style="margin-top: 20px">
+    <section v-if="result.isPending.value || result.error.value" class="card search-section">
       <StatePanel :loading="result.isPending.value" :error="result.error.value" @retry="result.refetch()" />
     </section>
-    <p v-else class="muted" style="margin: 18px 0">
-      {{ result.data.value?.total ?? 0 }} kết quả cho “{{ q }}”
-    </p>
-    <div class="stack">
-      <section v-if="ai.on('semantic_search') && ai.semanticReady.value" class="ai-card">
+    <section v-else-if="nothing" class="card search-section">
+      <StatePanel
+        empty
+        :title="`Không tìm thấy kết quả cho “${q}”`"
+        description="Thử từ khóa ngắn hơn, bỏ dấu hoặc tìm theo mã hồ sơ (ví dụ HS-000012)."
+        ><button class="button small secondary" type="button" @click="openPalette(q)">
+          <Search :size="15" />Đổi từ khóa
+        </button></StatePanel
+      >
+    </section>
+    <p v-else class="muted search-count">{{ result.data.value?.total ?? 0 }} kết quả cho “{{ q }}”</p>
+    <div v-if="!nothing" class="stack">
+      <section v-if="semanticOn" class="ai-card">
         <header><span class="ai-title"><Sparkles :size="16" />Kết quả theo ý nghĩa</span></header>
         <p v-if="meaning.isPending.value" class="muted">AI đang tìm nội dung có ý nghĩa gần với “{{ q }}”…</p>
         <p v-else-if="meaning.error.value" class="muted">Chưa tìm theo ý nghĩa được lúc này.</p>
@@ -100,12 +116,11 @@ const groups = [
           v-for="hit in meaning.data.value?.items"
           :key="`${hit.type}:${hit.id}`"
           :to="hit.link"
-          class="list-row"
-          style="color: inherit; text-decoration: none"
+          class="list-row plain-link"
         >
           <div class="grow">
-            <p>{{ hit.title }}</p>
-            <small>{{ hit.snippet }}</small>
+            <p class="ellipsis" :title="hit.title">{{ hit.title }}</p>
+            <small class="snippet">{{ hit.snippet }}</small>
           </div>
           <span class="tag">{{ TYPE_LABEL[hit.type] }}</span>
         </RouterLink>
@@ -113,28 +128,62 @@ const groups = [
       <template v-for="group in groups" :key="group.key">
         <section v-if="result.data.value?.groups[group.key]?.total" class="card">
           <header class="card-header">
-            <h2>
-              <component :is="group.icon" :size="18" style="vertical-align: -3px" />
-              {{ group.label }}
+            <h2 class="group-title">
+              <component :is="group.icon" :size="18" aria-hidden="true" />{{ group.label }}
             </h2>
-            <span class="muted">{{ result.data.value.groups[group.key].total }}</span>
+            <span class="muted group-count">{{ result.data.value.groups[group.key].total }}</span>
           </header>
           <RouterLink
             v-for="hit in result.data.value.groups[group.key].items"
             :key="hit.id"
             :to="hit.link"
-            class="list-row"
-            style="color: inherit; text-decoration: none"
+            class="list-row plain-link"
           >
             <div class="grow">
-              <p>{{ hit.title }}</p>
-              <small>{{ hit.snippet }}</small>
+              <p class="ellipsis" :title="hit.title">{{ hit.title }}</p>
+              <small class="snippet">{{ hit.snippet }}</small>
             </div>
             <StatusBadge v-if="hit.status" :status="hit.status" />
-            <small class="muted">{{ formatDate(hit.updated_at) }}</small>
+            <small class="muted nowrap">{{ formatDate(hit.updated_at) }}</small>
           </RouterLink>
         </section>
       </template>
     </div>
   </template>
 </template>
+<style scoped>
+.search-section {
+  margin-top: 20px;
+}
+.search-count {
+  margin: 18px 0;
+}
+.plain-link {
+  color: inherit;
+  text-decoration: none;
+}
+.ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.snippet {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.group-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.group-count {
+  font-variant-numeric: tabular-nums;
+}
+.nowrap {
+  white-space: nowrap;
+}
+</style>

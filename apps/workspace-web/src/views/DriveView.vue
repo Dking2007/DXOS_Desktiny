@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <!-- SPDX-FileCopyrightText: 2026 Desktiny contributors -->
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import {
@@ -19,6 +19,7 @@ import {
   Grid2X2,
   History,
   List,
+  Loader2,
   MoreVertical,
   PanelLeftClose,
   PanelLeftOpen,
@@ -103,7 +104,25 @@ function toggleRailCollapsed() {
   window.localStorage.setItem('dx-drive-rail-collapsed', railCollapsed.value ? '1' : '0')
 }
 const newMenuOpen = ref(false)
+const newMenuRoot = ref<HTMLElement>()
 const fileMenuId = ref<string | null>(null)
+// The "Mới" menu and the file action bar close on Escape; the menu also on a click elsewhere.
+function onDocumentPointer(event: PointerEvent) {
+  if (newMenuOpen.value && !newMenuRoot.value?.contains(event.target as Node)) newMenuOpen.value = false
+}
+function onDocumentKey(event: KeyboardEvent) {
+  if (event.key !== 'Escape' || modal.value) return
+  if (newMenuOpen.value) newMenuOpen.value = false
+  else if (fileMenuId.value) fileMenuId.value = null
+}
+onMounted(() => {
+  document.addEventListener('pointerdown', onDocumentPointer)
+  document.addEventListener('keydown', onDocumentKey)
+})
+onBeforeUnmount(() => {
+  document.removeEventListener('pointerdown', onDocumentPointer)
+  document.removeEventListener('keydown', onDocumentKey)
+})
 const viewMode = ref<'list' | 'grid'>('list')
 const sortBy = ref<'name' | 'created' | 'size'>('created')
 const sortDescending = ref(true)
@@ -193,13 +212,16 @@ const suggesting = ref(false)
 const suggestion = ref<{ folder_id: string | null; folder_name: string | null; reason: string } | null>(null)
 /** Let AI propose labels (and a better folder) for the file in the labels dialog. */
 async function suggestLabels() {
-  if (!selected.value) return
+  const file = selected.value
+  if (!file) return
   suggesting.value = true
   try {
     const result = await api.request<{ labels: string[]; folder_id: string | null; folder_name: string | null; reason: string }>(
-      `/ai/files/${selected.value.id}/labels`,
+      `/ai/files/${file.id}/labels`,
       { method: 'POST' },
     )
+    // The AI can take a while; by then the dialog may be showing another file (or be closed).
+    if (selected.value?.id !== file.id) return
     labelText.value = labelsToText([...parseLabels(labelText.value), ...result.labels])
     suggestion.value = result
   } catch (cause) {
@@ -231,6 +253,47 @@ async function drafted(file: { id: string; name: string }) {
 }
 const activeFile = computed(() => visibleFiles.value.find(item => item.id === fileMenuId.value) ?? null)
 const sortedFolders = computed(() => [...(folders.data.value?.items ?? [])].sort((a, b) => a.name.localeCompare(b.name, 'vi')))
+/**
+ * Destinations offered by the move/copy selects: the root, the folder being browsed (so "stay here"
+ * is a visible choice instead of a blank select) and its sub-folders — never the folder being moved.
+ */
+const moveTargets = computed(() => {
+  const options: { value: string; label: string }[] = [{ value: '', label: 'Tài liệu / thư mục gốc' }]
+  const here = crumbs.value.at(-1)
+  if (folder.value && here) options.push({ value: here.id, label: `${here.name} (thư mục đang mở)` })
+  for (const item of sortedFolders.value)
+    if (item.id !== selectedFolder.value?.id) options.push({ value: item.id, label: item.name })
+  return options
+})
+const usersToShare = computed(() => (users.data.value?.items ?? []).filter((user) => user.id !== session.user?.id))
+/** Why the dialog's main button cannot be pressed yet, or '' when it can. */
+const saveBlocked = computed(() => {
+  const trimmed = name.value.trim()
+  switch (modal.value) {
+    case 'folder':
+    case 'document':
+      return trimmed ? '' : 'Nhập tên trước khi lưu'
+    case 'rename':
+      if (!trimmed) return 'Tên tài liệu không được để trống'
+      return selected.value && trimmed === selected.value.name && targetFolder.value === (selected.value.folder_id ?? '')
+        ? 'Chưa thay đổi tên hoặc thư mục'
+        : ''
+    case 'folder-rename':
+      if (!trimmed) return 'Tên thư mục không được để trống'
+      return selectedFolder.value &&
+        trimmed === selectedFolder.value.name &&
+        targetFolder.value === (selectedFolder.value.parent_id ?? '')
+        ? 'Chưa thay đổi tên hoặc thư mục'
+        : ''
+    case 'share':
+    case 'folder-share':
+      return userId.value ? '' : 'Chọn người nhận'
+    case 'upload':
+      return uploadFile.value ? '' : 'Chọn tệp cần tải lên'
+    default:
+      return ''
+  }
+})
 const rootLabel = computed(() => (origin.value === 'shared' ? 'Được chia sẻ với tôi' : 'Tài liệu của tôi'))
 const currentLocation = computed(() => trash.value ? 'Thùng rác' : searchQuery.value ? 'Kết quả tìm kiếm' : crumbs.value.at(-1)?.name ?? rootLabel.value)
 watch(sortBy, value => { sortDescending.value = value !== 'name'; cursor.value = null })
@@ -273,6 +336,9 @@ function open(type: typeof modal.value, item?: DriveFile) {
   name.value = item?.name ?? ''
   targetFolder.value = item?.folder_id ?? ''
   labelText.value = labelsToText(item?.labels)
+  userId.value = ''
+  access.value = 'read'
+  suggestion.value = null
   error.value = null
   progress.value = null
   uploadFile.value = null
@@ -284,6 +350,8 @@ function openFolder(type: 'folder-rename' | 'folder-share', item: Folder) {
   selectedFolder.value = item
   name.value = item.name
   targetFolder.value = item.parent_id ?? ''
+  userId.value = ''
+  access.value = 'read'
   error.value = null
   progress.value = null
   uploadFile.value = null
@@ -333,9 +401,14 @@ function onDrop(event: DragEvent) {
   dragging.value = false
   const dropped = event.dataTransfer?.files?.[0]
   // At the top of "shared with me" there is no folder to drop into.
-  if (!dropped || trash.value || sharedRoot.value) return
+  if (!dropped || trash.value || sharedRoot.value) {
+    if (dropped) toast.info(trash.value ? 'Không thể tải tệp vào thùng rác.' : 'Hãy mở một thư mục được chia sẻ để tải tệp vào.')
+    return
+  }
   open('upload')
   uploadFile.value = dropped
+  const count = event.dataTransfer?.files?.length ?? 0
+  if (count > 1) toast.info(`Mỗi lần tải một tệp — đã chọn “${dropped.name}”, bỏ qua ${count - 1} tệp còn lại.`)
 }
 async function refresh() {
   await queryClient.invalidateQueries({ queryKey: ['drive'] })
@@ -355,6 +428,7 @@ const DONE: Partial<Record<NonNullable<typeof modal.value>, string>> = {
   'folder-share': 'Đã cập nhật chia sẻ thư mục',
 }
 async function perform(operation: () => Promise<unknown>, keep = false) {
+  if (busy.value) return
   busy.value = true
   error.value = null
   const done = modal.value ? DONE[modal.value] : undefined
@@ -370,11 +444,12 @@ async function perform(operation: () => Promise<unknown>, keep = false) {
   }
 }
 async function save() {
+  if (saveBlocked.value || busy.value) return
   if (modal.value === 'folder')
     return perform(() =>
       api.request('/drive/folders', {
         method: 'POST',
-        body: JSON.stringify({ name: name.value, parent_id: folder.value }),
+        body: JSON.stringify({ name: name.value.trim(), parent_id: folder.value }),
       }),
     )
   if (modal.value === 'document')
@@ -383,7 +458,7 @@ async function save() {
         method: 'POST',
         headers: { 'Idempotency-Key': newIntent() },
         body: JSON.stringify({
-          name: name.value,
+          name: name.value.trim(),
           kind: kind.value,
           folder_id: folder.value,
         }),
@@ -395,7 +470,7 @@ async function save() {
         method: 'PATCH',
         body: JSON.stringify({
           expected_revision: selected.value!.revision,
-          name: name.value,
+          name: name.value.trim(),
           folder_id: targetFolder.value || null,
         }),
       }),
@@ -416,7 +491,7 @@ async function save() {
         method: 'POST',
         headers: { 'Idempotency-Key': newIntent() },
         body: JSON.stringify({
-          name: name.value || null,
+          name: name.value.trim() || null,
           folder_id: targetFolder.value || null,
           labels: labelText.value.trim() ? parseLabels(labelText.value) : null,
         }),
@@ -439,7 +514,7 @@ async function save() {
         method: 'PATCH',
         body: JSON.stringify({
           expected_revision: selectedFolder.value!.revision ?? 1,
-          name: name.value,
+          name: name.value.trim(),
           parent_id: targetFolder.value || null,
         }),
       }),
@@ -505,6 +580,7 @@ async function download(item: DriveFile) {
 }
 async function restore(version: FileVersion) {
   if (!selected.value) return
+  if (!window.confirm(`Khôi phục phiên bản ${version.version_no}? Nội dung hiện tại được giữ lại thành một phiên bản cũ.`)) return
   await perform(() =>
     api.request(`/drive/files/${selected.value!.id}/restore`, {
       method: 'POST',
@@ -516,23 +592,29 @@ async function restore(version: FileVersion) {
     }),
   )
 }
+const uploadInput = ref<HTMLInputElement>()
 function pickFile(event: Event) {
   uploadFile.value = (event.target as HTMLInputElement).files?.[0] ?? null
 }
+function clearUpload() {
+  uploadFile.value = null
+  if (uploadInput.value) uploadInput.value.value = ''
+}
 </script>
 <template>
-  <div v-if="error && !modal" class="notice error error-inline" role="alert">
-    {{ errorText(error) }}
+  <div v-if="error && !modal" class="notice error error-inline drive-error" role="alert">
+    <span>{{ errorText(error) }}</span>
+    <button class="icon-button" type="button" aria-label="Đóng thông báo lỗi" title="Đóng" @click="error = null"><X :size="16" /></button>
   </div>
   <div class="drive-workspace" :class="{ 'rail-collapsed': railCollapsed }">
     <aside class="drive-rail" aria-label="Điều hướng tài liệu">
-      <div class="drive-new-wrap">
-        <button class="drive-new" :aria-expanded="newMenuOpen" aria-label="Mới" title="Mới" @click="newMenuOpen = !newMenuOpen"><Plus :size="22" /><span>Mới</span></button>
-        <div v-if="newMenuOpen" class="drive-new-menu">
-          <button @click="openNew('folder')"><FolderPlus :size="18" /> Thư mục mới</button>
-          <button @click="openNew('upload')"><Upload :size="18" /> Tải tệp lên</button>
-          <button @click="openNew('document')"><FilePlus2 :size="18" /> Tài liệu mới</button>
-          <button v-if="ai.on('document_draft')" @click="newMenuOpen = false; drafting = true"><Sparkles :size="18" /> Soạn văn bản bằng AI</button>
+      <div ref="newMenuRoot" class="drive-new-wrap">
+        <button class="drive-new" :aria-expanded="newMenuOpen" aria-haspopup="menu" aria-label="Mới" title="Tạo mới hoặc tải lên" @click="newMenuOpen = !newMenuOpen"><Plus :size="22" /><span>Mới</span></button>
+        <div v-if="newMenuOpen" class="drive-new-menu" role="menu">
+          <button role="menuitem" :disabled="sharedRoot || trash" :title="sharedRoot || trash ? 'Mở thư mục để tạo bên trong' : ''" @click="openNew('folder')"><FolderPlus :size="18" />Thư mục mới</button>
+          <button role="menuitem" :disabled="sharedRoot || trash" :title="sharedRoot || trash ? 'Mở thư mục để tải lên bên trong' : ''" @click="openNew('upload')"><Upload :size="18" />Tải tệp lên</button>
+          <button role="menuitem" :disabled="sharedRoot || trash" :title="sharedRoot || trash ? 'Mở thư mục để tạo bên trong' : ''" @click="openNew('document')"><FilePlus2 :size="18" />Tài liệu mới</button>
+          <button v-if="ai.on('document_draft')" role="menuitem" @click="newMenuOpen = false; drafting = true"><Sparkles :size="18" />Soạn văn bản bằng AI</button>
         </div>
       </div>
       <nav class="drive-nav" aria-label="Vị trí tài liệu">
@@ -542,7 +624,7 @@ function pickFile(event: Event) {
       </nav>
       <div v-if="!trash && !searchQuery && sortedFolders.length" class="drive-rail-folders">
         <span>THƯ MỤC Ở ĐÂY</span>
-        <button v-for="item in sortedFolders" :key="item.id" @click="enter(item)"><FolderClosed :size="17" />{{ item.name }}</button>
+        <button v-for="item in sortedFolders" :key="item.id" :title="item.name" @click="enter(item)"><FolderClosed :size="17" /><span>{{ item.name }}</span></button>
       </div>
       <p class="drive-rail-note">Kéo tệp vào vùng danh sách để tải lên thư mục đang mở.</p>
     </aside>
@@ -551,31 +633,35 @@ function pickFile(event: Event) {
         <h1 class="drive-title">{{ currentLocation }}</h1>
         <label class="drive-search"><Search :size="20" /><span class="sr-only">Tìm tài liệu trong toàn kho</span>
           <input v-model="search" type="search" placeholder="Tìm trong toàn bộ tài liệu" />
-          <button v-if="search" type="button" aria-label="Xóa từ khóa" @click="search = ''"><X :size="17" /></button>
+          <button v-if="search" type="button" aria-label="Xóa từ khóa" title="Xóa từ khóa" @click="search = ''"><X :size="17" /></button>
         </label>
         <div class="drive-panel-controls">
           <button class="drive-control drive-rail-toggle" :aria-label="railCollapsed ? 'Mở rộng cột tài liệu' : 'Thu gọn cột tài liệu'" :title="railCollapsed ? 'Mở rộng cột tài liệu' : 'Thu gọn cột tài liệu'" :aria-expanded="!railCollapsed" @click="toggleRailCollapsed"><PanelLeftOpen v-if="railCollapsed" :size="18" /><PanelLeftClose v-else :size="18" /></button>
           <label class="drive-sort"><span class="sr-only">Sắp xếp</span><select v-model="sortBy"><option value="created">Được thêm gần đây</option><option value="name">Tên</option><option value="size">Dung lượng</option></select></label>
-          <button class="drive-control" :aria-label="sortDescending ? 'Sắp xếp tăng dần' : 'Sắp xếp giảm dần'" @click="sortDescending = !sortDescending"><ArrowDownUp :size="17" /></button>
+          <button class="drive-control" :aria-label="sortDescending ? 'Sắp xếp tăng dần' : 'Sắp xếp giảm dần'" :title="sortDescending ? 'Đang giảm dần — bấm để tăng dần' : 'Đang tăng dần — bấm để giảm dần'" @click="sortDescending = !sortDescending"><ArrowDownUp :size="17" /></button>
           <span class="drive-control-divider" />
-          <button class="drive-control" :class="{ active: viewMode === 'list' }" aria-label="Xem danh sách" :aria-pressed="viewMode === 'list'" @click="viewMode = 'list'"><List :size="18" /></button>
-          <button class="drive-control" :class="{ active: viewMode === 'grid' }" aria-label="Xem dạng lưới" :aria-pressed="viewMode === 'grid'" @click="viewMode = 'grid'"><Grid2X2 :size="18" /></button>
+          <button class="drive-control" :class="{ active: viewMode === 'list' }" aria-label="Xem danh sách" title="Xem danh sách" :aria-pressed="viewMode === 'list'" @click="viewMode = 'list'"><List :size="18" /></button>
+          <button class="drive-control" :class="{ active: viewMode === 'grid' }" aria-label="Xem dạng lưới" title="Xem dạng lưới" :aria-pressed="viewMode === 'grid'" @click="viewMode = 'grid'"><Grid2X2 :size="18" /></button>
         </div>
       </div>
       <p v-if="anyFolderSyncing" class="notice drive-sync" role="status">Đang cấp lại quyền sau thay đổi chia sẻ hoặc di chuyển thư mục. Tài liệu có thể tạm thời chưa mở được.</p>
-    <div v-if="!trash && !searchQuery" class="drive-location">
-      <button @click="go(-1)">
-        <component
-          :is="origin === 'shared' ? UsersIcon : FolderClosed"
-          :size="14"
-          style="vertical-align: middle; margin-right: 6px"
-        />{{ origin === 'shared' ? 'Được chia sẻ với tôi' : 'Tài liệu' }}</button
+    <nav v-if="!trash && !searchQuery" class="drive-location" aria-label="Đường dẫn thư mục">
+      <button type="button" class="drive-crumb" :aria-current="crumbs.length ? undefined : 'page'" @click="go(-1)">
+        <component :is="origin === 'shared' ? UsersIcon : FolderClosed" :size="14" aria-hidden="true" /><span>{{
+          origin === 'shared' ? 'Được chia sẻ với tôi' : 'Tài liệu'
+        }}</span></button
       ><template v-for="(crumb, index) in crumbs" :key="crumb.id"
-        ><ChevronRight :size="13" /><button @click="go(index)">
-          {{ crumb.name }}
+        ><ChevronRight :size="13" class="drive-crumb-sep" aria-hidden="true" /><button
+          type="button"
+          class="drive-crumb"
+          :title="crumb.name"
+          :aria-current="index === crumbs.length - 1 ? 'page' : undefined"
+          @click="go(index)"
+        >
+          <span>{{ crumb.name }}</span>
         </button></template
       >
-    </div>
+    </nav>
     <div
       v-if="!trash && !searchQuery && sortedFolders.length"
       class="folder-grid"
@@ -591,15 +677,13 @@ function pickFile(event: Event) {
           @click="enter(item)"
         >
           <FolderClosed :size="23" /><span>{{ item.name }}</span
-          ><ChevronRight
-            :size="14"
-            style="margin-left: auto; color: var(--muted); fill: none"
-          />
+          ><ChevronRight :size="14" class="folder-open-arrow" aria-hidden="true" />
         </button>
         <div class="folder-tools">
           <button
             class="icon-button"
             :aria-label="`Đổi tên hoặc di chuyển ${item.name}`"
+            title="Đổi tên / di chuyển"
             @click="openFolder('folder-rename', item)"
           >
             <Pencil :size="15" /></button
@@ -607,6 +691,7 @@ function pickFile(event: Event) {
             v-if="owns(item)"
             class="icon-button"
             :aria-label="`Chia sẻ quyền kế thừa cho ${item.name}`"
+            title="Chia sẻ thư mục"
             @click="openFolder('folder-share', item)"
           >
             <Share2 :size="15" />
@@ -683,9 +768,9 @@ function pickFile(event: Event) {
             <td class="muted">{{ formatSize(item.size ?? 0) }}</td>
             <td>
               <div class="drive-row-actions">
-                <button v-if="!trash" class="drive-control" :aria-label="`Tải ${item.name}`" @click="download(item)"><Download :size="17" /></button>
-                <button v-if="!trash && owns(item)" class="drive-control" :aria-label="`Chia sẻ ${item.name}`" @click="open('share', item)"><Share2 :size="17" /></button>
-                <button class="drive-control" :aria-label="`Thêm thao tác cho ${item.name}`" :aria-expanded="fileMenuId === item.id" @click="toggleFileMenu(item)"><MoreVertical :size="18" /></button>
+                <button v-if="!trash" class="drive-control" :aria-label="`Tải ${item.name}`" title="Tải xuống" @click="download(item)"><Download :size="17" /></button>
+                <button v-if="!trash && owns(item)" class="drive-control" :aria-label="`Chia sẻ ${item.name}`" title="Chia sẻ" @click="open('share', item)"><Share2 :size="17" /></button>
+                <button class="drive-control" :class="{ active: fileMenuId === item.id }" :aria-label="`Thêm thao tác cho ${item.name}`" title="Thêm thao tác" :aria-expanded="fileMenuId === item.id" @click="toggleFileMenu(item)"><MoreVertical :size="18" /></button>
               </div>
             </td>
           </tr>
@@ -693,44 +778,44 @@ function pickFile(event: Event) {
       </table>
     </div>
     <div v-if="visibleFiles.length && viewMode === 'grid'" class="drive-file-grid">
-      <article v-for="item in visibleFiles" :key="item.id" class="drive-file-card">
+      <article v-for="item in visibleFiles" :key="item.id" class="drive-file-card" :class="{ active: fileMenuId === item.id }">
         <div class="drive-file-card-top"><span class="drive-file-icon" :class="fileTone(item)"><component :is="fileIcon(item)" :size="20" /></span>
-          <button class="drive-control" :aria-label="`Thêm thao tác cho ${item.name}`" :aria-expanded="fileMenuId === item.id" @click="toggleFileMenu(item)"><MoreVertical :size="18" /></button></div>
+          <button class="drive-control" :class="{ active: fileMenuId === item.id }" :aria-label="`Thêm thao tác cho ${item.name}`" title="Thêm thao tác" :aria-expanded="fileMenuId === item.id" @click="toggleFileMenu(item)"><MoreVertical :size="18" /></button></div>
         <div class="drive-file-preview" :class="fileTone(item)"><component :is="fileIcon(item)" :size="45" :stroke-width="1.3" /></div>
-        <div class="drive-file-card-bottom"><div class="grow"><RouterLink v-if="!trash && /\.(docx|xlsx|pptx|doc|xls|ppt|odt|ods|odp)$/i.test(item.name)" :to="`/drive/${item.id}/edit`" class="row-link">{{ item.name }}</RouterLink><button v-else-if="!trash" class="drive-file-name" :title="previewKind(item.name) ? 'Bấm để xem' : 'Bấm để tải về'" @click="openFile(item)">{{ item.name }}</button><strong v-else>{{ item.name }}</strong><small>{{ formatDate(item.created_at) }} · {{ formatSize(item.size ?? 0) }}</small></div></div>
+        <div class="drive-file-card-bottom"><div class="grow"><RouterLink v-if="!trash && /\.(docx|xlsx|pptx|doc|xls|ppt|odt|ods|odp)$/i.test(item.name)" :to="`/drive/${item.id}/edit`" class="row-link" :title="item.name">{{ item.name }}</RouterLink><button v-else-if="!trash" class="drive-file-name" :title="`${item.name} — ${previewKind(item.name) ? 'bấm để xem' : 'bấm để tải về'}`" @click="openFile(item)">{{ item.name }}</button><strong v-else :title="item.name">{{ item.name }}</strong><small>{{ formatDate(item.created_at) }} · {{ formatSize(item.size ?? 0) }}</small></div></div>
       </article>
     </div>
-    <div v-if="activeFile" class="drive-action-bar">
-      <span class="grow">{{ activeFile.name }}</span>
-      <button v-if="!trash && previewKind(activeFile.name)" @click="preview = activeFile"><Eye :size="16" /> Xem</button>
-      <button v-if="!trash" @click="download(activeFile)"><Download :size="16" /> Tải xuống</button>
-      <button v-if="!trash && ai.on('document_qa')" @click="aiFile = activeFile"><Sparkles :size="16" /> Hỏi AI</button>
-      <button v-if="!trash" @click="open('labels', activeFile)"><Tags :size="16" /> Nhãn</button>
-      <button v-if="!trash" @click="open('copy', activeFile)"><Copy :size="16" /> Sao chép</button>
-      <button v-if="!trash" @click="open('versions', activeFile)"><History :size="16" /> Phiên bản</button>
-      <button v-if="!trash" @click="open('rename', activeFile)"><Pencil :size="16" /> Đổi tên / di chuyển</button>
+    <div v-if="activeFile" class="drive-action-bar" role="toolbar" :aria-label="`Thao tác với ${activeFile.name}`">
+      <span class="grow" :title="activeFile.name">{{ activeFile.name }}</span>
+      <button v-if="!trash && previewKind(activeFile.name)" @click="preview = activeFile"><Eye :size="16" />Xem</button>
+      <button v-if="!trash" @click="download(activeFile)"><Download :size="16" />Tải xuống</button>
+      <button v-if="!trash && ai.on('document_qa')" @click="aiFile = activeFile"><Sparkles :size="16" />Hỏi AI</button>
+      <button v-if="!trash" @click="open('labels', activeFile)"><Tags :size="16" />Nhãn</button>
+      <button v-if="!trash" @click="open('copy', activeFile)"><Copy :size="16" />Sao chép</button>
+      <button v-if="!trash" @click="open('versions', activeFile)"><History :size="16" />Phiên bản</button>
+      <button v-if="!trash" @click="open('rename', activeFile)"><Pencil :size="16" />Đổi tên / di chuyển</button>
       <template v-if="owns(activeFile)">
-        <button v-if="!trash" @click="open('share', activeFile)"><Share2 :size="16" /> Chia sẻ</button>
-        <button @click="open('trash', activeFile)"><Trash2 :size="16" /> {{ trash ? 'Khôi phục' : 'Xóa' }}</button>
+        <button v-if="!trash" @click="open('share', activeFile)"><Share2 :size="16" />Chia sẻ</button>
+        <button :class="{ danger: !trash }" @click="open('trash', activeFile)"><Trash2 :size="16" />{{ trash ? 'Khôi phục' : 'Xóa' }}</button>
       </template>
       <span v-else class="drive-owner-note" :title="`Chỉ ${ownerName(activeFile)} được chia sẻ hoặc xóa tài liệu này`"
-        ><Share2 :size="14" /> Được chia sẻ bởi {{ ownerName(activeFile) }} · chỉ chủ sở hữu được chia sẻ, xóa</span
+        ><Share2 :size="14" />Được chia sẻ bởi {{ ownerName(activeFile) }} · chỉ chủ sở hữu được chia sẻ, xóa</span
       >
-      <button aria-label="Đóng thao tác" @click="fileMenuId = null"><X :size="16" /></button>
+      <button aria-label="Đóng thao tác" title="Đóng (Esc)" @click="fileMenuId = null"><X :size="16" /></button>
     </div>
     <div v-if="files.data.value?.has_more || cursor" class="pagination">
       <button
         class="button secondary small"
-        :disabled="!cursor"
+        :disabled="!cursor || files.isFetching.value"
         @click="cursor = null"
       >
         Về đầu</button
       ><button
         class="button secondary small"
-        :disabled="!files.data.value?.has_more"
+        :disabled="!files.data.value?.has_more || files.isFetching.value"
         @click="cursor = files.data.value?.next_cursor ?? null"
       >
-        Trang tiếp <ChevronRight :size="15" />
+        Trang tiếp<ChevronRight :size="15" />
       </button>
     </div>
     </section>
@@ -772,8 +857,7 @@ function pickFile(event: Event) {
         }}</code
         ><button
           v-if="error instanceof ApiError && error.status === 409"
-          class="button secondary small"
-          style="margin-top: 10px"
+          class="button secondary small drive-reload"
           @click="
             () => {
               refresh()
@@ -806,8 +890,7 @@ function pickFile(event: Event) {
             /><button
               v-if="modal === 'labels' && ai.on('file_labels')"
               type="button"
-              class="button secondary small ai-action"
-              style="justify-self: start; margin-top: 6px"
+              class="button secondary small ai-action drive-field-action"
               :disabled="suggesting"
               @click="suggestLabels"
             >
@@ -817,8 +900,7 @@ function pickFile(event: Event) {
             <button
               v-if="modal === 'labels' && suggestion?.folder_id"
               type="button"
-              class="button ghost small"
-              style="justify-self: start"
+              class="button ghost small drive-field-action"
               @click="moveToSuggested"
             >
               Chuyển vào thư mục gợi ý “{{ suggestion.folder_name }}”
@@ -846,13 +928,8 @@ function pickFile(event: Event) {
           <div v-if="modal === 'copy'" class="field">
             <label for="copy-folder">Thư mục đích</label
             ><select id="copy-folder" v-model="targetFolder">
-              <option value="">Tài liệu / thư mục gốc</option>
-              <option
-                v-for="item in folders.data.value?.items"
-                :key="item.id"
-                :value="item.id"
-              >
-                {{ item.name }}
+              <option v-for="option in moveTargets" :key="option.value" :value="option.value">
+                {{ option.label }}
               </option></select
             ><small>Chỉ các thư mục bạn được phép ghi.</small>
           </div>
@@ -885,13 +962,8 @@ function pickFile(event: Event) {
           <div v-if="modal === 'rename' || modal === 'folder-rename'" class="field">
             <label for="target-folder">Thư mục đích</label
             ><select id="target-folder" v-model="targetFolder">
-              <option value="">Tài liệu / thư mục gốc</option>
-              <option
-                v-for="item in folders.data.value?.items"
-                :key="item.id"
-                :value="item.id"
-              >
-                {{ item.name }}
+              <option v-for="option in moveTargets" :key="option.value" :value="option.value">
+                {{ option.label }}
               </option></select
             ><small>Quyền kế thừa được tính lại khi di chuyển.</small>
           </div></template
@@ -903,12 +975,13 @@ function pickFile(event: Event) {
             ></label
           ><input
             id="upload-file"
+            ref="uploadInput"
             type="file"
-            required
+            :required="!uploadFile"
             :disabled="busy"
             @change="pickFile"
           />
-          <div v-if="uploadFile" class="primary-cell">
+          <div v-if="uploadFile" class="primary-cell drive-upload-file">
             <File :size="22" />
             <div>
               <strong>{{ uploadFile.name }}</strong
@@ -919,7 +992,8 @@ function pickFile(event: Event) {
               type="button"
               class="icon-button"
               aria-label="Bỏ tệp đã chọn"
-              @click="uploadFile = null"
+              title="Bỏ tệp đã chọn"
+              @click="clearUpload"
             >
               <X :size="16" />
             </button>
@@ -961,6 +1035,7 @@ function pickFile(event: Event) {
                   class="button secondary small"
                   type="button"
                   :disabled="busy"
+                  title="Điền sẵn để thu hồi — bấm “Lưu quyền chia sẻ” để xác nhận"
                   @click="
                     () => {
                       userId = share.user_id
@@ -977,11 +1052,7 @@ function pickFile(event: Event) {
             <label for="share-user">Người nhận</label
             ><select id="share-user" v-model="userId" required>
               <option value="">Chọn thành viên</option>
-              <option
-                v-for="user in users.data.value?.items"
-                :key="user.id"
-                :value="user.id"
-              >
+              <option v-for="user in usersToShare" :key="user.id" :value="user.id">
                 {{ user.display_name }}
               </option>
             </select>
@@ -1029,10 +1100,18 @@ function pickFile(event: Event) {
           @click="close"
         >
           Hủy</button
-        ><button class="button" :disabled="busy">
-          {{
+        ><button
+          class="button"
+          :class="{ danger: modal === 'trash' && !trash }"
+          :disabled="busy || !!saveBlocked"
+          :title="saveBlocked"
+          :aria-busy="busy"
+        >
+          <Loader2 v-if="busy" :size="16" class="spin" />{{
             busy
-              ? 'Đang xử lý…'
+              ? modal === 'upload'
+                ? 'Đang tải lên…'
+                : 'Đang xử lý…'
               : modal === 'upload'
                 ? 'Tải lên'
                 : modal === 'share' || modal === 'folder-share'
@@ -1051,7 +1130,7 @@ function pickFile(event: Event) {
       </div>
     </form>
     <template v-else
-      ><p class="muted" style="margin-bottom: 15px">{{ selected?.name }}</p>
+      ><p class="muted drive-versions-file">{{ selected?.name }}</p>
       <StatePanel
         :loading="versionQuery.isPending.value"
         :error="versionQuery.error.value"
@@ -1061,8 +1140,7 @@ function pickFile(event: Event) {
       <div
         v-for="version in versionQuery.data.value?.items"
         :key="version.id"
-        class="list-row"
-        style="padding: 15px 0"
+        class="list-row drive-version-row"
       >
         <span class="file-icon"><History :size="17" /></span>
         <div class="grow">
@@ -1106,17 +1184,20 @@ function pickFile(event: Event) {
 .drive-new:hover { background: var(--surface-2); border-color: var(--teal-line); }
 .drive-new-menu { position: absolute; top: 60px; left: 0; z-index: 15; min-width: 210px; padding: 7px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: 0 16px 38px #0d2e4530; }
 .drive-new-menu button, .drive-nav button, .drive-rail-folders button { display: flex; align-items: center; gap: 13px; width: 100%; border: 0; background: none; color: var(--navy); cursor: pointer; text-align: left; }
-.drive-new-menu button { padding: 11px 12px; border-radius: 8px; font-size: 14px; }
+.drive-new-menu button { padding: 11px 12px; border-radius: 8px; font-size: 0.875rem; }
+.drive-new-menu button:disabled { opacity: 0.5; cursor: not-allowed; background: none; }
+.drive-new-menu button:focus-visible, .drive-nav button:focus-visible, .drive-rail-folders button:focus-visible, .drive-action-bar button:focus-visible, .drive-control:focus-visible, .drive-crumb:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 .drive-new-menu button:hover, .drive-rail-folders button:hover { background: var(--surface-3); }
 .drive-nav { display: grid; gap: 3px; }
-.drive-nav button { min-height: 42px; padding: 0 14px; border-radius: 0 20px 20px 0; font-size: 14px; font-weight: 600; }
+.drive-nav button { min-height: 42px; padding: 0 14px; border-radius: 0 20px 20px 0; font-size: 0.875rem; font-weight: 600; }
 .drive-nav button:hover { background: var(--surface-3); }
 .drive-nav button.active { background: var(--teal-soft); color: var(--teal-ink); }
 .drive-rail-folders { margin-top: 26px; border-top: 1px solid var(--border); padding-top: 17px; }
-.drive-rail-folders > span { display: block; padding: 0 13px 9px; font-size: 12px; font-weight: 700; letter-spacing: .1em; color: var(--muted); }
-.drive-rail-folders button { padding: 9px 13px; border-radius: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.drive-rail-folders > span { display: block; padding: 0 13px 9px; font-size: 0.75rem; font-weight: 700; letter-spacing: .1em; color: var(--muted); }
+.drive-rail-folders button { gap: 10px; min-height: 36px; padding: 8px 13px; border-radius: 8px; font-size: 0.8125rem; }
+.drive-rail-folders button > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .drive-rail-folders svg { flex: none; color: #b5944b; }
-.drive-rail-note { margin: 24px 13px; font-size: 13px; line-height: 1.55; color: var(--muted); }
+.drive-rail-note { margin: 24px 13px; font-size: 0.8125rem; line-height: 1.55; color: var(--muted); }
 @media (min-width: 701px) {
   .drive-workspace { transition: grid-template-columns 0.2s ease; }
   .drive-workspace.rail-collapsed { grid-template-columns: 64px minmax(0, 1fr); }
@@ -1132,14 +1213,27 @@ function pickFile(event: Event) {
 .drive-panel.drag-over { outline: 3px dashed #4098a6; outline-offset: -9px; background: var(--surface-2); }
 .drive-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 84px; padding: 18px 23px; }
 .drive-panel-head { gap: 16px; }
-.drive-title { margin: 0; font-size: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.drive-panel-controls { display: flex; align-items: center; gap: 5px; }
-.drive-sort select { min-height: 40px; max-width: 125px; border: 0; background: transparent; color: var(--navy); font-size: 13px; cursor: pointer; }
+.drive-title { margin: 0; font-size: 1.25rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.drive-panel-controls { display: flex; align-items: center; gap: 6px; }
+.drive-sort select { min-height: 40px; max-width: 125px; border: 0; background: transparent; color: var(--navy); font-size: 0.8125rem; cursor: pointer; }
 .drive-control { width: 40px; height: 40px; display: grid; place-items: center; border: 0; border-radius: 7px; background: transparent; color: var(--muted); cursor: pointer; }
 .drive-control:hover, .drive-control.active { background: var(--surface-3); color: var(--teal-ink); }
 .drive-control-divider { height: 21px; width: 1px; background: var(--border); margin: 0 5px; }
-.drive-sync { margin: 0 20px 12px; }
-.drive-panel :deep(.drive-location) { padding: 10px 23px 16px; border-bottom: 0; }
+.drive-sync { margin: 0 23px 16px; }
+.drive-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 12px 16px; }
+.drive-panel .drive-location { gap: 4px; padding: 8px 23px 16px; border-bottom: 0; }
+.drive-crumb { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; max-width: 240px; padding: 4px 8px; border-radius: 8px; }
+.drive-crumb:hover { background: var(--surface-3); color: var(--navy); }
+.drive-crumb > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.drive-crumb-sep { flex: none; color: var(--muted); }
+.folder-open-arrow { flex: none; margin-left: auto; color: var(--muted); fill: none; }
+.drive-reload { margin-top: 12px; }
+.drive-field-action { justify-self: start; margin-top: 8px; }
+.drive-upload-file { gap: 12px; margin-top: 12px; padding: 12px; border: 1px solid var(--border); border-radius: 10px; }
+.drive-upload-file > div { flex: 1; min-width: 0; }
+.drive-upload-file strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.drive-versions-file { margin-bottom: 16px; overflow-wrap: anywhere; }
+.drive-version-row { gap: 12px; padding: 16px 0; }
 .drive-panel :deep(.folder-grid) { padding: 12px 23px 24px; gap: 12px; }
 /* Folder tools take room only while pointed at, so the name stays readable. */
 @media (hover: hover) { .drive-panel :deep(.folder-tools) { opacity: 0; transition: opacity 0.15s; } .drive-panel :deep(.folder-card:hover .folder-tools), .drive-panel :deep(.folder-card:focus-within .folder-tools) { opacity: 1; } }
@@ -1156,10 +1250,10 @@ function pickFile(event: Event) {
 .drive-file-icon.slide { background: var(--amber-soft); color: var(--amber-ink); }
 .drive-file-icon.pdf { background: var(--red-soft); color: #ba5147; }
 .drive-file-icon.image { background: var(--violet-soft); color: #7e5ab5; }
-.drive-row-actions { display: flex; align-items: center; justify-content: flex-end; gap: 2px; }
+.drive-row-actions { display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
 .drive-file-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 16px; padding: 18px 23px 28px; border-top: 1px solid var(--border); }
 .drive-file-card { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; min-width: 0; background: var(--surface); }
-.drive-file-card:hover { border-color: var(--teal-line); box-shadow: 0 6px 18px #102c4112; }
+.drive-file-card:hover, .drive-file-card.active { border-color: var(--teal-line); box-shadow: 0 6px 18px #102c4112; }
 .drive-file-card-top { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px 7px 15px; }
 .drive-file-card-top .drive-file-icon { width: 29px; height: 29px; display: grid; place-items: center; }
 .drive-file-preview { height: 118px; display: grid; place-items: center; color: #7aa7b3; background: linear-gradient(140deg, var(--surface-3), var(--surface-3)); }
@@ -1169,14 +1263,16 @@ function pickFile(event: Event) {
 .drive-file-preview.image { color: #987bc2; background: linear-gradient(140deg, var(--violet-soft), var(--violet-soft)); }
 .drive-file-card-bottom { display: flex; padding: 12px 15px 16px; min-width: 0; }
 .drive-file-card-bottom .grow { min-width: 0; }
-.drive-file-card-bottom strong, .drive-file-card-bottom .row-link, .drive-file-card-bottom .drive-file-name { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 14px; }
-.drive-file-card-bottom small { display: block; color: var(--muted); margin-top: 5px; font-size: 12px; }
-.drive-action-bar { position: sticky; bottom: 12px; z-index: 8; display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin: 12px 18px; padding: 8px 10px 8px 17px; border: 1px solid var(--teal-line); border-radius: 12px; background: var(--teal-soft); box-shadow: 0 7px 24px #183e5125; }
-.drive-action-bar > span { min-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 700; }
-.drive-action-bar button { display: flex; align-items: center; gap: 5px; border: 0; border-radius: 7px; padding: 8px; color: var(--teal-ink); background: transparent; cursor: pointer; font-size: 13px; }
-.drive-action-bar button:hover { background: var(--teal-soft); }
-.drive-action-bar > .drive-owner-note { display: inline-flex; align-items: center; gap: 5px; min-width: 0; padding: 0 8px; color: var(--muted); font-size: 13px; font-weight: 500; }
+.drive-file-card-bottom strong, .drive-file-card-bottom .row-link, .drive-file-card-bottom .drive-file-name { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.875rem; }
+.drive-file-card-bottom small { display: block; color: var(--muted); margin-top: 5px; font-size: 0.75rem; }
+.drive-action-bar { position: sticky; bottom: 12px; z-index: 8; display: flex; align-items: center; flex-wrap: wrap; gap: 4px 6px; margin: 12px 18px; padding: 8px 10px 8px 16px; border: 1px solid var(--teal-line); border-radius: 12px; background: var(--teal-soft); box-shadow: 0 7px 24px #183e5125; }
+.drive-action-bar > span { min-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.875rem; font-weight: 700; }
+.drive-action-bar button { display: flex; align-items: center; gap: 6px; min-height: 36px; border: 0; border-radius: 8px; padding: 6px 10px; color: var(--teal-ink); background: transparent; cursor: pointer; font-size: 0.8125rem; font-weight: 600; }
+.drive-action-bar button:hover { background: var(--surface); }
+.drive-action-bar button.danger { color: var(--red-ink); }
+.drive-action-bar > .drive-owner-note { display: inline-flex; align-items: center; gap: 6px; min-width: 0; padding: 0 8px; color: var(--muted); font-size: 0.8125rem; font-weight: 500; }
 .drive-panel :deep(.pagination) { padding: 16px 23px; }
 @media (max-width: 1100px) { .drive-workspace { grid-template-columns: 180px minmax(0, 1fr); } .drive-panel-head { flex-wrap: wrap; } .drive-search { order: 3; flex-basis: 100%; max-width: none; } }
-@media (max-width: 700px) { .drive-workspace { display: block; height: auto; min-height: calc(100dvh - 72px); } .drive-rail { border-right: 0; border-bottom: 1px solid var(--border); } .drive-rail { position: static; display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding: 0; } .drive-new-wrap { margin: 0; } .drive-nav { display: flex; flex: 1; } .drive-nav button { min-height: 45px; padding: 0 10px; border-radius: 10px; justify-content: center; } .drive-rail-folders, .drive-rail-note, .drive-rail-toggle { display: none; } .drive-panel-head { padding: 16px; } .drive-panel :deep(.folder-grid) { padding: 10px 16px 17px; } .drive-file-grid { padding: 15px; } .drive-sort select { max-width: 105px; } }
+@media (max-width: 700px) { .drive-workspace { display: block; height: auto; min-height: calc(100dvh - 72px); } .drive-rail { border-right: 0; border-bottom: 1px solid var(--border); } .drive-rail { position: static; display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding: 0; } .drive-new-wrap { margin: 0; } .drive-nav { display: flex; flex: 1; } .drive-nav button { min-height: 45px; padding: 0 10px; border-radius: 10px; justify-content: center; } .drive-rail-folders, .drive-rail-note, .drive-rail-toggle { display: none; } .drive-panel-head { padding: 16px; } .drive-panel :deep(.folder-grid) { padding: 10px 16px 17px; } .drive-file-grid { padding: 15px; } .drive-sort select { max-width: 105px; } .drive-rail { padding: 12px 16px; } .drive-panel .drive-location { padding: 8px 16px 12px; } .drive-action-bar { margin: 12px; } }
+@media (max-width: 560px) { .drive-nav button > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); } .drive-nav button { flex: 1; } .drive-new { padding: 0 16px; } .drive-panel-head { padding: 12px 16px; min-height: 0; } .drive-panel-controls { flex-wrap: wrap; } .drive-table .primary-cell { min-width: 180px; } }
 </style>

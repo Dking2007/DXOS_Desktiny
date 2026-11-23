@@ -2,7 +2,7 @@
 <!-- SPDX-FileCopyrightText: 2026 Desktiny contributors -->
 <script setup lang="ts">
 import { computed, nextTick, ref } from 'vue'
-import { AlertCircle, Building2, Globe2, ImagePlus, Megaphone, Play, ScanText, SendHorizontal, X } from 'lucide-vue-next'
+import { AlertCircle, Building2, Globe2, ImagePlus, Loader2, Megaphone, Play, ScanText, SendHorizontal, X } from 'lucide-vue-next'
 import { useSession } from '../stores/session'
 import AvatarPhoto from '../components/AvatarPhoto.vue'
 import { toast } from '../ui/toast'
@@ -13,7 +13,7 @@ import WritingTools from '../ai/WritingTools.vue'
 import { useAi } from '../ai/useAi'
 
 const body = defineModel<string>({ required: true })
-const props = defineProps<{ busy: boolean }>()
+const props = defineProps<{ busy: boolean; publishing?: boolean }>()
 const emit = defineEmits<{
   publish: [audience: 'organization' | 'department', official: boolean, attachmentIds: string[]]
 }>()
@@ -56,6 +56,14 @@ const ready = computed(
     !media.failed.value &&
     !props.busy,
 )
+/** Why "Đăng bài" is disabled, shown as its tooltip. */
+const publishTitle = computed(() => {
+  if (props.publishing) return 'Đang đăng…'
+  if (media.uploading.value) return 'Chờ ảnh/video tải lên xong'
+  if (media.failed.value) return 'Bỏ tệp tải lên lỗi trước khi đăng'
+  if (!body.value.trim() && !media.ids.value.length) return 'Viết nội dung hoặc thêm ảnh/video để đăng'
+  return 'Ctrl + Enter để đăng nhanh'
+})
 const status = computed(() => {
   if (media.uploading.value) return 'Đang tải ảnh/video lên…'
   if (media.failed.value) return 'Có tệp tải lên lỗi — bỏ tệp đó để đăng.'
@@ -157,7 +165,14 @@ defineExpose({ focus, reset, hasMedia })
           ><i :style="{ width: `${Math.round(item.progress * 100)}%` }"
         /></span>
         <span v-if="item.error" class="feed-pending-error"><AlertCircle :size="18" /></span>
-        <button type="button" class="feed-pending-remove" :aria-label="`Bỏ ${item.file.name}`" @mousedown.prevent @click="media.remove(item.key)">
+        <button
+          type="button"
+          class="feed-pending-remove"
+          :aria-label="`Bỏ ${item.file.name}`"
+          :title="item.media || item.error ? 'Bỏ tệp' : 'Hủy tải lên'"
+          @mousedown.prevent
+          @click="media.remove(item.key)"
+        >
           <X :size="13" />
         </button>
         <button
@@ -179,7 +194,7 @@ defineExpose({ focus, reset, hasMedia })
         {{ item.file.name }}: {{ item.media!.alt }}
       </li>
     </ul>
-    <div v-if="open && ai.on('writing_help') && body.trim().length >= 3" style="padding: 0 16px 8px">
+    <div v-if="open && ai.on('writing_help') && body.trim().length >= 3" class="feed-writing-tools">
       <WritingTools v-model="body" />
     </div>
     <p v-if="status" class="feed-pending-status" :class="{ error: media.failed.value }" role="status">{{ status }}</p>
@@ -202,6 +217,7 @@ defineExpose({ focus, reset, hasMedia })
           :aria-checked="audience === 'department'"
           :class="{ active: audience === 'department' }"
           :disabled="!session.user?.department_id"
+          :title="session.user?.department_id ? '' : 'Bạn chưa thuộc phòng ban nào'"
           @mousedown.prevent
           @click="audience = 'department'"
         >
@@ -219,8 +235,10 @@ defineExpose({ focus, reset, hasMedia })
       </label>
       <span class="grow" />
       <small v-if="body.length > LIMIT * 0.9" class="feed-counter">{{ body.length.toLocaleString('vi-VN') }}/{{ LIMIT.toLocaleString('vi-VN') }}</small>
-      <button class="button" :disabled="!ready" title="Ctrl + Enter để đăng nhanh" @mousedown.prevent>
-        <SendHorizontal :size="16" />{{ busy ? 'Đang đăng…' : 'Đăng bài' }}
+      <button class="button" :disabled="!ready" :aria-busy="publishing" :title="publishTitle" @mousedown.prevent>
+        <Loader2 v-if="publishing" :size="16" class="spin" /><SendHorizontal v-else :size="16" />{{
+          publishing ? 'Đang đăng…' : 'Đăng bài'
+        }}
       </button>
     </div>
     <p v-if="official && canOfficial" class="feed-official-note">

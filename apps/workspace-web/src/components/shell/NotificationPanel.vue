@@ -32,6 +32,7 @@ const FILTERS: { key: 'all' | 'unread' | Category; label: string }[] = [
   { key: 'feed', label: 'Bảng tin' },
 ]
 const ICONS = { approval: ClipboardCheck, task: ListChecks, mention: AtSign, feed: Newspaper, automation: Bot, other: Bell }
+const TONES = { approval: 'approvals', task: 'tasks', mention: 'chat', feed: 'feed', automation: 'processes', other: 'neutral' } as const
 const filter = ref<(typeof FILTERS)[number]['key']>('all')
 
 const notifications = useQuery({
@@ -64,17 +65,39 @@ async function refresh() {
     queryClient.invalidateQueries({ queryKey: ['me-overview'] }),
   ])
 }
+// Ids being marked read, so each button works once and the list does not flicker.
+const marking = ref(new Set<string>())
+const markingAll = ref(false)
 async function markRead(item: Notification) {
-  await api.request(`/notifications/${item.id}`, { method: 'PATCH', body: JSON.stringify({}) })
-  await refresh()
+  if (marking.value.has(item.id)) return
+  marking.value = new Set(marking.value).add(item.id)
+  try {
+    await api.request(`/notifications/${item.id}`, { method: 'PATCH', body: JSON.stringify({}) })
+    await refresh()
+  } finally {
+    const next = new Set(marking.value)
+    next.delete(item.id)
+    marking.value = next
+  }
+}
+async function markOne(item: Notification) {
+  try {
+    await markRead(item)
+  } catch (error) {
+    toast.error(error)
+  }
 }
 async function markAll() {
+  if (markingAll.value) return
+  markingAll.value = true
   try {
     const result = await api.request<{ updated: number }>('/notifications/read-all', { method: 'POST' })
     await refresh()
     toast.success(result.updated ? `Đã đánh dấu ${result.updated} thông báo là đã đọc` : 'Không còn thông báo chưa đọc')
   } catch (error) {
     toast.error(error)
+  } finally {
+    markingAll.value = false
   }
 }
 async function openItem(item: Notification) {
@@ -98,15 +121,23 @@ async function openItem(item: Notification) {
       :aria-label="unreadCount ? `Thông báo, ${unreadCount} chưa đọc` : 'Thông báo'"
       aria-haspopup="dialog"
       :aria-expanded="open"
+      :title="unreadCount ? `Thông báo (${unreadCount} chưa đọc)` : 'Thông báo'"
       @click="open = !open"
     >
-      <Bell :size="20" /><i v-if="unreadCount" class="count-dot">{{ unreadCount > 9 ? '9+' : unreadCount }}</i>
+      <Bell :size="20" aria-hidden="true" /><i v-if="unreadCount" class="count-dot" aria-hidden="true">{{ unreadCount > 9 ? '9+' : unreadCount }}</i>
     </button>
     <section v-if="open" class="dropdown notification-panel" role="dialog" aria-label="Thông báo">
       <header class="notification-panel-head">
         <strong>Thông báo</strong>
-        <button v-if="unreadCount" class="link-button" type="button" @click="markAll">
-          <CheckCheck :size="15" />Đánh dấu tất cả đã đọc
+        <button
+          v-if="unreadCount"
+          class="link-button"
+          type="button"
+          :disabled="markingAll"
+          :aria-busy="markingAll"
+          @click="markAll"
+        >
+          <CheckCheck :size="15" aria-hidden="true" />{{ markingAll ? 'Đang đánh dấu…' : 'Đánh dấu tất cả đã đọc' }}
         </button>
       </header>
       <div class="chip-row" role="group" aria-label="Lọc thông báo">
@@ -140,12 +171,12 @@ async function openItem(item: Notification) {
             class="notification-item"
             :class="{ unread: !item.read_at }"
           >
-            <span class="notification-icon" :class="item.category">
+            <span class="notification-icon" :class="item.category" :data-tone="TONES[item.category ?? 'other']" aria-hidden="true">
               <component :is="ICONS[item.category ?? 'other']" :size="16" />
             </span>
             <button class="notification-open" type="button" @click="openItem(item)">
               <strong>{{ item.title }}</strong>
-              <p v-if="item.body">{{ item.body }}</p>
+              <span v-if="item.body" class="notification-body">{{ item.body }}</span>
               <small>{{ formatDate(item.created_at, true) }}</small>
             </button>
             <button
@@ -154,9 +185,10 @@ async function openItem(item: Notification) {
               type="button"
               aria-label="Đánh dấu đã đọc"
               title="Đánh dấu đã đọc"
-              @click="markRead(item)"
+              :disabled="marking.has(item.id)"
+              @click="markOne(item)"
             >
-              <CheckCheck :size="16" />
+              <CheckCheck :size="16" aria-hidden="true" />
             </button>
           </div>
         </template>

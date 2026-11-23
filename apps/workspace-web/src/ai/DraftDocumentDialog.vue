@@ -27,6 +27,7 @@ const signerName = ref('')
 const busy = ref(false)
 const error = ref('')
 async function submit() {
+  if (busy.value || points.value.trim().length < 5) return
   busy.value = true
   error.value = ''
   try {
@@ -95,7 +96,11 @@ function close() {
       </div>
       <div class="form-actions">
         <button type="button" class="button secondary" :disabled="busy" @click="close">Hủy</button>
-        <button class="button ai-action" :disabled="busy || points.trim().length < 5">
+        <button
+          class="button ai-action"
+          :disabled="busy || points.trim().length < 5"
+          :title="points.trim().length < 5 ? 'Nhập các ý chính của văn bản trước.' : ''"
+        >
           <Sparkles :size="16" />{{ busy ? 'AI đang soạn…' : 'Soạn văn bản' }}
         </button>
       </div>

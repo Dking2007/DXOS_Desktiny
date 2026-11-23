@@ -5,7 +5,7 @@
   width: auto;
   min-height: 36px;
   padding: 6px 10px;
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 .prewrap {
   white-space: pre-wrap;
@@ -21,7 +21,7 @@
 }
 .priority {
   display: inline-flex;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   padding: 3px 9px;
   border-radius: 999px;
@@ -80,7 +80,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 2px 2px 4px;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .kanban-card {
   display: flex;
@@ -106,29 +106,31 @@
   border-left-color: var(--red);
 }
 .kanban-card strong {
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 600;
 }
 .kanban-card small {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .kanban-meta {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
-  font-size: 13px;
+  gap: 6px 8px;
+  font-size: 0.8125rem;
   color: var(--muted);
 }
 .due-groups section h3 {
-  padding: 18px 23px 6px;
-  font-size: 15px;
+  padding: 20px 23px 8px;
+  font-size: 0.9375rem;
 }
 .checklist-edit {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   align-items: center;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 .progress-track {
   height: 7px;
@@ -156,47 +158,49 @@
 .comment .avatar {
   width: 32px;
   height: 32px;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .comment p {
   margin-top: 4px;
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 .comment-form {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   align-items: flex-end;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
 }
 .file-chip {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  margin: 0 6px 6px 0;
-  padding: 3px 9px;
-  border-radius: 7px;
+  gap: 6px;
+  max-width: 100%;
+  padding: 4px 4px 4px 10px;
+  border-radius: 8px;
   background: var(--surface-3);
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .delegated-note {
   display: flex !important;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   color: var(--amber) !important;
   font-weight: 600;
 }
 
 .task-flows {
   display: grid;
-  gap: 10px;
+  gap: 12px;
 }
 .task-flows-hint {
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .task-flow {
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  padding: 10px 12px;
+  padding: 12px 14px;
   border: 1px solid var(--border);
   border-radius: 10px;
 }
@@ -209,20 +213,20 @@
   display: block;
 }
 .task-flow strong {
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .task-flow small {
-  font-size: 13px;
+  font-size: 0.8125rem;
   margin-top: 2px;
 }
 .task-flows-always {
   display: grid;
-  gap: 3px;
-  padding-top: 6px;
+  gap: 4px;
+  padding-top: 12px;
   border-top: 1px dashed var(--border);
 }
 .task-flows-always small {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--muted);
 }
 /* Shell additions */
@@ -239,7 +243,7 @@
   border-radius: 999px;
   background: #2bb5c0;
   color: #06303a;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-style: normal;
   font-weight: 700;
   display: grid;
@@ -254,7 +258,7 @@
   right: 6px;
   min-width: 16px;
   height: 16px;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .topbar-search {
   flex: 1;
@@ -299,14 +303,14 @@
   padding: 8px 8px 8px 16px;
 }
 .search-large input {
-  font-size: 16px;
+  font-size: 1rem;
 }
 .bar-row {
   display: grid;
-  grid-template-columns: 150px minmax(0, 1fr) 40px;
+  grid-template-columns: 150px minmax(0, 1fr) 48px;
   gap: 12px;
   align-items: center;
-  padding: 7px 0;
+  padding: 8px 0;
 }
 .bar-row strong {
   text-align: right;
@@ -325,7 +329,7 @@
   background: var(--surface);
   border-radius: 999px;
   padding: 4px 11px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--navy);
 }
 .chip-select button.active {

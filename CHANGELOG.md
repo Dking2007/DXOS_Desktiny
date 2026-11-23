@@ -7,6 +7,24 @@ V2 → V3: [docs/V3_CHANGES.md](docs/V3_CHANGES.md).
 
 ## [Unreleased]
 
+Nhánh `feat/ui-ux-nang-cap`: nâng cấp trải nghiệm người dùng của Workspace. Không đổi API, không thêm migration
+hay thư viện mới; thay đổi phía máy chủ duy nhất là luồng đăng nhập OIDC.
+
+### Added
+- **Cài đặt cá nhân** (`/preferences`, mọi người dùng; 9bf7477): giao diện sáng/tối/theo máy, mật độ hiển thị, thu
+  gọn thanh bên, cỡ chữ 90–125% (toàn bộ cỡ chữ đổi sang `rem`), phông chữ, giãn dòng, giảm chuyển động, tăng tương
+  phản, luôn hiện viền focus, gạch chân liên kết, định dạng ngày (dd/mm/yyyy hoặc yyyy-mm-dd), giờ 24h/12h, ngày đầu
+  tuần, khôi phục mặc định. Áp dụng ngay, lưu theo từng người trên trình duyệt. Ngôn ngữ hiện chỉ có tiếng Việt.
+- **Trình thiết kế quy trình** (c5d4bb9): sao chép/cắt/dán/nhân bản nhiều bước kèm đường nối, hoàn tác/làm lại,
+  chọn tất cả, dịch bước bằng phím mũi tên; menu chuột phải cho bước, nền và đường nối; nút `+` ở cổng ra và giữa
+  đường nối để chèn bước tự nối; sắp xếp tự động trái sang phải; bám lưới; căn chỉnh nhiều bước; bảng phím tắt (`?`).
+- **Cơ cấu tổ chức** (Thiết lập; 345be65): ba chế độ xem Sơ đồ / Cây / Bảng; kéo, thu phóng, vừa khung, xuất SVG/PNG;
+  thống kê phòng ban, thành viên, chưa xếp phòng, phòng chưa có lãnh đạo, độ sâu; bảng chi tiết phòng với thao tác
+  nhanh; cảnh báo dữ liệu lỗi (vòng lặp phòng cha, phòng cha đã mất).
+- **Bộ chọn người** khi giao việc (fd29309): tìm không dấu, nhóm Cá nhân/Đơn vị, chọn nhiều thành thẻ, chọn cả
+  phòng, gợi ý người hay chọn, dùng được bằng bàn phím; vẫn mượt với khoảng 1000 người.
+- Icon điều hướng có màu theo module, tương phản ≥ 3:1 ở cả nền sáng và tối (9bf7477); nút "Lên đầu trang" (9bf7477).
+
 ### Changed
 - **Core không có giao diện khi chạy riêng** (đúng yêu cầu Core headless của đề thi): công cụ quản trị kỹ thuật
   Core admin (`apps/core-admin`) chuyển từ profile `core` sang profile mới `console` (vẫn có trong `workspace`).
@@ -14,6 +32,29 @@ V2 → V3: [docs/V3_CHANGES.md](docs/V3_CHANGES.md).
   ở `/` và `/console/` thay vì 502. Muốn dùng Core admin khi chỉ chạy Core: thêm `--profile console`. README,
   `docs/installation.md`, `docs/operations.md`, `SELF_REVIEW.md` hướng dẫn thử Core bằng `examples/core-client` và
   `/core/v1/docs`; test triển khai kiểm `--profile core` không có ứng dụng giao diện nào.
+- Chuẩn hóa khoảng cách theo token (`--space-*`, `--gap-icon`, `--field-gap`, `--control-h`): nút, tab, ô nhập,
+  cảnh báo, bảng, hộp thoại không còn dính nhau; viền focus rõ khi dùng bàn phím (9bf7477).
+- Rà soát nút bấm trên các màn hình (fd29309, 0c682f3): chống gửi trùng, trạng thái "Đang …", nút bị khóa có lý do,
+  xác nhận thao tác nguy hiểm, hỏi trước khi bỏ nội dung đã gõ (ModalDialog có `dirty`/`beforeClose`), ẩn thao tác
+  khi thiếu quyền, trạng thái tải/trống/lỗi cho danh sách.
+- Hộp Phát hành quy trình: "Lưu & phát hành" khi canvas chưa lưu, thay cho nút Phát hành bấm được nhưng lỗi.
+- Tab "Giao diện" rời khỏi Thiết lập (quản trị) sang Cài đặt cá nhân; địa chỉ cũ tự chuyển hướng.
+
+### Fixed
+- Đăng nhập để form Keycloak quá 5 phút trả JSON `oidc_state_invalid`: state đăng nhập nay sống 30 phút, callback
+  lỗi chuyển về trang đăng nhập kèm thông báo (f3be40b).
+- Nút thu gọn thanh bên không có tác dụng ở trang thiết kế quy trình (9bf7477).
+- Hồ sơ báo "Đã phê duyệt" khi bước duyệt đã được người khác xử lý; "Nghiệm thu" đóng việc không hỏi; một tệp lỗi
+  làm mất các tệp đã tải lên trước đó (fd29309).
+- Dữ liệu trả về muộn ghi đè dữ liệu mới: tin cũ trộn vào hội thoại khác, gợi ý nhãn AI ghi sang tệp khác, nhận xét
+  AI hiện số liệu kỳ cũ (fd29309, 0c682f3).
+- Rò tài nguyên: tài liệu PDF và URL tạm khi đóng xem trước giữa chừng, trình soạn thảo ONLYOFFICE tạo sau khi rời
+  trang, các hẹn giờ không được hủy (fd29309, 0c682f3, c5d4bb9).
+
+### Performance
+- Canvas không tuần tự hóa sơ đồ trong lúc kéo bước và không vẽ lại cả trang theo từng khung thu phóng (c5d4bb9).
+- Nhắn tin và bảng tin chỉ vẽ lại dòng/bài thay đổi khi gõ phím (0c682f3); bộ định dạng ngày/dung lượng dùng lại
+  thay vì tạo mới mỗi dòng; danh mục ít đổi không tải lại mỗi lần quay lại cửa sổ (9bf7477, c5d4bb9).
 
 ## [3.1.0] - 2026-11-21 — plugin đóng gói
 

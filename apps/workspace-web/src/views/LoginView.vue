@@ -3,8 +3,8 @@
 <!-- The entrance: a framed title card on a deep blue ground that always fits one screen, one way in
      through the organisation's SSO. Everything moves gently and stays still for reduced motion. -->
 <script setup lang="ts">
-import { ChevronRight, TriangleAlert } from 'lucide-vue-next'
-import { computed, ref } from 'vue'
+import { ChevronRight, Loader2, TriangleAlert } from 'lucide-vue-next'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { appearance, brand } from '../ui/appearance'
 
@@ -31,10 +31,27 @@ const ground = computed(() => {
   return result
 })
 const busy = ref(false)
+let stuck = 0
 function login() {
+  if (busy.value) return
   busy.value = true
   window.location.assign('/workspace/v1/auth/login')
+  // If the sign-in page never loads (offline, blocked), give the button back instead of spinning forever.
+  stuck = window.setTimeout(() => (busy.value = false), 15_000)
 }
+// Coming back with the browser's Back button restores this page from the cache with the button
+// still saying "Đang chuyển…"; make it usable again.
+function onPageShow(event: PageTransitionEvent) {
+  if (event.persisted) {
+    window.clearTimeout(stuck)
+    busy.value = false
+  }
+}
+onMounted(() => window.addEventListener('pageshow', onPageShow))
+onBeforeUnmount(() => {
+  window.removeEventListener('pageshow', onPageShow)
+  window.clearTimeout(stuck)
+})
 // Specks of light drifting up; fixed positions so the page looks the same on every visit.
 const SPECKS = [
   [6, 14, 0],
@@ -119,19 +136,29 @@ const SPECKS = [
 
       <div class="entry-actions rise" style="--d: 1.15s">
         <p v-if="route.query.connection" class="entry-warning" role="alert">
-          <TriangleAlert :size="16" />Chưa kết nối được máy chủ. Thử đăng nhập
-          lại sau ít phút.
+          <TriangleAlert :size="16" aria-hidden="true" /><span
+            >Chưa kết nối được máy chủ. Thử đăng nhập lại sau ít phút.</span
+          >
+        </p>
+        <p v-else-if="route.query.login" class="entry-warning" role="alert">
+          <TriangleAlert :size="16" aria-hidden="true" /><span>{{
+            route.query.login === 'expired'
+              ? 'Phiên đăng nhập đã hết hạn do để trang đăng nhập quá lâu. Bấm đăng nhập lại để tiếp tục.'
+              : 'Phiên đăng nhập không hợp lệ (có thể do mở nhiều tab đăng nhập). Bấm đăng nhập lại.'
+          }}</span>
         </p>
         <button
           class="entry-button"
           type="button"
           :disabled="busy"
+          :aria-busy="busy"
           @click="login"
         >
           <span>{{
             busy ? 'Đang chuyển tới trang đăng nhập…' : entry.button_label || 'Đăng nhập bằng SSO'
           }}</span>
-          <ChevronRight :size="20" aria-hidden="true" />
+          <Loader2 v-if="busy" :size="20" class="entry-spin" aria-hidden="true" />
+          <ChevronRight v-else :size="20" aria-hidden="true" />
         </button>
         <p class="entry-note">
           <template v-if="entry.note">{{ entry.note }}</template
@@ -579,7 +606,8 @@ const SPECKS = [
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: calc(var(--u) * 1.4);
+  gap: max(12px, calc(var(--u) * 1.6));
+  max-width: 100%;
   margin-top: calc(var(--u) * 5.5);
 }
 .entry-button {
@@ -600,10 +628,13 @@ const SPECKS = [
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.18),
     0 12px 30px rgba(2, 8, 24, 0.45);
+  max-width: 100%;
   color: #f4f7fc;
   font: inherit;
   font-size: clamp(16px, calc(var(--u) * 1.9), 19px);
   font-weight: 600;
+  line-height: 1.3;
+  text-align: center;
   cursor: pointer;
   transition:
     transform 0.2s,
@@ -639,8 +670,21 @@ const SPECKS = [
 .entry-button > * {
   position: relative;
 }
+.entry-button > span {
+  min-width: 0;
+  padding: 10px 0;
+}
 .entry-button svg {
+  flex: none;
   transition: transform 0.2s;
+}
+.entry-spin {
+  animation: entry-spin 1s linear infinite;
+}
+@keyframes entry-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 .entry-button:hover:not(:disabled) {
   transform: translateY(-2px);
@@ -665,23 +709,31 @@ const SPECKS = [
   opacity: 0.85;
 }
 .entry-note {
+  max-width: 560px;
   margin: 0;
-  color: rgba(205, 218, 238, 0.72);
+  line-height: 1.5;
+  color: rgba(205, 218, 238, 0.78);
   font-family: 'Source Sans 3', sans-serif;
   font-size: clamp(13px, calc(var(--u) * 1.5), 15px);
+}
+.entry-warning > svg {
+  flex: none;
 }
 .entry-warning {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  margin: 0;
-  padding: 8px 14px;
+  max-width: 100%;
+  margin: 0 0 4px;
+  padding: 12px 16px;
+  text-align: left;
+  line-height: 1.45;
   border: 1px solid rgba(251, 191, 36, 0.45);
   border-radius: 10px;
   background: rgba(120, 80, 10, 0.35);
   color: #fde7b0;
   font-family: 'Source Sans 3', sans-serif;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 
 /* Tablets held upright: more height to fill, so the card grows with the width. */
@@ -707,14 +759,27 @@ const SPECKS = [
     gap: 12px;
   }
   .entry-title {
-    font-size: 21px;
+    font-size: 1.3125rem;
     line-height: 1.35;
   }
   .entry-code {
     letter-spacing: 0.24em;
   }
   .entry-button {
-    padding: 0 26px 0 30px;
+    gap: 12px;
+    padding: 0 22px 0 26px;
+  }
+  /* Long organisation names wrap instead of being cut by the frame. */
+  .entry-org {
+    max-width: 100%;
+  }
+  .entry-org span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .entry-org::before,
+  .entry-org::after {
+    flex: none;
   }
 }
 /* A very short window (a phone on its side): let it scroll rather than squash. */
@@ -726,26 +791,26 @@ const SPECKS = [
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .entry-light,
-  .entry-specks i,
-  .entry-frame,
-  .entry-corner rect,
-  .entry-emblem::after,
-  .entry-emblem-ring::before,
-  .entry-button::before,
-  .rise,
-  .entry-title {
+  :root:not([data-motion='full']) .entry-light,
+  :root:not([data-motion='full']) .entry-specks i,
+  :root:not([data-motion='full']) .entry-frame,
+  :root:not([data-motion='full']) .entry-corner rect,
+  :root:not([data-motion='full']) .entry-emblem::after,
+  :root:not([data-motion='full']) .entry-emblem-ring::before,
+  :root:not([data-motion='full']) .entry-button::before,
+  :root:not([data-motion='full']) .rise,
+  :root:not([data-motion='full']) .entry-title {
     animation: none;
   }
-  .entry-corner path {
+  :root:not([data-motion='full']) .entry-corner path {
     animation: none;
     stroke-dashoffset: 0;
   }
-  .entry-specks {
+  :root:not([data-motion='full']) .entry-specks {
     display: none;
   }
-  .entry-button,
-  .entry-button svg {
+  :root:not([data-motion='full']) .entry-button,
+  :root:not([data-motion='full']) .entry-button svg {
     transition: none;
   }
 }

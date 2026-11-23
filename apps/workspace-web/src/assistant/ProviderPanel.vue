@@ -2,7 +2,7 @@
 <!-- SPDX-FileCopyrightText: 2026 Desktiny contributors -->
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { CheckCircle2, KeyRound, ListRestart, Pencil, Plug, Plus, Star, Trash2, XCircle } from 'lucide-vue-next'
+import { CheckCircle2, KeyRound, ListRestart, Loader2, Pencil, Plug, Plus, Star, Trash2, XCircle } from 'lucide-vue-next'
 import type { AssistantAdmin, AssistantProvider } from '@dx/web-shared/types.ts'
 import { errorText, formatDate } from '@dx/web-shared/api.ts'
 import ModalDialog from '@dx/web-shared/components/ModalDialog.vue'
@@ -122,7 +122,16 @@ const canSave = computed(
       (!apiKey.value.trim() && (dialog.value === 'edit' || keyOptional.value))) &&
     (!isGateway.value || dialog.value === 'edit' || !!preview.value),
 )
+/** Why "Lưu dịch vụ" is disabled, shown as its tooltip. */
+const saveTitle = computed(() => {
+  if (canSave.value) return ''
+  if (!name.value.trim()) return 'Nhập tên hiển thị'
+  if (isGateway.value && dialog.value === 'add' && !preview.value) return 'Nhập địa chỉ cổng hợp lệ'
+  if (!model.value.trim()) return 'Chọn hoặc nhập model'
+  return 'Khóa API cần ít nhất 8 ký tự'
+})
 async function save() {
+  if (busy.value || !canSave.value) return
   busy.value = true
   error.value = ''
   try {
@@ -160,6 +169,7 @@ async function save() {
   }
 }
 async function test(item: AssistantProvider) {
+  if (testing.value) return
   testing.value = item.id
   try {
     const result = await api.request<{ ok: boolean; message: string }>(`/assistant/providers/${item.id}/test`, {
@@ -174,24 +184,34 @@ async function test(item: AssistantProvider) {
     testing.value = ''
   }
 }
+/** `<provider id>:<action>` while a row's activate/delete request runs. */
+const rowBusy = ref('')
 async function activate(item: AssistantProvider) {
+  if (rowBusy.value) return
+  rowBusy.value = `${item.id}:activate`
   try {
     await api.request(`/assistant/providers/${item.id}/activate`, { method: 'POST' })
     toast.success(`Trợ lý giờ dùng “${item.name}”`)
     emit('changed')
   } catch (cause) {
     toast.error(cause)
+  } finally {
+    rowBusy.value = ''
   }
 }
 async function remove(item: AssistantProvider) {
+  if (rowBusy.value) return
   const warning = item.active ? ' Đây là dịch vụ đang dùng: trợ lý sẽ ngừng trả lời cho tới khi chọn dịch vụ khác.' : ''
   if (!window.confirm(`Xóa dịch vụ “${item.name}” và khóa API đã lưu?${warning}`)) return
+  rowBusy.value = `${item.id}:remove`
   try {
     await api.request(`/assistant/providers/${item.id}`, { method: 'DELETE' })
     toast.success('Đã xóa dịch vụ AI')
     emit('changed')
   } catch (cause) {
     toast.error(cause)
+  } finally {
+    rowBusy.value = ''
   }
 }
 </script>
@@ -200,7 +220,7 @@ async function remove(item: AssistantProvider) {
     <header class="card-header">
       <div>
         <h2>Dịch vụ AI</h2>
-        <p class="muted" style="font-size: 15px; margin-top: 4px">
+        <p class="muted provider-intro">
           Trợ lý dùng dịch vụ được đánh dấu <strong>Đang dùng</strong>. Khóa API được mã hóa và không bao giờ hiển
           thị lại.
         </p>
@@ -228,27 +248,58 @@ async function remove(item: AssistantProvider) {
           <small>{{ item.kind_label }} · model <code>{{ item.model }}</code></small>
           <small v-if="item.endpoint" class="provider-endpoint"><code>{{ item.endpoint }}</code></small>
           <small
-            ><KeyRound :size="12" /> {{ item.key_hint ? `Khóa ${item.key_hint}` : 'Không dùng khóa' }} ·
+            ><KeyRound :size="12" aria-hidden="true" />{{ item.key_hint ? `Khóa ${item.key_hint}` : 'Không dùng khóa' }} ·
             <template v-if="item.last_test_ok === true"
-              ><CheckCircle2 :size="12" class="ok" /> Kết nối tốt {{ formatDate(item.last_test_at, true) }}</template
+              ><CheckCircle2 :size="12" class="ok" aria-hidden="true" />Kết nối tốt {{ formatDate(item.last_test_at, true) }}</template
             ><template v-else-if="item.last_test_ok === false"
-              ><XCircle :size="12" class="bad" /> Lần kiểm tra gần nhất lỗi</template
+              ><XCircle :size="12" class="bad" aria-hidden="true" />Lần kiểm tra gần nhất lỗi</template
             ><template v-else>Chưa kiểm tra</template></small
           >
         </div>
         <span v-if="item.active" class="provider-active"><Star :size="13" />Đang dùng</span>
         <div class="provider-actions">
-          <button class="button secondary small" type="button" :disabled="!!testing" @click="test(item)">
-            <Plug :size="14" />{{ testing === item.id ? 'Đang kiểm tra…' : 'Kiểm tra' }}
+          <button
+            class="button secondary small"
+            type="button"
+            :disabled="!!testing"
+            :aria-busy="testing === item.id"
+            @click="test(item)"
+          >
+            <Loader2 v-if="testing === item.id" :size="14" class="spin" /><Plug v-else :size="14" />{{
+              testing === item.id ? 'Đang kiểm tra…' : 'Kiểm tra'
+            }}
           </button>
-          <button v-if="!item.active" class="button secondary small" type="button" @click="activate(item)">
-            Dùng dịch vụ này
+          <button
+            v-if="!item.active"
+            class="button secondary small"
+            type="button"
+            :disabled="!!rowBusy"
+            :aria-busy="rowBusy === `${item.id}:activate`"
+            @click="activate(item)"
+          >
+            <Loader2 v-if="rowBusy === `${item.id}:activate`" :size="14" class="spin" />{{
+              rowBusy === `${item.id}:activate` ? 'Đang chuyển…' : 'Dùng dịch vụ này'
+            }}
           </button>
-          <button class="icon-button" type="button" :aria-label="`Sửa ${item.name}`" title="Sửa" @click="openEdit(item)">
+          <button
+            class="icon-button"
+            type="button"
+            :aria-label="`Sửa ${item.name}`"
+            title="Sửa"
+            :disabled="!!rowBusy"
+            @click="openEdit(item)"
+          >
             <Pencil :size="16" />
           </button>
-          <button class="icon-button" type="button" :aria-label="`Xóa ${item.name}`" title="Xóa" @click="remove(item)">
-            <Trash2 :size="16" />
+          <button
+            class="icon-button provider-delete"
+            type="button"
+            :aria-label="`Xóa ${item.name}`"
+            title="Xóa"
+            :disabled="!!rowBusy"
+            @click="remove(item)"
+          >
+            <Loader2 v-if="rowBusy === `${item.id}:remove`" :size="16" class="spin" /><Trash2 v-else :size="16" />
           </button>
         </div>
       </article>
@@ -363,9 +414,18 @@ async function remove(item: AssistantProvider) {
             type="button"
             class="button secondary small"
             :disabled="loadingModels || (!editing && (isGateway ? !baseUrl.trim() : apiKey.trim().length < 8))"
+            :title="
+              !editing && (isGateway ? !baseUrl.trim() : apiKey.trim().length < 8)
+                ? isGateway
+                  ? 'Nhập địa chỉ cổng trước'
+                  : 'Nhập khóa API trước'
+                : ''
+            "
             @click="fetchModels"
           >
-            <ListRestart :size="14" />{{ loadingModels ? 'Đang lấy…' : 'Lấy danh sách model' }}
+            <Loader2 v-if="loadingModels" :size="14" class="spin" /><ListRestart v-else :size="14" />{{
+              loadingModels ? 'Đang lấy…' : 'Lấy danh sách model'
+            }}
           </button>
         </div>
         <small class="muted">
@@ -394,7 +454,7 @@ async function remove(item: AssistantProvider) {
         />
         <small class="muted">{{ KIND_HINTS[kind] }}</small>
       </div>
-      <div class="field" style="max-width: 240px">
+      <div class="field provider-tokens">
         <label for="provider-tokens">Độ dài trả lời tối đa (token)</label>
         <input id="provider-tokens" v-model.number="maxTokens" type="number" min="256" max="64000" />
       </div>
@@ -406,8 +466,22 @@ async function remove(item: AssistantProvider) {
       </div>
       <div class="form-actions">
         <button type="button" class="button secondary" :disabled="busy" @click="close">Hủy</button>
-        <button class="button" :disabled="busy || !canSave">{{ busy ? 'Đang lưu…' : 'Lưu dịch vụ' }}</button>
+        <button class="button" :disabled="busy || !canSave" :title="saveTitle" :aria-busy="busy">
+          <Loader2 v-if="busy" :size="16" class="spin" />{{ busy ? 'Đang lưu…' : 'Lưu dịch vụ' }}
+        </button>
       </div>
     </form>
   </ModalDialog>
 </template>
+<style scoped>
+.provider-intro {
+  margin-top: 6px;
+  font-size: 0.9375rem;
+}
+.provider-tokens {
+  max-width: 260px;
+}
+.provider-delete:hover:not(:disabled) {
+  color: var(--red-ink);
+}
+</style>

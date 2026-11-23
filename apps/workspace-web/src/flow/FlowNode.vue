@@ -19,6 +19,11 @@ const exits = computed(() => outputs(props.data.kind, props.data.config))
 function top(index: number) {
   return `${((index + 1) / (exits.value.length + 1)) * 100}%`
 }
+/** Opens the step picker next to the "+" that was pressed. */
+function add(handle: string | undefined, event: MouseEvent) {
+  const box = (event.currentTarget as HTMLElement).getBoundingClientRect()
+  context.addAfter(props.id, handle, { x: box.right, y: box.top + box.height / 2 })
+}
 const statusLabel: Record<string, string> = {
   succeeded: 'Đã xong',
   would_run: 'Sẽ chạy',
@@ -87,12 +92,21 @@ const statusLabel: Record<string, string> = {
           :class="`handle-${tone(exit)}`"
           :style="{ top: top(index) }"
         />
-        <span
-          class="branch-tag"
-          :class="[`tag-${tone(exit)}`, { taken: data.branch === exit }]"
-          :style="{ top: `calc(${top(index)} - 9px)` }"
-          >{{ branchLabel(data.kind, exit, data.config) }}</span
-        >
+        <span class="branch-port" :style="{ top: `calc(${top(index)} - 11px)` }">
+          <span class="branch-tag" :class="[`tag-${tone(exit)}`, { taken: data.branch === exit }]">{{
+            branchLabel(data.kind, exit, data.config)
+          }}</span>
+          <button
+            v-if="!context.readonly"
+            class="flow-node-add branch-add nodrag"
+            type="button"
+            :aria-label="`Thêm bước sau cổng ${branchLabel(data.kind, exit, data.config)}`"
+            :title="`Thêm bước sau cổng ${branchLabel(data.kind, exit, data.config)}`"
+            @click.stop="add(exit, $event)"
+          >
+            <Plus :size="13" />
+          </button>
+        </span>
       </template>
     </template>
     <template v-else-if="!meta.terminal">
@@ -103,7 +117,7 @@ const statusLabel: Record<string, string> = {
         type="button"
         aria-label="Thêm bước sau"
         title="Thêm bước sau"
-        @click.stop="context.addAfter(id)"
+        @click.stop="add(undefined, $event)"
       >
         <Plus :size="13" />
       </button>

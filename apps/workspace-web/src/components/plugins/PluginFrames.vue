@@ -15,6 +15,7 @@ import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { useRouter } from 'vue-router'
 import { Puzzle } from 'lucide-vue-next'
 import ModalDialog from '@dx/web-shared/components/ModalDialog.vue'
+import StatePanel from '@dx/web-shared/components/StatePanel.vue'
 import { api } from '../../api'
 import { toast } from '../../ui/toast'
 import { useSession } from '../../stores/session'
@@ -165,10 +166,21 @@ onMounted(() => window.addEventListener('message', onMessage))
 onBeforeUnmount(() => window.removeEventListener('message', onMessage))
 </script>
 <template>
+  <!-- A single plugin page (its own route or an action dialog) says why it is blank instead of showing nothing. -->
+  <StatePanel
+    v-if="only && (slots.isPending.value || slots.error.value || !items.length)"
+    :loading="slots.isPending.value"
+    :error="slots.error.value"
+    :empty="!items.length"
+    :rows="2"
+    title="Không mở được trang của plugin"
+    description="Plugin có thể đang tắt, đã bị gỡ hoặc bạn chưa có quyền xem trang này. Hỏi quản trị viên tại Quản trị › Plugin."
+    @retry="slots.refetch()"
+  />
   <template v-for="item in items" :key="keyOf(item)">
     <section v-if="!bare" class="card plugin-frame-card" :aria-label="`${item.title} (plugin ${item.plugin_name})`">
       <header class="card-header plugin-frame-head">
-        <h3><Puzzle :size="15" /> {{ item.title }}</h3>
+        <h3><Puzzle :size="15" aria-hidden="true" />{{ item.title }}</h3>
         <small class="muted" :title="item.origin">{{ item.plugin_name }}</small>
       </header>
       <iframe
@@ -211,8 +223,9 @@ onBeforeUnmount(() => window.removeEventListener('message', onMessage))
 }
 .plugin-frame-head h3 {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   align-items: center;
+  min-width: 0;
 }
 .plugin-frame {
   display: block;

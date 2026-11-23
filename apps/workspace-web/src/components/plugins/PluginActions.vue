@@ -46,6 +46,12 @@ function close(result: unknown) {
       bare
       @close="close"
     />
-    <small class="muted">Do plugin {{ open.plugin_name }} cung cấp.</small>
+    <small class="muted plugin-action-source">Do plugin {{ open.plugin_name }} cung cấp.</small>
   </ModalDialog>
 </template>
+<style scoped>
+.plugin-action-source {
+  display: block;
+  margin-top: 12px;
+}
+</style>

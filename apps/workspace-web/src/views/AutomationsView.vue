@@ -7,6 +7,7 @@ import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { ArrowRight, CirclePause, FileCheck2, Paperclip, Plug, Plus, Workflow, Zap } from 'lucide-vue-next'
 import { api } from '../api'
 import { errorText, formatDate } from '@dx/web-shared/api.ts'
+import { confirmDiscard } from '../ui/unsaved'
 import type { Page } from '@dx/web-shared/api.ts'
 import StatePanel from '@dx/web-shared/components/StatePanel.vue'
 import StatusBadge from '@dx/web-shared/components/StatusBadge.vue'
@@ -114,9 +115,30 @@ const connectionForm = ref<{
   secret_header: string
   timeout_seconds: number
 } | null>(null)
+const BLANK_CONNECTION = {
+  name: '',
+  base_url: 'https://',
+  auth_type: 'none',
+  secret: '',
+  secret_header: 'X-API-Key',
+  timeout_seconds: 10,
+}
+function openConnection() {
+  error.value = null
+  connectionForm.value = { ...BLANK_CONNECTION }
+}
+function closeConnection() {
+  const value = connectionForm.value
+  const typed =
+    !!value &&
+    (!!value.name.trim() || value.base_url !== BLANK_CONNECTION.base_url || !!value.secret)
+  if (busy.value || !confirmDiscard(typed)) return
+  connectionForm.value = null
+  error.value = null
+}
 async function saveConnection() {
   const value = connectionForm.value
-  if (!value) return
+  if (!value || busy.value) return
   busy.value = true
   error.value = null
   try {
@@ -140,7 +162,6 @@ async function saveConnection() {
       <button class="button" @click="showTemplates = true"><Plus :size="18" />Tạo luồng</button>
     </div>
   </header>
-  <div v-if="error && !connectionForm" class="notice error error-inline">{{ errorText(error) }}</div>
   <section v-if="rules.isPending.value || rules.error.value || !shown.length" class="card">
     <StatePanel
       :loading="rules.isPending.value"
@@ -180,7 +201,9 @@ async function saveConnection() {
       </RouterLink>
       <div class="flow-card-body">
         <div class="flow-card-title">
-          <RouterLink :to="`/processes/${rule.id}`" class="row-link">{{ rule.name }}</RouterLink>
+          <RouterLink :to="`/processes/${rule.id}`" class="row-link flow-name" :title="rule.name">{{
+            rule.name
+          }}</RouterLink>
           <span class="tag">{{
             rule.active_version_no ? `Phiên bản ${rule.active_version_no}` : 'Bản nháp'
           }}</span>
@@ -212,7 +235,7 @@ async function saveConnection() {
           <StatusBadge v-if="rule.last_run" :status="rule.last_run.state" />
           <small v-if="rule.last_run" class="muted">{{ formatDate(rule.last_run.created_at, true) }}</small>
           <small v-else class="muted">Chưa chạy lần nào</small>
-          <RouterLink :to="`/processes/${rule.id}`" class="button ghost small" style="margin-left: auto"
+          <RouterLink :to="`/processes/${rule.id}`" class="button ghost small flow-open"
             >Mở canvas <ArrowRight :size="14"
           /></RouterLink>
         </div>
@@ -220,22 +243,14 @@ async function saveConnection() {
     </article>
   </div>
 
-  <section class="card" style="margin-top: 22px">
+  <section class="card connections-card">
     <header class="card-header">
       <div><span class="eyebrow">KẾT NỐI NGOÀI</span><h2>Kết nối webhook</h2></div>
       <button
         class="button secondary small"
         :disabled="!catalog.data.value?.webhooks_enabled"
-        @click="
-          connectionForm = {
-            name: '',
-            base_url: 'https://',
-            auth_type: 'none',
-            secret: '',
-            secret_header: 'X-API-Key',
-            timeout_seconds: 10,
-          }
-        "
+        :title="catalog.data.value?.webhooks_enabled ? '' : 'Hệ thống chưa cho phép kết nối ra ngoài.'"
+        @click="openConnection"
       >
         <Plug :size="15" />Thêm kết nối
       </button>
@@ -244,14 +259,24 @@ async function saveConnection() {
       Hệ thống chưa cho phép gửi dữ liệu sang hệ thống khác. Liên hệ bộ phận kỹ thuật để mở danh sách máy chủ được
       phép kết nối.
     </p>
-    <p v-else-if="catalog.data.value" class="card-body muted" style="padding-bottom: 0">
+    <p v-else-if="catalog.data.value" class="card-body muted connections-hint">
       Máy chủ được phép: <code>{{ catalog.data.value.allowed_hosts.join(', ') }}</code>. Khóa bí mật được mã hóa và
       không bao giờ hiển thị lại.
     </p>
+    <StatePanel
+      :loading="connections.isPending.value"
+      :error="connections.error.value"
+      :empty="connections.data.value?.items.length === 0 && !!catalog.data.value?.webhooks_enabled"
+      compact
+      :rows="2"
+      title="Chưa có kết nối nào"
+      description="Thêm kết nối để luồng gửi dữ liệu sang hệ thống khác qua webhook."
+      @retry="connections.refetch()"
+    />
     <div v-for="item in connections.data.value?.items" :key="item.id" class="list-row">
       <div class="grow">
-        <p>{{ item.name }}</p>
-        <small class="mono">{{ item.base_url }}</small>
+        <p class="ellipsis" :title="item.name">{{ item.name }}</p>
+        <small class="mono ellipsis" :title="item.base_url">{{ item.base_url }}</small>
       </div>
       <span class="tag">{{ item.auth_type === 'none' ? 'Không xác thực' : 'Có khóa bí mật' }}</span>
       <span class="tag">{{ item.timeout_seconds }}s</span>
@@ -264,16 +289,18 @@ async function saveConnection() {
     wide
     @close="showTemplates = false"
   >
-    <div class="field" style="margin-bottom: 14px">
-      <label for="template-form">Biểu mẫu áp dụng</label
-      ><select id="template-form" v-model="templateForm">
-        <option value="">Chọn sau trên canvas…</option>
-        <option v-for="form in forms" :key="form.id" :value="form.id">{{ form.name }}</option>
-      </select>
-      <small class="muted"
-        >Biểu mẫu là những gì người tạo hồ sơ phải điền.
-        <button type="button" class="button ghost small" @click="creatingForm = true">Tạo biểu mẫu mới</button></small
-      >
+    <div class="field template-form-field">
+      <label for="template-form">Biểu mẫu áp dụng</label>
+      <div class="template-form-row">
+        <select id="template-form" v-model="templateForm">
+          <option value="">Chọn sau trên canvas…</option>
+          <option v-for="form in forms" :key="form.id" :value="form.id">{{ form.name }}</option>
+        </select>
+        <button type="button" class="button secondary small" @click="creatingForm = true">
+          <Plus :size="15" />Tạo biểu mẫu mới
+        </button>
+      </div>
+      <small class="muted">Biểu mẫu là những gì người tạo hồ sơ phải điền.</small>
     </div>
     <div class="template-grid">
       <button
@@ -304,7 +331,7 @@ async function saveConnection() {
         <small>{{ template.description }}</small>
       </button>
     </div>
-    <span class="section-label" style="display: block; margin: 18px 0 10px">Phản ứng với sự kiện</span>
+    <span class="section-label template-section">Phản ứng với sự kiện</span>
     <div class="template-grid">
       <button
         v-for="template in TEMPLATES"
@@ -325,14 +352,17 @@ async function saveConnection() {
     </div>
   </ModalDialog>
   <ProcessFormDialog v-if="creatingForm" @close="creatingForm = false" @created="formCreated" />
-  <ModalDialog v-if="connectionForm" title="Thêm kết nối webhook" @close="connectionForm = null">
-    <div v-if="error" class="notice error error-inline">{{ errorText(error) }}</div>
+  <ModalDialog v-if="connectionForm" title="Thêm kết nối webhook" @close="closeConnection">
+    <div v-if="error" class="notice error error-inline" role="alert">{{ errorText(error) }}</div>
     <form class="stack" @submit.prevent="saveConnection">
       <div class="field">
-        <label for="conn-name">Tên</label><input id="conn-name" v-model="connectionForm.name" required />
+        <label for="conn-name">Tên<span class="required"> *</span></label
+        ><input id="conn-name" v-model="connectionForm.name" required maxlength="200" :disabled="busy" />
       </div>
       <div class="field">
-        <label for="conn-url">Địa chỉ gốc</label><input id="conn-url" v-model="connectionForm.base_url" type="url" required />
+        <label for="conn-url">Địa chỉ gốc<span class="required"> *</span></label
+        ><input id="conn-url" v-model="connectionForm.base_url" type="url" required :disabled="busy" />
+        <small>Chỉ những máy chủ trong danh sách được phép ở trên.</small>
       </div>
       <div class="form-grid">
         <div class="field">
@@ -357,13 +387,63 @@ async function saveConnection() {
         ><input id="conn-secret" v-model="connectionForm.secret" type="password" autocomplete="off" required />
       </div>
       <div class="form-actions">
-        <button type="button" class="button secondary" @click="connectionForm = null">Hủy</button
-        ><button class="button" :disabled="busy">Lưu kết nối</button>
+        <button type="button" class="button secondary" :disabled="busy" @click="closeConnection">Hủy</button
+        ><button class="button" :disabled="busy">{{ busy ? 'Đang lưu…' : 'Lưu kết nối' }}</button>
       </div>
     </form>
   </ModalDialog>
-  <p class="muted" style="margin-top: 18px; font-size: 14px">
-    <Workflow :size="14" style="vertical-align: -2px" /> Mỗi sự kiện chỉ chạy mỗi luồng một lần. Luồng không tự chạy
+  <p class="muted flows-footnote">
+    <Workflow :size="14" aria-hidden="true" class="flows-footnote-icon" />Mỗi sự kiện chỉ chạy mỗi luồng một lần. Luồng không tự chạy
     lại vì chính việc nó làm, và các luồng nối tiếp nhau sẽ dừng sau vài bước để tránh chạy vòng mãi.
   </p>
 </template>
+<style scoped>
+.connections-card {
+  margin-top: 24px;
+}
+.connections-hint {
+  padding-bottom: 0;
+}
+.ellipsis {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.flow-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.flow-open {
+  margin-left: auto;
+}
+.template-form-field {
+  margin-bottom: 16px;
+}
+.template-form-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.template-form-row select {
+  flex: 1;
+  min-width: 0;
+}
+.template-section {
+  display: block;
+  margin: 20px 0 10px;
+}
+.flows-footnote {
+  margin-top: 20px;
+  font-size: 0.875rem;
+}
+.flows-footnote-icon {
+  vertical-align: -2px;
+  margin-right: 6px;
+}
+@media (max-width: 640px) {
+  .template-form-row {
+    flex-wrap: wrap;
+  }
+}
+</style>

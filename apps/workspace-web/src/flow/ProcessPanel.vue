@@ -3,7 +3,20 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
-import { CheckCircle2, FlaskConical, Play, Plus, Rocket, Sparkles, Trash2, Users, XCircle } from 'lucide-vue-next'
+import {
+  AlertTriangle,
+  CheckCircle2,
+  CircleSlash,
+  FlaskConical,
+  Play,
+  Plus,
+  Rocket,
+  Save,
+  Sparkles,
+  Trash2,
+  Users,
+  XCircle,
+} from 'lucide-vue-next'
 import { ApiError, errorText, formatDate, type Page } from '@dx/web-shared/api.ts'
 import type { FormTemplate } from '@dx/web-shared/types.ts'
 import ModalDialog from '@dx/web-shared/components/ModalDialog.vue'
@@ -91,7 +104,12 @@ const ERRORS: Record<string, string> = {
   loop_limit: 'Quay lại bước quá nhiều lần',
 }
 
-const props = defineProps<{ ruleId: string; dirty: boolean }>()
+const props = defineProps<{
+  ruleId: string
+  dirty: boolean
+  /** Saves the canvas; given, unsaved changes can be saved and published in one go. */
+  save?: () => Promise<boolean>
+}>()
 const emit = defineEmits<{ close: []; changed: [rule: ProcessRule] }>()
 const client = useQueryClient()
 const ai = useAi()
@@ -175,7 +193,33 @@ const send = (path: string, method: string, body?: unknown) =>
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   })
 const expected = () => ({ expected_revision: rule.data.value!.revision })
-const publish = () => act(() => send('/publish', 'POST', expected()), 'Đã phát hành phiên bản mới')
+/** Publishes the saved draft; unsaved canvas changes are saved (and scenarios re-run) first. */
+function publish() {
+  void act(async () => {
+    if (props.dirty) {
+      if (!props.save || !(await props.save()))
+        throw new Error('Chưa lưu được canvas nên chưa phát hành. Xem thông báo lỗi trên trang thiết kế rồi thử lại.')
+      const latest = await rule.refetch()
+      if (scenarios.data.value?.items.length) await send('/scenario-reports', 'POST')
+      await send('/publish', 'POST', { expected_revision: latest.data!.revision })
+      return
+    }
+    await send('/publish', 'POST', expected())
+  }, 'Đã phát hành phiên bản mới')
+}
+const upToDate = computed(
+  () => !props.dirty && !!rule.data.value?.active_version_no && !rule.data.value.unpublished_changes,
+)
+const publishBlocked = computed(() => {
+  if (busy.value) return 'Đang xử lý, đợi một chút'
+  if (props.dirty && !props.save) return 'Lưu canvas trước khi phát hành'
+  if (upToDate.value) return 'Bản nháp trùng với phiên bản đang áp dụng: chưa có gì mới để phát hành'
+  return ''
+})
+function removeScenarioAsk(scenario: Scenario) {
+  if (!window.confirm(`Xóa kịch bản “${scenario.name}”? Thao tác này không hoàn tác được.`)) return
+  void removeScenario(scenario.id)
+}
 function unpublish() {
   if (!window.confirm('Ngừng áp dụng? Hồ sơ mới sẽ không dùng quy trình này; hồ sơ đã tạo vẫn đi theo phiên bản của mình.'))
     return
@@ -266,22 +310,32 @@ const resultFor = (id: string) => latestReport.value?.results.find((item) => ite
 </script>
 <template>
   <ModalDialog title="Phát hành" wide @close="emit('close')">
-    <div class="tabs" role="tablist" aria-label="Phần quản trị quy trình">
+    <div class="tabs panel-tabs" role="tablist" aria-label="Phần quản trị quy trình">
       <button class="tab" :class="{ active: tab === 'publish' }" role="tab" :aria-selected="tab === 'publish'" @click="tab = 'publish'">
-        <Rocket :size="15" />Phát hành
+        <Rocket :size="16" aria-hidden="true" /><span>Phát hành</span>
       </button>
       <button v-if="rule.data.value?.form_id" class="tab" :class="{ active: tab === 'access' }" role="tab" :aria-selected="tab === 'access'" @click="tab = 'access'">
-        <Users :size="15" />Phân quyền
+        <Users :size="16" aria-hidden="true" /><span>Phân quyền</span>
       </button>
       <button class="tab" :class="{ active: tab === 'scenarios' }" role="tab" :aria-selected="tab === 'scenarios'" @click="tab = 'scenarios'">
-        <FlaskConical :size="15" />Kịch bản thử<span v-if="scenarios.data.value?.items.length" class="tab-count">{{ scenarios.data.value.items.length }}</span>
+        <FlaskConical :size="16" aria-hidden="true" /><span>Kịch bản thử</span
+        ><span v-if="scenarios.data.value?.items.length" class="tab-count">{{ scenarios.data.value.items.length }}</span>
       </button>
     </div>
     <div v-if="error" class="notice error error-inline" role="alert">{{ error }}</div>
     <StatePanel v-if="!rule.data.value" :loading="rule.isPending.value" :error="rule.error.value" compact @retry="rule.refetch()" />
 
     <div v-else-if="tab === 'publish'" class="stack">
-      <div v-if="dirty" class="notice warning" role="alert">Canvas có thay đổi chưa lưu. Lưu trước khi phát hành.</div>
+      <div v-if="dirty" class="notice warning" role="status">
+        <AlertTriangle :size="18" aria-hidden="true" />
+        <span v-if="save"
+          >Canvas có thay đổi chưa lưu. Bấm <b>Lưu &amp; phát hành</b> để lưu bản nháp<template
+            v-if="scenarios.data.value?.items.length"
+          >, chạy lại kịch bản thử</template
+          > rồi phát hành luôn.</span
+        >
+        <span v-else>Canvas có thay đổi chưa lưu. Lưu trước khi phát hành.</span>
+      </div>
       <p v-if="rule.data.value.active_version_no">
         Đang áp dụng <strong>phiên bản {{ rule.data.value.active_version_no }}</strong
         >.
@@ -293,20 +347,26 @@ const resultFor = (id: string) => latestReport.value?.results.find((item) => ite
         Có {{ scenarios.data.value.items.length }} kịch bản thử: tất cả phải đạt trên đúng bản nháp này thì mới phát hành được.
       </p>
       <div class="inline-actions">
-        <button
-          class="button"
-          :disabled="busy || dirty || (!!rule.data.value.active_version_no && !rule.data.value.unpublished_changes)"
-          @click="publish"
-        >
-          <Rocket :size="16" />Phát hành
+        <button class="button" :disabled="!!publishBlocked" :title="publishBlocked" :aria-busy="busy" @click="publish">
+          <Save v-if="dirty && save && !busy" :size="16" aria-hidden="true" /><Rocket v-else :size="16" aria-hidden="true" />{{
+            busy ? 'Đang xử lý…' : dirty && save ? 'Lưu & phát hành' : 'Phát hành'
+          }}
         </button>
-        <button v-if="rule.data.value.active_version_id" class="button secondary" :disabled="busy" @click="unpublish">Ngừng áp dụng</button>
+        <button
+          v-if="rule.data.value.active_version_id"
+          class="button secondary"
+          :disabled="busy"
+          title="Hồ sơ mới không dùng quy trình này nữa; hồ sơ đang chạy vẫn đi tiếp"
+          @click="unpublish"
+        >
+          <CircleSlash :size="16" aria-hidden="true" />Ngừng áp dụng
+        </button>
       </div>
 
       <template v-if="impact.data.value && rule.data.value.unpublished_changes">
         <hr class="divider" />
         <h3>So với phiên bản {{ impact.data.value.version_no }}</h3>
-        <ul class="stack" style="margin: 0; padding-left: 18px">
+        <ul class="stack impact-list">
           <li v-for="node in impact.data.value.nodes.added" :key="node.id">Thêm bước “{{ node.label || KINDS[node.type as keyof typeof KINDS]?.title }}”</li>
           <li v-for="node in impact.data.value.nodes.removed" :key="node.id">Bỏ bước “{{ node.label || KINDS[node.type as keyof typeof KINDS]?.title }}”</li>
           <li v-for="node in impact.data.value.nodes.changed" :key="node.id">Đổi cấu hình bước “{{ node.after.label || KINDS[node.after.type as keyof typeof KINDS]?.title }}”</li>
@@ -364,7 +424,9 @@ const resultFor = (id: string) => latestReport.value?.results.find((item) => ite
         <input id="process-files" v-model.number="requiredFiles" type="number" min="0" max="30" />
         <small class="muted">Phần này thuộc nội dung quy trình: áp dụng từ lần phát hành sau.</small>
       </div>
-      <div class="form-actions"><button class="button" :disabled="busy">Lưu phân quyền</button></div>
+      <div class="form-actions">
+        <button class="button" :disabled="busy" :aria-busy="busy">{{ busy ? 'Đang lưu…' : 'Lưu phân quyền' }}</button>
+      </div>
     </form>
 
     <div v-else class="stack">
@@ -372,11 +434,31 @@ const resultFor = (id: string) => latestReport.value?.results.find((item) => ite
         Mỗi kịch bản là một hồ sơ mẫu đi qua bản nháp bằng đúng bộ máy chạy thật, không tạo nhiệm vụ, việc hay thông báo nào.
       </p>
       <div class="inline-actions">
-        <button class="button" :disabled="busy || dirty || !scenarios.data.value?.items.length" @click="runAll"><Play :size="15" />Chạy tất cả</button>
-        <button class="button secondary" @click="adding = !adding"><Plus :size="15" />Thêm kịch bản</button>
-        <button v-if="ai.on('package_scenarios')" class="button secondary" :disabled="busy" @click="suggest"><Sparkles :size="15" />AI đề xuất</button>
+        <button
+          class="button"
+          :disabled="busy || dirty || !scenarios.data.value?.items.length"
+          :title="
+            dirty
+              ? 'Lưu canvas trước: kịch bản chạy trên bản đã lưu'
+              : !scenarios.data.value?.items.length
+                ? 'Chưa có kịch bản nào để chạy'
+                : ''
+          "
+          :aria-busy="busy"
+          @click="runAll"
+        >
+          <Play :size="15" aria-hidden="true" />{{ busy ? 'Đang chạy…' : 'Chạy tất cả' }}
+        </button>
+        <button class="button secondary" :aria-expanded="adding" @click="adding = !adding">
+          <Plus :size="15" aria-hidden="true" />Thêm kịch bản
+        </button>
+        <button v-if="ai.on('package_scenarios')" class="button secondary" :disabled="busy" @click="suggest">
+          <Sparkles :size="15" aria-hidden="true" />{{ busy ? 'Đang xử lý…' : 'AI đề xuất' }}
+        </button>
       </div>
-      <div v-if="dirty" class="notice warning">Canvas có thay đổi chưa lưu; kịch bản chạy trên bản đã lưu.</div>
+      <div v-if="dirty" class="notice warning">
+        <AlertTriangle :size="18" aria-hidden="true" /><span>Canvas có thay đổi chưa lưu; kịch bản chạy trên bản đã lưu.</span>
+      </div>
 
       <form v-if="adding" class="stack card-body" @submit.prevent="addScenario">
         <div class="form-grid">
@@ -419,7 +501,7 @@ const resultFor = (id: string) => latestReport.value?.results.find((item) => ite
         </div>
         <div class="form-actions">
           <button type="button" class="button secondary" @click="adding = false">Hủy</button>
-          <button class="button" :disabled="busy">Lưu kịch bản</button>
+          <button class="button" :disabled="busy" :aria-busy="busy">{{ busy ? 'Đang lưu…' : 'Lưu kịch bản' }}</button>
         </div>
       </form>
 
@@ -427,8 +509,8 @@ const resultFor = (id: string) => latestReport.value?.results.find((item) => ite
         Chưa có kịch bản nào. Kịch bản không bắt buộc, nhưng giúp phát hiện sai sót trước khi hồ sơ thật đi vào quy trình.
       </p>
       <div v-for="scenario in scenarios.data.value?.items" :key="scenario.id" class="list-row">
-        <CheckCircle2 v-if="resultFor(scenario.id)?.passed" :size="18" style="color: var(--success, #1f8a5b)" />
-        <XCircle v-else-if="resultFor(scenario.id)" :size="18" style="color: var(--danger, #c0392b)" />
+        <CheckCircle2 v-if="resultFor(scenario.id)?.passed" :size="18" class="scenario-pass" aria-label="Đạt" />
+        <XCircle v-else-if="resultFor(scenario.id)" :size="18" class="scenario-fail" aria-label="Không đạt" />
         <FlaskConical v-else :size="18" />
         <div class="grow">
           <p>{{ scenario.name }}</p>
@@ -442,10 +524,40 @@ const resultFor = (id: string) => latestReport.value?.results.find((item) => ite
             </template>
           </small>
         </div>
-        <button class="icon-button" :aria-label="`Xóa ${scenario.name}`" title="Xóa kịch bản" :disabled="busy" @click="removeScenario(scenario.id)">
+        <button class="icon-button" :aria-label="`Xóa ${scenario.name}`" title="Xóa kịch bản" :disabled="busy" @click="removeScenarioAsk(scenario)">
           <Trash2 :size="16" />
         </button>
       </div>
     </div>
   </ModalDialog>
 </template>
+<style scoped>
+/* Icon and label never touch, and the count chip keeps its distance too. */
+.panel-tabs {
+  gap: 4px;
+}
+.panel-tabs .tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  white-space: nowrap;
+}
+.impact-list {
+  margin: 0;
+  padding-left: 18px;
+  gap: 8px;
+}
+.scenario-pass {
+  color: var(--green-ink);
+  flex-shrink: 0;
+}
+.scenario-fail {
+  color: var(--red);
+  flex-shrink: 0;
+}
+.notice > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+</style>

@@ -71,9 +71,11 @@ import type { PluginSlotItem } from '../components/plugins/PluginFrames.vue'
 import StepAnswerDialog from '../components/StepAnswerDialog.vue'
 import { toast } from '../ui/toast'
 import { isOfficeFile, previewKind } from '../ui/preview'
+import { initialsOf } from '../ui/people'
 import FilePreview from '../components/FilePreview.vue'
 import type { StepFile } from '../flow/ProcessCanvas.vue'
-import { useUnsavedGuard } from '../ui/unsaved'
+import { confirmDiscard as askDiscard, useUnsavedGuard } from '../ui/unsaved'
+import { reasonMissing } from '../components/workForms'
 const route = useRoute()
 const router = useRouter()
 const queryClient = useQueryClient()
@@ -143,7 +145,26 @@ const evidencePage = ref(1)
 const evidenceQuote = ref('')
 const evidenceValue = ref('')
 const correctedValues = ref<Record<string, string>>({})
+const evidenceBlocked = computed(() =>
+  !evidenceField.value
+    ? 'Chọn mục trong biểu mẫu.'
+    : !evidenceFile.value
+      ? 'Chọn tài liệu gốc.'
+      : !evidenceQuote.value.trim()
+        ? 'Dán câu trích từ tài liệu.'
+        : '',
+)
+function cancelEvidence() {
+  if (busy.value || !askDiscard(!!evidenceQuote.value.trim() || !!evidenceValue.value.trim())) return
+  manualEvidence.value = false
+  evidenceField.value = ''
+  evidenceFile.value = ''
+  evidencePage.value = 1
+  evidenceQuote.value = ''
+  evidenceValue.value = ''
+}
 async function addEvidence() {
+  if (busy.value || evidenceBlocked.value) return
   busy.value = true
   error.value = null
   try {
@@ -154,11 +175,14 @@ async function addEvidence() {
         suggested_value: parseValue(evidenceValue.value) }),
     })
     evidenceQuote.value = ''
+    evidenceValue.value = ''
     manualEvidence.value = false
+    toast.success('Đã lưu căn cứ đối chiếu')
     await queryClient.invalidateQueries({ queryKey: ['field-evidence', id] })
   } catch (cause) { error.value = cause } finally { busy.value = false }
 }
 async function reviewEvidence(item: FieldEvidence, decision: 'confirm' | 'correct' | 'reject') {
+  if (busy.value) return
   busy.value = true
   error.value = null
   try {
@@ -333,9 +357,12 @@ const CLOSING: Record<Closing, { title: string; text: string; button: string; do
   },
 }
 const closingReason = ref('')
+function dismissClosing() {
+  if (!busy.value && askDiscard(!!closingReason.value.trim())) closing.value = null
+}
 async function closeCase() {
   const value = detail.data.value
-  if (!value || !closing.value) return
+  if (!value || !closing.value || busy.value) return
   busy.value = true
   error.value = null
   const action = closing.value
@@ -412,7 +439,10 @@ async function taskCreated(task: Task) {
   showTask.value = false
   await router.push(`/tasks/${task.id}`)
 }
+const discussing = ref(false)
 async function discuss() {
+  if (discussing.value) return
+  discussing.value = true
   try {
     const conversation = await api.request<Conversation>('/conversations', {
       method: 'POST',
@@ -421,6 +451,8 @@ async function discuss() {
     await router.push(`/chat?c=${conversation.id}`)
   } catch (cause) {
     error.value = cause
+  } finally {
+    discussing.value = false
   }
 }
 const confirmation = ref<'submit' | 'approve' | 'reject' | 'return' | 'withdraw' | null>(
@@ -489,8 +521,11 @@ async function refresh() {
   await queryClient.invalidateQueries({ queryKey: ['notifications'] })
   await inbox.refetch()
 }
+const saveBlocked = computed(() =>
+  !editTitle.value.trim() ? 'Nhập tên hồ sơ trước.' : !dirty.value ? 'Chưa có thay đổi nào để lưu.' : '',
+)
 async function save() {
-  if (!detail.data.value) return
+  if (!detail.data.value || busy.value || saveBlocked.value) return
   errors.value = validatePayload(detail.data.value.form.fields, payload.value)
   if (Object.keys(errors.value).length) return
   busy.value = true
@@ -518,8 +553,21 @@ async function save() {
 function ask(action: typeof confirmation.value) {
   confirmation.value = action
   reason.value = ''
+  corrections.value = {}
   error.value = null
   intent.value = newIntent()
+}
+/** Returning and rejecting must say why; approving, submitting and withdrawing need not. */
+const reasonRequired = computed(() => confirmation.value === 'return' || confirmation.value === 'reject')
+const confirmBlocked = computed(() => {
+  if (reasonMissing(reasonRequired.value, reason.value)) return 'Nêu lý do trước khi xác nhận.'
+  if (confirmation.value === 'submit' && recipients.error.value)
+    return 'Chưa lấy được danh sách người nhận. Thử lại trước khi trình.'
+  return ''
+})
+function dismissConfirmation() {
+  const typed = !!reason.value.trim() || Object.values(corrections.value).some((value) => value !== '' && value != null)
+  if (!busy.value && askDiscard(typed)) confirmation.value = null
 }
 function changedCorrections() {
   const values: Record<string, unknown> = {}
@@ -538,10 +586,14 @@ const DONE = {
   withdraw: 'Đã thu hồi hồ sơ về bản nháp',
 }
 async function confirm() {
-  if (!detail.data.value) return
+  if (!detail.data.value || busy.value || confirmBlocked.value) return
   busy.value = true
   error.value = null
   try {
+    const deciding = !['withdraw', 'submit'].includes(confirmation.value ?? '')
+    // The step may have been decided elsewhere (a colleague, a delegate) since the page loaded.
+    if (deciding && !myTask.value)
+      throw new Error('Bước duyệt này không còn chờ bạn. Tải lại trang để xem tình trạng mới nhất.')
     if (confirmation.value === 'withdraw')
       await api.request(`/cases/${id}/withdraw`, {
         method: 'POST',
@@ -720,11 +772,8 @@ function moveTab(step: number) {
 </script>
 <template>
   <div class="breadcrumb">
-    <RouterLink to="/cases"
-      ><ArrowLeft
-        :size="14"
-        style="vertical-align: middle; margin-right: 5px"
-      />Hồ sơ</RouterLink
+    <RouterLink to="/cases" class="crumb-back"
+      ><ArrowLeft :size="14" aria-hidden="true" />Hồ sơ</RouterLink
     ><span aria-hidden="true">/</span
     ><span>{{ detail.data.value?.code || 'Chi tiết hồ sơ' }}</span>
   </div>
@@ -737,7 +786,7 @@ function moveTab(step: number) {
   <template v-if="detail.data.value">
     <header class="page-head">
       <div>
-        <h1>{{ detail.data.value.title }}</h1>
+        <h1 class="case-heading">{{ detail.data.value.title }}</h1>
         <div class="case-subline">
           <StatusBadge :status="detail.data.value.status" /><span v-if="detail.data.value.archived_at" class="tag"
             ><Archive :size="13" /> Lưu trữ</span
@@ -749,8 +798,8 @@ function moveTab(step: number) {
       <div v-if="!editing" class="page-actions">
         <button v-if="ai.on('case_qa')" class="button ai-ask" @click="openAsk()">
           <Sparkles :size="16" />Hỏi AI về hồ sơ</button
-        ><button class="button secondary" @click="discuss">
-          <MessagesSquare :size="16" />Trao đổi</button
+        ><button class="button secondary" :disabled="discussing" @click="discuss">
+          <MessagesSquare :size="16" />{{ discussing ? 'Đang mở…' : 'Trao đổi' }}</button
         ><button
           v-if="session.can('tasks.create')"
           class="button secondary"
@@ -790,8 +839,7 @@ function moveTab(step: number) {
         }}</code
         ><button
           v-if="error instanceof ApiError && error.status === 409"
-          class="button secondary small"
-          style="margin-top: 10px"
+          class="button secondary small notice-action"
           @click="
             () => {
               editing = false
@@ -916,7 +964,7 @@ function moveTab(step: number) {
             <span v-if="editing" class="tag">Đang chỉnh sửa bản nháp</span>
           </header>
           <div class="card-body">
-            <div v-if="editing" class="field" style="margin-bottom: 22px">
+            <div v-if="editing" class="field edit-title-field">
               <label for="edit-case-title">Tên hồ sơ</label
               ><input
                 id="edit-case-title"
@@ -970,7 +1018,7 @@ function moveTab(step: number) {
               >
                 <span class="file-icon"><FileText :size="19" /></span>
                 <div class="grow">
-                  <strong>{{ file.name }}</strong
+                  <strong class="ellipsis" :title="file.name">{{ file.name }}</strong
                   ><small>Bản mới nhất trong kho · được chốt lại khi trình</small>
                 </div>
                 <button
@@ -1012,35 +1060,53 @@ function moveTab(step: number) {
               <button
                 v-if="canEdit && !manualEvidence"
                 type="button"
-                class="button ghost small"
-                style="justify-self: start; margin-bottom: 10px"
+                class="button ghost small evidence-add"
                 @click="manualEvidence = true"
               >
                 <Plus :size="15" />Thêm căn cứ thủ công
               </button>
-              <div v-if="canEdit && manualEvidence" class="form-grid">
+              <form v-if="canEdit && manualEvidence" class="form-grid evidence-form" @submit.prevent="addEvidence">
                 <div class="field"><label for="evidence-field">Mục trong biểu mẫu</label><select id="evidence-field" v-model="evidenceField"><option value="">Chọn mục</option><option v-for="field in detail.data.value.form.fields" :key="field.key" :value="field.key">{{ field.label }}</option></select></div>
                 <div class="field"><label for="evidence-file">Tài liệu gốc</label><select id="evidence-file" v-model="evidenceFile"><option value="">Chọn tài liệu</option><option v-for="file in detail.data.value.files" :key="file.id" :value="file.id">{{ file.name }}</option></select></div>
                 <div class="field"><label for="evidence-page">Trang</label><input id="evidence-page" v-model.number="evidencePage" type="number" min="1" /></div>
                 <div class="field"><label for="evidence-value">Giá trị trong tài liệu</label><input id="evidence-value" v-model="evidenceValue" placeholder="Ví dụ: 12500000" /></div>
-                <div class="field full-width"><label for="evidence-quote">Câu trích từ tài liệu</label><textarea id="evidence-quote" v-model="evidenceQuote" rows="2" /></div>
-                <button class="button secondary" :disabled="busy || !evidenceField || !evidenceFile || !evidenceQuote" @click="addEvidence">Lưu đối chiếu</button>
-              </div>
+                <div class="field full-width"><label for="evidence-quote">Câu trích từ tài liệu</label><textarea id="evidence-quote" v-model="evidenceQuote" rows="2" maxlength="2000" /></div>
+                <div class="form-actions full-width">
+                  <button type="button" class="button secondary" :disabled="busy" @click="cancelEvidence">Hủy</button
+                  ><button class="button" :disabled="busy || !!evidenceBlocked" :title="evidenceBlocked">
+                    {{ busy ? 'Đang lưu…' : 'Lưu đối chiếu' }}
+                  </button>
+                </div>
+              </form>
               <StatePanel :loading="fieldEvidence.isPending.value" :error="fieldEvidence.error.value"
                 :empty="fieldEvidence.data.value?.items.length === 0" compact title="Chưa có đối chiếu nào" @retry="fieldEvidence.refetch()" />
-              <div v-for="item in fieldEvidence.data.value?.items" :key="item.id" class="list-row">
-                <div class="grow"><strong>{{ fieldLabel(item.field_key) }} · {{ item.review_state === 'confirmed' ? 'Đã xác nhận' : item.review_state === 'rejected' ? 'Đã bác bỏ' : 'Cần kiểm tra' }}</strong>
+              <div v-for="item in fieldEvidence.data.value?.items" :key="item.id" class="list-row evidence-row">
+                <div class="grow evidence-body"><strong>{{ fieldLabel(item.field_key) }} · {{ item.review_state === 'confirmed' ? 'Đã xác nhận' : item.review_state === 'rejected' ? 'Đã bác bỏ' : 'Cần kiểm tra' }}</strong>
                   <small>{{ item.source_kind === 'ai' ? 'Gợi ý tự động' : 'Nhập tay' }}: {{ plainValue(item.suggested_value.value) }} · trang {{ item.source_page }}</small>
                   <small>Trích: “{{ item.source_quote }}”</small>
                   <small v-if="item.confirmed_value">Giá trị xác nhận: {{ plainValue(item.confirmed_value.value) }} · {{ userName(item.reviewed_by_id || '') }}</small>
-                  <div v-if="canEdit && item.review_state === 'needs_review'" class="inline-actions">
+                  <div v-if="canEdit && item.review_state === 'needs_review'" class="inline-actions evidence-actions">
                     <button class="button secondary small" :disabled="busy" @click="reviewEvidence(item, 'confirm')">Xác nhận</button>
-                    <input v-model="correctedValues[item.id]" :aria-label="`Giá trị đúng cho ${fieldLabel(item.field_key)}`" placeholder="Giá trị đúng" />
-                    <button class="button secondary small" :disabled="busy || !correctedValues[item.id]" @click="reviewEvidence(item, 'correct')">Sửa và xác nhận</button>
+                    <input
+                      v-model="correctedValues[item.id]"
+                      class="evidence-correct"
+                      :aria-label="`Giá trị đúng cho ${fieldLabel(item.field_key)}`"
+                      placeholder="Giá trị đúng"
+                    />
+                    <button
+                      class="button secondary small"
+                      :disabled="busy || !correctedValues[item.id]?.trim()"
+                      :title="correctedValues[item.id]?.trim() ? '' : 'Nhập giá trị đúng trước.'"
+                      @click="reviewEvidence(item, 'correct')"
+                    >
+                      Sửa và xác nhận
+                    </button>
                     <button class="button ghost small" :disabled="busy" @click="reviewEvidence(item, 'reject')">Bác bỏ</button>
                   </div>
                 </div>
-                <button class="button ghost small" @click="openEvidenceSource(item)">Mở trang gốc</button>
+                <button class="button ghost small" title="Tải tài liệu gốc, mở đúng trang được trích" @click="openEvidenceSource(item)">
+                  Mở trang gốc
+                </button>
               </div>
             </div>
           </section>
@@ -1052,11 +1118,7 @@ function moveTab(step: number) {
                 <span class="eyebrow">CĂN CỨ ĐỂ DUYỆT</span>
                 <h2>Bản đã trình</h2>
               </div>
-              <select
-                v-model="selectedSubmission"
-                aria-label="Chọn lần trình"
-                style="width: auto; min-height: 34px; font-size: 14px"
-              >
+              <select v-model="selectedSubmission" aria-label="Chọn lần trình" class="compact-select">
                 <option
                   v-for="item in detail.data.value.submissions"
                   :key="item.id"
@@ -1067,7 +1129,7 @@ function moveTab(step: number) {
               </select>
             </header>
             <div v-if="submission" class="card-body">
-              <div class="notice" style="margin-bottom: 20px">
+              <div class="notice submission-note">
                 <ShieldCheck :size="18" /><span
                   >Đây là nội dung đúng như lúc trình ngày
                   {{ formatDate(submission.submitted_at || submission.created_at, true) }}.
@@ -1082,12 +1144,11 @@ function moveTab(step: number) {
               <div
                 v-for="file in submission.files_snapshot"
                 :key="file.version_id || file.id"
-                class="list-row"
-                style="padding-left: 0; padding-right: 0"
+                class="list-row flush-row"
               >
-                <FileText :size="18" />
+                <FileText :size="18" aria-hidden="true" class="row-icon" />
                 <div class="grow">
-                  <p>{{ file.name || 'Tài liệu đã chốt' }}</p>
+                  <p class="ellipsis" :title="file.name || ''">{{ file.name || 'Tài liệu đã chốt' }}</p>
                   <small>Phiên bản đã chốt khi trình<template v-if="file.checksum"> · mã kiểm tra {{ String(file.checksum).slice(0, 10) }}</template></small>
                 </div>
                 <button
@@ -1127,7 +1188,7 @@ function moveTab(step: number) {
                     >{{ eventActor(event) }} ·
                     {{ formatDate(event.created_at, true) }}</small
                   >
-                  <p v-if="eventNote(event)" class="muted prewrap" style="font-size: 14px; margin-top: 5px">
+                  <p v-if="eventNote(event)" class="muted prewrap event-note">
                     {{ eventNote(event) }}
                   </p>
                 </li>
@@ -1158,7 +1219,7 @@ function moveTab(step: number) {
         <section v-if="tab === 'route'" class="card">
           <header class="card-header"><h2>Vì sao hồ sơ được chuyển đến những người này?</h2></header>
           <div class="card-body">
-            <p class="muted" style="margin-bottom: 14px">
+            <p class="muted route-intro">
               Quy trình chọn người duyệt dựa trên thông tin trong hồ sơ. Dưới đây là từng bước và lý do.
             </p>
             <StatePanel :loading="explanation.isPending.value" :error="explanation.error.value"
@@ -1186,7 +1247,7 @@ function moveTab(step: number) {
           </div>
         </section>
       </div>
-      <aside v-if="tab !== 'process'" class="stack" style="align-content: start">
+      <aside v-if="tab !== 'process'" class="stack case-aside">
         <PluginFrames place="case.side" :context="{ case_id: id }" />
         <section v-if="ai.on('case_qa')" class="card case-ask-card" aria-label="Hỏi đáp về hồ sơ">
           <header class="card-header">
@@ -1255,7 +1316,7 @@ function moveTab(step: number) {
     <div v-if="editing" class="sticky-actions" role="region" aria-label="Lưu bản nháp">
       <span><Pencil :size="16" />{{ dirty ? 'Có thay đổi chưa lưu' : 'Đang chỉnh sửa bản nháp' }}</span>
       <button class="button secondary" :disabled="busy" @click="stopEdit">Hủy</button
-      ><button class="button" :disabled="busy" @click="save">
+      ><button class="button" :disabled="busy || !!saveBlocked" :title="saveBlocked" @click="save">
         <Save :size="17" />{{ busy ? 'Đang lưu…' : 'Lưu bản nháp' }}
       </button>
     </div>
@@ -1293,9 +1354,9 @@ function moveTab(step: number) {
             : 'Bản nháp — kiểm tra lại trước khi trình.'
         }}</span
       >
-      <button class="button secondary" @click="startEdit">
+      <button class="button secondary" :disabled="busy" @click="startEdit">
         <Pencil :size="16" />Chỉnh sửa</button
-      ><button class="button" @click="ask('submit')">
+      ><button class="button" :disabled="busy" @click="ask('submit')">
         <Send :size="16" />Chuyển duyệt
       </button>
     </div>
@@ -1318,11 +1379,7 @@ function moveTab(step: number) {
               ? 'Thu hồi hồ sơ đã trình'
               : 'Từ chối hồ sơ'
     "
-    @close="
-      () => {
-        if (!busy) confirmation = null
-      }
-    "
+    @close="dismissConfirmation"
     ><div v-if="error" class="notice error error-inline" role="alert">
       {{ errorText(error) }}
     </div>
@@ -1344,17 +1401,18 @@ function moveTab(step: number) {
             ><StatePanel
               :loading="recipients.isPending.value"
               :error="recipients.error.value"
+              :empty="recipients.data.value?.items.length === 0"
+              compact
+              title="Chưa xác định được người nhận"
+              description="Quy trình sẽ chọn người nhận khi hồ sơ được chuyển; nếu không ai nhận, hồ sơ chờ ở bước đầu."
               @retry="recipients.refetch()"
             />
             <div
               v-for="user in recipients.data.value?.items"
               :key="user.id"
-              class="list-row"
-              style="padding: 10px 0"
+              class="list-row recipient-row"
             >
-              <span class="avatar">{{
-                user.display_name.split(' ').slice(-1)[0]?.slice(0, 1)
-              }}</span
+              <span class="avatar" aria-hidden="true">{{ initialsOf(user.display_name) }}</span
               ><span>{{ user.display_name }}</span>
             </div>
           </div></template
@@ -1379,17 +1437,14 @@ function moveTab(step: number) {
                 v-model="corrections[field.key]"
                 :type="field.type === 'number' ? 'number' : 'text'"
                 :placeholder="String(detail.data.value?.payload[field.key] ?? '')"
+                :disabled="busy"
               />
             </div>
           </template>
           <div class="field">
             <label for="decision-reason"
-              >{{
-                confirmation === 'approve' || confirmation === 'withdraw'
-                  ? 'Ghi chú (không bắt buộc)'
-                  : 'Lý do'
-              }}<span
-                v-if="confirmation !== 'approve' && confirmation !== 'withdraw'"
+              >{{ reasonRequired ? 'Lý do' : 'Ghi chú (không bắt buộc)' }}<span
+                v-if="reasonRequired"
                 class="required"
               >
                 *</span
@@ -1398,14 +1453,14 @@ function moveTab(step: number) {
               id="decision-reason"
               v-model="reason"
               rows="4"
-              :required="confirmation !== 'approve' && confirmation !== 'withdraw'"
+              :required="reasonRequired"
               :disabled="busy"
+              maxlength="3000"
               placeholder="Ghi rõ nội dung cần lưu ý…"
             /><button
               v-if="ai.on('decision_draft') && myTask && ['approve', 'reject', 'return'].includes(confirmation ?? '')"
               type="button"
-              class="button secondary small ai-action"
-              style="justify-self: start; margin-top: 6px"
+              class="button secondary small ai-action draft-button"
               :disabled="drafting || busy"
               @click="draftReason"
             >
@@ -1418,15 +1473,14 @@ function moveTab(step: number) {
           type="button"
           class="button secondary"
           :disabled="busy"
-          @click="confirmation = null"
+          @click="dismissConfirmation"
         >
           Hủy</button
         ><button
           class="button"
           :class="{ danger: confirmation === 'reject' }"
-          :disabled="
-            busy || (confirmation === 'submit' && !!recipients.error.value)
-          "
+          :disabled="busy || !!confirmBlocked"
+          :title="confirmBlocked"
         >
           {{
             busy
@@ -1452,11 +1506,7 @@ function moveTab(step: number) {
   <ModalDialog
     v-if="closing"
     :title="CLOSING[closing].title"
-    @close="
-      () => {
-        if (!busy) closing = null
-      }
-    "
+    @close="dismissClosing"
     ><div v-if="error" class="notice error error-inline" role="alert">{{ errorText(error) }}</div>
     <form @submit.prevent="closeCase">
       <div class="stack">
@@ -1468,7 +1518,7 @@ function moveTab(step: number) {
         </div>
       </div>
       <div class="form-actions">
-        <button type="button" class="button secondary" :disabled="busy" @click="closing = null">Quay lại</button
+        <button type="button" class="button secondary" :disabled="busy" @click="dismissClosing">Quay lại</button
         ><button class="button" :class="{ danger: closing === 'delete' || closing === 'cancel' }" :disabled="busy">
           {{ busy ? 'Đang ghi nhận…' : CLOSING[closing].button }}
         </button>
@@ -1492,3 +1542,87 @@ function moveTab(step: number) {
     @created="taskCreated"
   />
 </template>
+<style scoped>
+.crumb-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.case-heading {
+  overflow-wrap: anywhere;
+}
+.notice-action {
+  margin-top: 10px;
+}
+.edit-title-field {
+  margin-bottom: 24px;
+}
+.ellipsis {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.evidence-add {
+  margin-bottom: 12px;
+}
+.evidence-form {
+  margin: 4px 0 20px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+.evidence-form .form-actions {
+  margin-top: 0;
+  padding-top: 16px;
+}
+.evidence-row {
+  align-items: flex-start;
+  padding-left: 0;
+  padding-right: 0;
+}
+.evidence-body {
+  display: grid;
+  gap: 4px;
+}
+.evidence-actions {
+  margin-top: 8px;
+}
+.evidence-correct {
+  width: auto;
+  flex: 1 1 160px;
+  min-width: 0;
+  min-height: 32px;
+  padding: 5px 10px;
+  font-size: 0.875rem;
+}
+.submission-note {
+  margin-bottom: 20px;
+}
+.flush-row {
+  padding-left: 0;
+  padding-right: 0;
+}
+.row-icon {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+.event-note {
+  font-size: 0.875rem;
+  margin-top: 6px;
+}
+.route-intro {
+  margin-bottom: 16px;
+}
+.case-aside {
+  align-content: start;
+}
+.recipient-row {
+  padding: 10px 0;
+}
+.draft-button {
+  align-self: flex-start;
+  margin-top: 8px;
+}
+</style>

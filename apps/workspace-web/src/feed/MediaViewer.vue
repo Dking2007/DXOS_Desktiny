@@ -18,8 +18,14 @@ function go(step: number) {
   index.value = (index.value + step + count) % count
 }
 function onKey(event: KeyboardEvent) {
+  // Arrow keys inside a playing video seek it; only switch items from elsewhere.
+  if (event.target instanceof HTMLMediaElement || props.items.length < 2) return
   if (event.key === 'ArrowRight') go(1)
   else if (event.key === 'ArrowLeft') go(-1)
+  else if (event.key === 'Home') index.value = 0
+  else if (event.key === 'End') index.value = props.items.length - 1
+  else return
+  event.preventDefault()
 }
 function onTouchEnd(event: TouchEvent) {
   const delta = event.changedTouches[0].clientX - touchX
@@ -44,7 +50,8 @@ onBeforeUnmount(() => {
     @click.self="emit('close')"
   >
     <header class="media-viewer-bar">
-      <span>{{ index + 1 }} / {{ items.length }}</span>
+      <span aria-live="polite">{{ index + 1 }} / {{ items.length }}</span>
+      <span v-if="items.length > 1" class="media-viewer-hint">Dùng phím ← → để chuyển</span>
       <span class="grow" />
       <a class="icon-button" :href="`${current.url}?download=1`" :download="current.name" aria-label="Tải về" title="Tải về"
         ><Download :size="19"
@@ -63,10 +70,10 @@ onBeforeUnmount(() => {
       <video v-else :key="current.id" :src="current.url" controls autoplay playsinline />
     </div>
     <template v-if="items.length > 1">
-      <button class="media-viewer-nav prev" type="button" aria-label="Ảnh trước" @click="go(-1)">
+      <button class="media-viewer-nav prev" type="button" aria-label="Mục trước" title="Mục trước (←)" @click="go(-1)">
         <ChevronLeft :size="28" />
       </button>
-      <button class="media-viewer-nav next" type="button" aria-label="Ảnh sau" @click="go(1)">
+      <button class="media-viewer-nav next" type="button" aria-label="Mục sau" title="Mục sau (→)" @click="go(1)">
         <ChevronRight :size="28" />
       </button>
       <div class="media-viewer-strip">
@@ -76,6 +83,7 @@ onBeforeUnmount(() => {
           type="button"
           :class="{ active: n === index }"
           :aria-label="`Xem mục ${n + 1}`"
+          :aria-current="n === index ? 'true' : undefined"
           @click="index = n"
         >
           <img v-if="item.kind === 'image'" :src="item.url" alt="" loading="lazy" />

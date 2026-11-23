@@ -12,6 +12,7 @@ import { useSession } from '../stores/session'
 import { toast } from '../ui/toast'
 import { roleLabel } from '../ui/labels'
 import { initialsOf } from '../ui/people'
+import { useUnsavedGuard } from '../ui/unsaved'
 import AvatarPhoto from '../components/AvatarPhoto.vue'
 
 const session = useSession()
@@ -64,6 +65,11 @@ const errors = computed(() => ({
       : '',
 }))
 const valid = computed(() => !Object.values(errors.value).some(Boolean))
+// Leaving the page or closing the tab with edits asks first.
+useUnsavedGuard(changed)
+const saveBlocked = computed(() =>
+  !changed.value ? 'Chưa có thay đổi nào để lưu.' : !valid.value ? 'Sửa các ô báo lỗi trước khi lưu.' : '',
+)
 
 function adopt(value: User) {
   // The profile answer has no capabilities or CSRF token; keep the session's.
@@ -119,6 +125,8 @@ async function choose(event: Event) {
   }
 }
 async function removePhoto() {
+  if (uploading.value || !window.confirm('Gỡ ảnh đại diện? Đồng nghiệp sẽ thấy chữ viết tắt tên bạn thay cho ảnh.'))
+    return
   uploading.value = true
   try {
     adopt(await api.request<User>('/me/avatar', { method: 'DELETE' }))
@@ -152,7 +160,7 @@ async function removePhoto() {
               @click="picker?.click()"
             >
               <Camera :size="15" />{{
-                session.user.avatar_url ? 'Đổi ảnh' : 'Tải ảnh lên'
+                uploading ? 'Đang xử lý…' : session.user.avatar_url ? 'Đổi ảnh' : 'Tải ảnh lên'
               }}
             </button>
             <button
@@ -256,9 +264,10 @@ async function removePhoto() {
         <button
           class="button"
           type="submit"
-          :disabled="!changed || !valid || saving"
+          :disabled="!!saveBlocked || saving"
+          :title="saveBlocked"
         >
-          <Save :size="16" />Lưu thay đổi
+          <Save :size="16" />{{ saving ? 'Đang lưu…' : 'Lưu thay đổi' }}
         </button>
       </div>
     </form>
