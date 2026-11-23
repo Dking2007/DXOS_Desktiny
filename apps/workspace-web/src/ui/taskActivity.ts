@@ -117,3 +117,105 @@ export function activitySteps(
   if (!limit || steps.length <= limit + 1) return { steps, hidden: 0 }
   return { steps: steps.slice(-limit), hidden: steps.length - limit }
 }
+
+// ---- Drawing the history on a workflow canvas ------------------------------------------------
+
+export type CanvasDirection = 'down' | 'right'
+
+export interface PlacedStep {
+  step: ActivityStep
+  x: number
+  y: number
+  width: number
+  height: number
+  /** Last step of the whole history. */
+  latest: boolean
+}
+
+export interface StepLink {
+  id: string
+  source: string
+  target: string
+  /** A side note hanging off a main step, drawn dashed. */
+  aside: boolean
+  tone: StepTone
+  /** The main line wrapped to a new row: the link runs back along this height, between the rows. */
+  corridor?: number
+}
+
+export const NODE_WIDTH = 236
+export const GAP_RIGHT = 48
+const GAP_DOWN = 26
+const GAP_ASIDE = 18
+const ROW_GAP = 64
+
+/** Height a step needs: title and who/when, plus a line for what changed and two for a reason. */
+export function stepHeight(step: ActivityStep): number {
+  if (!step.major) return 48
+  return 58 + (step.note ? 18 : 0) + (step.reason ? 36 : 0)
+}
+
+/** How many main steps fit side by side in a canvas this wide, at full size. */
+export function stepsPerRow(width: number): number {
+  return Math.max(1, Math.floor((width - 40 + GAP_RIGHT) / (NODE_WIDTH + GAP_RIGHT)))
+}
+
+/**
+ * Where each step sits. `down` (the narrow card): every step in order, one under the other.
+ * `right` (the wide view): main steps left to right, wrapping after `perRow` of them, side notes
+ * stacked under the main step they followed, so the path of the work reads at a glance.
+ */
+export function canvasLayout(
+  steps: ActivityStep[],
+  direction: CanvasDirection,
+  latestId = steps.at(-1)?.id,
+  perRow = Infinity,
+): { placed: PlacedStep[]; links: StepLink[] } {
+  const placed: PlacedStep[] = []
+  const links: StepLink[] = []
+  const link = (from: ActivityStep, to: ActivityStep, aside: boolean, corridor?: number) =>
+    links.push({ id: `${from.id}->${to.id}`, source: from.id, target: to.id, aside, tone: to.tone, corridor })
+  const put = (step: ActivityStep, x: number, y: number) =>
+    placed.push({ step, x, y, width: NODE_WIDTH, height: stepHeight(step), latest: step.id === latestId })
+
+  if (direction === 'down') {
+    let y = 0
+    steps.forEach((step, index) => {
+      put(step, 0, y)
+      y += stepHeight(step) + GAP_DOWN
+      if (index) link(steps[index - 1], step, !step.major || !steps[index - 1].major)
+    })
+    return { placed, links }
+  }
+
+  // Main steps open a column; side notes stack in the column of the main step before them.
+  const columns: { main: ActivityStep; notes: ActivityStep[] }[] = []
+  for (const step of steps) {
+    if (step.major || !columns.length) columns.push({ main: step, notes: [] })
+    else columns[columns.length - 1].notes.push(step)
+  }
+  let rowTop = 0
+  let previous: ActivityStep | null = null
+  for (let start = 0; start < columns.length; start += perRow) {
+    const row = columns.slice(start, start + perRow)
+    const mainHeight = Math.max(...row.map((c) => stepHeight(c.main)))
+    let rowBottom = rowTop + mainHeight
+    row.forEach((column, index) => {
+      const x = index * (NODE_WIDTH + GAP_RIGHT)
+      put(column.main, x, rowTop)
+      if (previous) link(previous, column.main, false, index === 0 ? rowTop - ROW_GAP / 2 : undefined)
+      previous = column.main
+      let anchor = column.main
+      let y = rowTop + mainHeight + GAP_ASIDE + 14
+      for (const note of column.notes) {
+        put(note, x, y)
+        link(anchor, note, true)
+        anchor = note
+        y += stepHeight(note) + GAP_ASIDE
+      }
+      rowBottom = Math.max(rowBottom, y - GAP_ASIDE)
+    })
+    rowTop = rowBottom + ROW_GAP
+  }
+  return { placed, links }
+}
