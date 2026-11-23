@@ -11,6 +11,8 @@ Nhánh `feat/ui-ux-nang-cap`: nâng cấp trải nghiệm người dùng của W
 hay thư viện mới; thay đổi phía máy chủ duy nhất là luồng đăng nhập OIDC.
 
 ### Added
+- **Trình soạn thảo ONLYOFFICE toàn màn hình**: nút "Toàn màn hình" trên trang chỉnh sửa tài liệu che cả cửa sổ (ẩn thanh
+  bên, đầu trang) và bật chế độ toàn màn hình của trình duyệt; "Thu nhỏ" hoặc Esc để quay lại, không tải lại tài liệu.
 - **Cài đặt cá nhân** (`/preferences`, mọi người dùng; 9bf7477): giao diện sáng/tối/theo máy, mật độ hiển thị, thu
   gọn thanh bên, cỡ chữ 90–125% (toàn bộ cỡ chữ đổi sang `rem`), phông chữ, giãn dòng, giảm chuyển động, tăng tương
   phản, luôn hiện viền focus, gạch chân liên kết, định dạng ngày (dd/mm/yyyy hoặc yyyy-mm-dd), giờ 24h/12h, ngày đầu
