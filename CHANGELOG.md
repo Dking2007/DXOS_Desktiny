@@ -33,6 +33,9 @@ hay thư viện mới; thay đổi phía máy chủ duy nhất là luồng đăn
   khi thiếu quyền, trạng thái tải/trống/lỗi cho danh sách.
 - Hộp Phát hành quy trình: "Lưu & phát hành" khi canvas chưa lưu, thay cho nút Phát hành bấm được nhưng lỗi.
 - Tab "Giao diện" rời khỏi Thiết lập (quản trị) sang Cài đặt cá nhân; địa chỉ cũ tự chuyển hướng.
+- Bộ chọn người có tìm kiếm thay ô chọn thường ở "Chuyển cho", cấu hình bước quy trình (người nhận, giao cho, đơn vị
+  nhận, chuyển cấp) và thiết kế biểu mẫu (4e38e30); chặn tạo biểu mẫu khi bước "người cụ thể" chưa chọn người
+  (3e8aa00).
 
 ### Fixed
 - Đăng nhập để form Keycloak quá 5 phút trả JSON `oidc_state_invalid`: state đăng nhập nay sống 30 phút, callback
