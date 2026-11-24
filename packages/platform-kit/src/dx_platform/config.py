@@ -35,6 +35,9 @@ class Settings(BaseSettings):
     storage_local_path: str = ".data/blobs"
     max_upload_bytes: int = 52_428_800
     download_ticket_seconds: int = 120
+    clamav_host: str = ""
+    clamav_port: int = 3310
+    clamav_timeout_seconds: float = Field(default=30.0, gt=0, le=600)
     onlyoffice_public_url: str = "http://localhost:8080/office"
     onlyoffice_internal_url: str = "http://onlyoffice"
     onlyoffice_jwt_secret: str = ""

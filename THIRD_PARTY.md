@@ -19,6 +19,7 @@ mọi thư viện lấy qua trình quản lý gói (npm, pip) và mọi dịch v
 | RustFS | 1.0.3 | Apache-2.0 | <https://github.com/rustfs/rustfs> | dịch vụ chạy riêng — lưu trữ S3, thay MinIO (AGPL-3.0) |
 | Nginx | 1.28.0-alpine | BSD-2-Clause | <https://nginx.org/LICENSE> | dịch vụ chạy riêng — API gateway/static host |
 | ONLYOFFICE Docs (tùy chọn) | 8.3.3 | AGPL-3.0-only | <https://github.com/ONLYOFFICE/DocumentServer> | dịch vụ chạy riêng, mặc định TẮT; giao tiếp qua HTTP/JWT, không liên kết vào mã Desktiny |
+| ClamAV (tùy chọn) | 1.4.3 | GPL-2.0-only | <https://github.com/Cisco-Talos/clamav> | dịch vụ chạy riêng, mặc định TẮT (profile antivirus); giao tiếp qua TCP clamd, không liên kết vào mã Desktiny |
 | Python (base image) | 3.13.5-slim-bookworm | PSF-2.0 | <https://docs.python.org/3/license.html> | runtime của container API |
 | Node.js (build image) | 22.17.0-alpine | MIT | <https://github.com/nodejs/node> | chỉ dùng khi build frontend |
 | Alpine Linux | 3.21.3 | MIT (+ gói riêng) | <https://www.alpinelinux.org/> | helper một lần cấp quyền tệp realm |

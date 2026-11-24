@@ -41,7 +41,7 @@ from .models import (
     Workflow,
 )
 from .policy import admin, authorized_resources, check, owner_or_admin
-from .storage import BlobStore, checksum, inspect_content
+from .storage import BlobStore, checksum, inspect_content, scan_malware
 from .transactions import audit, begin_idempotency, emit
 from .workflow import advance, simulate_graph, validate_graph
 
@@ -476,6 +476,16 @@ def create_app(settings: Settings | None = None, engine=None):
             100,
         )
 
+    def scan_upload(db, actor, file_id, content):
+        try:
+            scan_malware(settings, content)
+        except AppError as exc:
+            if exc.code == "malware_detected":
+                db.rollback()  # drop a half-open idempotency record before auditing the rejection
+                audit(db, actor, "file.upload.malware_blocked", file_id, {"reason": exc.detail})
+                db.commit()
+            raise
+
     @router.post("/storage/uploads", status_code=201)
     def upload_start(
         body: UploadInput, db: DB, actor: User, idem_key: str | None = Header(None, alias="Idempotency-Key")
@@ -534,6 +544,7 @@ def create_app(settings: Settings | None = None, engine=None):
             raise AppError(422, "size_mismatch", "Kích thước tệp chưa đủ hoặc không khớp.")
         content = bytes(data)
         mime = inspect_content(content, file.name, file.mime)
+        scan_upload(db, actor, file.id, content)
         key = "blobs/" + uid()
         store.put(key, content, mime)
         upload.object_key, upload.checksum, upload.state = key, checksum(content), "received"
@@ -638,6 +649,7 @@ def create_app(settings: Settings | None = None, engine=None):
         file = get_file(file_id, db, actor, "write", lock=True)
         revision(file, expected_revision)
         mime = inspect_content(content, file.name, file.mime)
+        scan_upload(db, actor, file.id, content)
         key = "blobs/" + uid()
         store.put(key, content, mime)
         version = StorageVersion(

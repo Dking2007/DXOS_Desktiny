@@ -73,10 +73,28 @@ cần egress firewall và policy riêng cho Document Server.
 JSON Schema validation không thay luật nghiệp vụ. Không eval Python/JavaScript hoặc
 SQL tùy ý từ graph/form. File không được dùng tên gốc làm object key/path. Rich text
 không thuộc phạm vi đợt đầu; tránh render nội dung không tin cậy với `v-html`.
-Kiểm định dạng file/giới hạn giải nén không phải quét malware; hiện chưa tích hợp
-antivirus hoặc sandbox scan. Audit của Core có chuỗi băm SHA-256 (`GET
+Kiểm định dạng file/giới hạn giải nén không phải quét malware; việc quét do ClamAV
+đảm nhiệm (mục dưới), chưa có sandbox scan. Audit của Core có chuỗi băm SHA-256 (`GET
 /core/v1/audit-logs/verify`) và trigger chặn sửa/xóa trên PostgreSQL: sửa trực tiếp
 bằng SQL bị phát hiện. Chuỗi không chống được người ghi lại toàn bộ bảng rồi tính lại mọi
 hash; muốn chống điều đó phải lưu `head` ở nơi quản trị DB không sửa được (chưa làm).
 Audit của Workspace và các dòng Core ghi trước `core_0003` chưa có chuỗi.
 Không log Authorization/cookie/secret hoặc toàn bộ nội dung tài liệu.
+
+## Quét mã độc (ClamAV)
+
+Core quét nội dung tệp bằng ClamAV (clamd, lệnh `INSTREAM` qua TCP, client tự viết ở
+`dx_platform/clamav.py`, không thêm phụ thuộc) trước khi ghi vào storage, ở hai đường:
+upload mới (`PUT /storage/uploads/{id}/content`) và tạo phiên bản mới của tệp.
+
+- Bật: `docker compose --profile core --profile antivirus up -d` và đặt
+  `CLAMAV_HOST=clamav` (tuỳ chọn `CLAMAV_PORT=3310`, `CLAMAV_TIMEOUT_SECONDS=30`).
+  `CLAMAV_HOST` trống = tắt quét. Dịch vụ `clamav` ghim `clamav/clamav:1.4.3`, không
+  publish cổng ra host, cần vài trăm MB RAM và vài phút nạp CSDL chữ ký lúc khởi động.
+- Tệp nhiễm: HTTP 422 `malware_detected`, không ghi storage, ghi audit
+  `file.upload.malware_blocked`.
+- Fail-closed: đã cấu hình mà clamd không phản hồi/timeout/trả lỗi thì HTTP 503
+  `malware_scan_unavailable`, tệp không được nhận.
+- Giới hạn: chỉ quét tải lên qua Core (Workspace tải qua Core nên cũng được quét); tệp đã
+  lưu trước khi bật quét không được quét lại; `StreamMaxLength` của clamd (mặc định 100 MB)
+  cần không nhỏ hơn `MAX_UPLOAD_BYTES` (50 MB); chưa có sandbox, chữ ký phụ thuộc freshclam.

@@ -38,6 +38,9 @@ x-api-env: &api-env
   SMTP_FROM: ${SMTP_FROM:-}
   SMTP_TLS: ${SMTP_TLS:-true}
   ASSISTANT_ALLOWED_HOSTS: ${ASSISTANT_ALLOWED_HOSTS:-}
+  CLAMAV_HOST: ${CLAMAV_HOST:-}
+  CLAMAV_PORT: ${CLAMAV_PORT:-3310}
+  CLAMAV_TIMEOUT_SECONDS: ${CLAMAV_TIMEOUT_SECONDS:-30}
   BROKER_URL: redis://broker:6379/0
   COOKIE_SECURE: "false"
 
@@ -374,6 +377,22 @@ services:
     shm_size: 256mb
     networks: [dx]
 
+  clamav:
+    image: clamav/clamav:1.4.3
+    profiles: [antivirus]
+    restart: unless-stopped
+    environment:
+      CLAMAV_NO_FRESHCLAMD: "false"
+    volumes:
+      - clamav-db:/var/lib/clamav
+    healthcheck:
+      test: [CMD, clamdcheck.sh]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 180s
+    networks: [dx]
+
 networks:
   dx:
     driver: bridge
@@ -386,3 +405,4 @@ volumes:
   office-data:
   office-logs:
   office-lib:
+  clamav-db:

@@ -7,6 +7,7 @@ from pathlib import Path
 
 import boto3
 from botocore.config import Config
+from dx_platform.clamav import ScanInfected, ScanUnavailable, scan_bytes
 from dx_platform.errors import AppError
 
 
@@ -149,3 +150,21 @@ def inspect_content(data: bytes, name: str, claimed_mime: str) -> str:
 
 def checksum(data: bytes):
     return hashlib.sha256(data).hexdigest()
+
+
+def scan_malware(settings, data: bytes) -> None:
+    """ClamAV scan before storing. Disabled when CLAMAV_HOST is empty; fail-closed otherwise."""
+    if not settings.clamav_host:
+        return
+    try:
+        scan_bytes(settings.clamav_host, settings.clamav_port, data, settings.clamav_timeout_seconds)
+    except ScanInfected as exc:
+        raise AppError(
+            422, "malware_detected", f"Tệp bị từ chối vì phát hiện mã độc ({exc.signature})."
+        ) from None
+    except ScanUnavailable:
+        raise AppError(
+            503,
+            "malware_scan_unavailable",
+            "Không quét được mã độc (dịch vụ ClamAV không phản hồi) nên tệp chưa được nhận. Thử lại sau.",
+        ) from None
