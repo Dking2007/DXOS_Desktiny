@@ -42,7 +42,7 @@ Quy mô thay đổi so với `v0.2.2`: khoảng 300 tệp, +53 000 / −8 600 d�
 | 1 | Quản lý mã nguồn (5) | Có commit của 2 tài khoản | 3 tài khoản có commit riêng (`Dking2007`, `Raphael-Fug`, `Mai1174`); thay đổi đi qua nhánh tính năng và PR #34–#38 | Merge `release/v3.0.0` bằng PR trên GitHub để có dấu vết duyệt; xóa các nhánh đã merge |
 | 2 | Cấp phép OSI (10) | SPDX 180 tệp, `reuse lint` đạt | Tệp mới đều có header SPDX hoặc nằm trong `REUSE.toml`; `add_spdx_headers --check` đạt; `reuse lint` đạt (xem mục 4) | ScanCode vẫn chưa chạy |
 | 3 | Release (5) | Tag SemVer + Release tự động | Tag `v3.0.0`, CHANGELOG mục `[3.0.0]` kèm lý do đổi số chính | Push tag để workflow tạo Release; kiểm `.tar.gz` và `SHA256SUMS` trên GitHub |
-| 4 | Cài đặt & biên dịch (10) | `BUILD.md`, `Makefile`, `make install PREFIX=` | Build Docker Compose từ code V3 và chạy migration trên CSDL có sẵn dữ liệu (mục 4) | Chạy `make up` trên máy sạch; thêm `.gitattributes` (mục 5) |
+| 4 | Cài đặt & biên dịch (10) | `BUILD.md`, `Makefile`, `make install PREFIX=` | Build Docker Compose từ code V3 và chạy migration trên CSDL có sẵn dữ liệu (mục 4) | Chạy `make up` trên máy sạch (`.gitattributes` đã có, LF thống nhất) |
 | 5 | Thư viện & gói (10) | `THIRD_PARTY.md` đầy đủ | Sinh lại `THIRD_PARTY.md` từ lockfile, không có khác biệt; 0 gói cần duyệt | `pip-licenses` cho 63 gói Python (xem mục 4) |
 | 6 | Tài liệu & giao tiếp (10) | CHANGELOG, CONTRIBUTING, mẫu issue/PR | CHANGELOG `[3.0.0]`, tài liệu này, `docs/plugins.md`, `docs/packs.md`, `SELF_REVIEW.md` cập nhật | Thành viên ký `SELF_REVIEW.md` |
 
@@ -71,11 +71,10 @@ Trên nhánh `release/v3.0.0`, máy Windows 11 có Docker Desktop. Kết quả �
   sửa `1f57e43`. Bài học: CI hiện chạy typecheck trên máy runner, không build image, nên lỗi này lọt qua CI.
 - **npm bỏ qua gói tùy chọn khi tải lỗi.** Một lượt build image thiếu `@rollup/rollup-linux-x64-musl` dù lockfile có
   đủ; build lại với `--no-cache` thì đạt. Nếu gặp lại, xóa cache build của image web.
-- **Gói ngành bị revert rồi áp dụng lại.** `main` revert PR #37 ở PR #38 cùng ngày 14/11. V3 đưa lại vì plugin kết
-  nối phụ thuộc vào nó. Nhóm cần thống nhất với người đã revert (Mai1174) trước khi merge vào `main`.
-- **Xuống dòng CRLF trên Windows.** Kho chưa có `.gitattributes`. Máy đặt `core.autocrlf=true` sẽ checkout
-  `infra/compose/init-databases.sh` với CRLF, Postgres không chạy được script và không tạo user CSDL
-  (`password authentication failed for user "dx_core"`). Cách sửa đề xuất: thêm `*.sh text eol=lf`.
+- **Gói ngành bị revert rồi áp dụng lại.** `main` revert PR #37 ở PR #38 ngày 14/11; V3 đưa lại vì plugin kết
+  nối phụ thuộc vào nó, và `main` đã áp dụng lại (commit `5045637`).
+- **Xuống dòng CRLF trên Windows.** Kho đã có `.gitattributes` (LF thống nhất), nên máy đặt `core.autocrlf=true`
+  vẫn checkout `infra/compose/init-databases.sh` với LF và Postgres tạo được user CSDL.
 - **Test Python trên Windows.** `psycopg` thuần Python cần libpq của hệ điều hành; Windows không có sẵn nên phải
   chạy pytest trong container như CI.
 - **Nhảy số phiên bản.** Người đọc lịch sử tag sẽ thấy `v0.2.2` → `v3.0.0`. Lý do được ghi ở CHANGELOG và đầu tài

@@ -7,10 +7,13 @@ V2 → V3: [docs/V3_CHANGES.md](docs/V3_CHANGES.md).
 
 ## [Unreleased]
 
-Nhánh `feat/ui-ux-nang-cap`: nâng cấp trải nghiệm người dùng của Workspace. Không đổi API, không thêm migration
-hay thư viện mới; thay đổi phía máy chủ duy nhất là luồng đăng nhập OIDC.
+Nâng cấp trải nghiệm người dùng của Workspace, quét mã độc khi tải tệp lên Core, sửa lỗi bản cài đặt không nạp
+được gói ngành và hoàn thiện tài liệu nộp bài OLP 2026. Không thêm migration hay thư viện mới.
 
 ### Added
+- **Quét mã độc khi tải tệp lên Core** bằng ClamAV (client clamd tự viết, không thêm thư viện): dịch vụ `clamav`
+  trong profile compose `antivirus`, bật bằng `CLAMAV_HOST`. Tệp nhiễm bị từ chối 422 `malware_detected` và ghi audit
+  `file.upload.malware_blocked`; clamd không phản hồi thì từ chối 503 (fail-closed). Xem `docs/security.md`.
 - **Cài đặt cá nhân** (`/preferences`, mọi người dùng; 9bf7477): giao diện sáng/tối/theo máy, mật độ hiển thị, thu
   gọn thanh bên, cỡ chữ 90–125% (toàn bộ cỡ chữ đổi sang `rem`), phông chữ, giãn dòng, giảm chuyển động, tăng tương
   phản, luôn hiện viền focus, gạch chân liên kết, định dạng ngày (dd/mm/yyyy hoặc yyyy-mm-dd), giờ 24h/12h, ngày đầu
@@ -38,6 +41,8 @@ hay thư viện mới; thay đổi phía máy chủ duy nhất là luồng đăn
   (3e8aa00).
 
 ### Fixed
+- Bản cài bằng `make install` không nạp được gói ngành: nay tìm gói ở `<prefix>/share/desktiny/packs` khi không chạy
+  trong thư mục mã nguồn (có thể ghi đè bằng `PACKS_DIR`).
 - Đăng nhập để form Keycloak quá 5 phút trả JSON `oidc_state_invalid`: state đăng nhập nay sống 30 phút, callback
   lỗi chuyển về trang đăng nhập kèm thông báo (f3be40b).
 - Nút thu gọn thanh bên không có tác dụng ở trang thiết kế quy trình (9bf7477).
@@ -52,6 +57,17 @@ hay thư viện mới; thay đổi phía máy chủ duy nhất là luồng đăn
 - Canvas không tuần tự hóa sơ đồ trong lúc kéo bước và không vẽ lại cả trang theo từng khung thu phóng (c5d4bb9).
 - Nhắn tin và bảng tin chỉ vẽ lại dòng/bài thay đổi khi gõ phím (0c682f3); bộ định dạng ngày/dung lượng dùng lại
   thay vì tạo mới mỗi dòng; danh mục ít đổi không tải lại mỗi lần quay lại cửa sổ (9bf7477, c5d4bb9).
+
+### Docs
+- Thêm `docs/doi-chieu-de-thi.md` đối chiếu từng yêu cầu đề OLP 2026 với mã nguồn, cách kiểm và giới hạn; thêm mục
+  "Ranh giới Core headless" và sơ đồ hai tầng vào `docs/architecture.md`.
+- Thêm `README_EN.md`; viết lại `docs/demo.md` thành kịch bản demo 15 phút có phần chuẩn bị chạy không cần mạng.
+- README: badge CI/giấy phép/REUSE/phát hành, ghi rõ bản phân phối chính thức là `.tar.gz` + `SHA256SUMS`, thêm
+  LGPL-3.0 (psycopg) vào danh sách giấy phép tương thích; sửa ngày gửi PR Keycloak và phiên bản flowkit.
+- `.env.example` liệt kê đủ biến tùy chọn (`PACKS_DIR`, `DATABASE_URL`, OIDC, S3, worker, ClamAV); `BUILD.md` ghi rõ
+  giới hạn Windows của Makefile, cách chạy test PostgreSQL và thư mục gói ngành; sửa lệnh clone trỏ đúng repo.
+- `SELF_REVIEW.md` và `docs/V3_CHANGES.md` cập nhật theo lượt rà 23/11; `packages/platform-kit` có tệp `LICENSE`;
+  spec quy trình nghiệp vụ chuyển sang `docs/design/quy-trinh-nghiep-vu.md`. Repo đổi tên thành `DXOS_Desktiny`.
 
 ## [3.1.0] - 2026-11-21 — plugin đóng gói
 
@@ -307,7 +323,7 @@ phiên bản của chính chúng.
   `/business-packages*`, `/package-versions*`; `CaseCreate.package_version_id` đổi thành `process_id`;
   `/ai/package-versions/{id}/scenarios` đổi thành `/ai/processes/{id}/scenarios`. Đã chạy migration lên và xuống trên bản
   sao dữ liệu PostgreSQL. 14 test backend thay `test_packages.py`, `test_processes.py`; 2 test frontend. Spec:
-  [docs/superpowers/specs/2026-11-06-quy-trinh-nghiep-vu-design.md](docs/superpowers/specs/2026-11-06-quy-trinh-nghiep-vu-design.md).
+  [docs/design/quy-trinh-nghiep-vu.md](docs/design/quy-trinh-nghiep-vu.md).
 - **Hạn xử lý theo từng bước duyệt** (migration `workspace_0017`, `approval_tasks.due_at`): mỗi bước có "thời
   hạn xử lý" (giờ hoặc ngày), tính từ lúc hồ sơ tới bước đó. Hồ sơ quá hạn khi một bước đang chờ quá hạn của nó;
   lịch việc của người duyệt, danh sách Cần phê duyệt và thẻ "chờ lâu ở bước nào" (thêm số bước quá hạn) dùng hạn
@@ -442,10 +458,10 @@ Trạng thái kho trước khi bước vào V2, tag hồi tố tại `f089bfb`.
 ### Fixed
 - Thứ tự import trong `auth.py` để CI backend qua ruff — `d495abb`.
 
-[Unreleased]: https://github.com/Dking2007/DXOS_V2/compare/v3.1.0...HEAD
-[3.1.0]: https://github.com/Dking2007/DXOS_V2/compare/v3.0.0...v3.1.0
-[3.0.0]: https://github.com/Dking2007/DXOS_V2/compare/v0.2.2...v3.0.0
-[0.2.2]: https://github.com/Dking2007/DXOS_V2/compare/v0.2.1...v0.2.2
-[0.2.1]: https://github.com/Dking2007/DXOS_V2/compare/v0.2.0...v0.2.1
-[0.2.0]: https://github.com/Dking2007/DXOS_V2/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/Dking2007/DXOS_V2/releases/tag/v0.1.0
+[Unreleased]: https://github.com/Dking2007/DXOS_Desktiny/compare/v3.1.0...HEAD
+[3.1.0]: https://github.com/Dking2007/DXOS_Desktiny/compare/v3.0.0...v3.1.0
+[3.0.0]: https://github.com/Dking2007/DXOS_Desktiny/compare/v0.2.2...v3.0.0
+[0.2.2]: https://github.com/Dking2007/DXOS_Desktiny/compare/v0.2.1...v0.2.2
+[0.2.1]: https://github.com/Dking2007/DXOS_Desktiny/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/Dking2007/DXOS_Desktiny/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/Dking2007/DXOS_Desktiny/releases/tag/v0.1.0

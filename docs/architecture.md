@@ -11,6 +11,55 @@
 - Workspace chỉ truy cập Core qua HTTP `CoreClient`. Code dùng chung chỉ là thư viện
   kỹ thuật; không chia sẻ ORM nghiệp vụ. Core phải chạy được khi Workspace dừng.
 
+## Ranh giới Core headless
+
+Core (`services/core-api`) chỉ phục vụ API dưới `/core/v1/`; không trả HTML nghiệp vụ, không
+có template hay tệp tĩnh. Ứng dụng quản trị `/console/` (`apps/core-admin`) là một client
+riêng, đăng nhập qua Keycloak rồi gọi API Core như mọi client khác. Đường `/core/v1/docs` và
+`/core/v1/openapi.json` là tài liệu OpenAPI do FastAPI tự sinh; đó là tài liệu API, không phải
+giao diện nghiệp vụ. Mã hiện chưa có cờ cấu hình để tắt hai đường này. Bảng đối chiếu với đề
+OLP 2026 ở [doi-chieu-de-thi.md](doi-chieu-de-thi.md).
+
+```mermaid
+flowchart LR
+  subgraph T2["Tầng 2: ứng dụng"]
+    WEB["Workspace web (Vue)<br/>H · P · D · I"]
+    WAPI["Workspace API<br/>H · P · D · I"]
+    WW["Workspace worker"]
+    ADM["Core admin /console/"]
+    EXT["Client khác<br/>examples/core-client"]
+  end
+  subgraph T1["Tầng 1: Core headless"]
+    GW["Gateway Nginx"]
+    KC["Keycloak<br/>OIDC / SSO"]
+    CAPI["core-api /core/v1/"]
+    CW["core-worker"]
+    PG[("PostgreSQL")]
+    S3[("RustFS / S3")]
+    VK[("Valkey")]
+    AV["ClamAV (tuỳ chọn)"]
+  end
+  WEB --> GW
+  ADM --> GW
+  EXT --> GW
+  GW --> WAPI
+  GW --> CAPI
+  WEB -. đăng nhập .-> KC
+  ADM -. đăng nhập .-> KC
+  EXT -. token .-> KC
+  WAPI -->|CoreClient HTTP| CAPI
+  WW -->|CoreClient HTTP| CAPI
+  CAPI -. kiểm token .-> KC
+  CAPI --> PG
+  CAPI --> S3
+  CW --> PG
+  CAPI -.-> AV
+  CAPI -.-> VK
+```
+
+Mũi tên liền là lời gọi dữ liệu; nét đứt là xác thực hoặc thành phần tuỳ chọn. Workspace dùng
+database riêng và không truy cập PostgreSQL của Core.
+
 ## Nguồn sự thật
 
 | Dữ liệu | Nơi sở hữu |

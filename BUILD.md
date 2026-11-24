@@ -22,7 +22,7 @@ Danh sách đầy đủ và giấy phép: [THIRD_PARTY.md](THIRD_PARTY.md).
 ## 2. Cách A — Docker Compose (toàn bộ nền tảng, có SSO)
 
 ```bash
-git clone https://github.com/Raphael-Fug/DXOS_V2.git && cd DXOS_V2
+git clone https://github.com/Dking2007/DXOS_Desktiny.git && cd DXOS_Desktiny
 make up                       # bootstrap .env, build image, khởi động, nạp dữ liệu demo
 # cổng khác: make up BASE_URL=http://localhost:8090
 ```
@@ -32,8 +32,10 @@ Mở http://localhost:8080/ . Tài khoản demo ngẫu nhiên nằm ở
 
 ## 3. Cách B — Biên dịch trực tiếp (không Docker)
 
+Makefile dùng đường dẫn `.venv/bin` của Linux/macOS; trên Windows hãy chạy trong WSL2 (Ubuntu) hoặc dùng cách A (Docker).
+
 ```bash
-git clone https://github.com/Raphael-Fug/DXOS_V2.git && cd DXOS_V2
+git clone https://github.com/Dking2007/DXOS_Desktiny.git && cd DXOS_Desktiny
 make venv deps PYTHON=python3.13   # môi trường ảo Python 3.13 + npm ci (Ubuntu 24.04: python3 mặc định là 3.12)
 make build                    # biên dịch frontend → apps/*/dist
 make test                     # pytest + vitest
@@ -43,7 +45,7 @@ make install PREFIX=$HOME/desktiny   # cài ra ngoài thư mục mã nguồn
 Sau `make install`, gói Python (`dx_core`, `dx_workspace`, `dx_platform_kit`) nằm dưới
 `$PREFIX/lib/python3.13/site-packages`, web tĩnh dưới `$PREFIX/share/desktiny/`, migration
 CSDL ở `$PREFIX/share/desktiny/{core,workspace}-api/`, lệnh `$PREFIX/bin/desktiny-migrate`, cấu hình mẫu ở
-`$PREFIX/share/desktiny/config/env.example`. Có thể xóa thư mục mã nguồn rồi chạy:
+`$PREFIX/share/desktiny/config/env.example`. Gói ngành được cài vào `$PREFIX/share/desktiny/packs` và được tìm tự động; có thể ghi đè bằng `PACKS_DIR`. Có thể xóa thư mục mã nguồn rồi chạy:
 
 ```bash
 export PYTHONPATH=$HOME/desktiny/lib/python3.13/site-packages
@@ -70,6 +72,10 @@ make lint test                # ruff, eslint, vue-tsc, pytest, vitest
 pipx install reuse && make reuse    # giấy phép từng tệp (REUSE)
 make licenses                 # cập nhật THIRD_PARTY.md từ lockfile
 ```
+
+Test backend cần PostgreSQL và thư viện `libpq5`. Đặt `DX_TEST_POSTGRES_URL=postgresql+psycopg://USER:PASS@HOST:5432/DB_TEST`
+trỏ tới một CSDL test trống (tên CSDL phải chứa `test`; test tạo schema riêng và không đụng bảng hiện có). Không đặt biến này
+thì các test PostgreSQL bị bỏ qua (skip), không báo lỗi.
 
 ## 5. Đóng gói bản phát hành
 

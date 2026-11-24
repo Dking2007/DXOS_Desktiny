@@ -1,5 +1,9 @@
 # Desktiny
 
+[![CI](https://github.com/Dking2007/DXOS_Desktiny/actions/workflows/ci.yml/badge.svg)](https://github.com/Dking2007/DXOS_Desktiny/actions/workflows/ci.yml) [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE) [![REUSE](https://img.shields.io/badge/REUSE-compliant-green)](REUSE.toml) [![Release](https://img.shields.io/github/v/release/Dking2007/DXOS_Desktiny)](https://github.com/Dking2007/DXOS_Desktiny/releases)
+
+English: [README_EN.md](README_EN.md)
+
 *Desk + destiny — văn phòng số cho cơ quan.* (Tên cũ: DX Workspace; tên nội bộ trong mã
 nguồn, cơ sở dữ liệu và container vẫn là `dx_workspace` / `dx-workspace`.)
 
@@ -324,8 +328,7 @@ và trademark đúng bản phát hành; tích hợp API không phải giấy mi�
 Mã nguồn do dự án tự viết phát hành theo **Apache License 2.0** (SPDX: `Apache-2.0`).
 
 - **Vì sao chọn Apache-2.0**: giấy phép OSI rộng rãi, có điều khoản cấp quyền bằng sáng chế, tương thích với
-  toàn bộ thư viện dùng trong dự án (MIT/BSD/Apache/MPL/PSF/OFL; psycopg LGPL-3.0 dùng như thư viện liên kết động,
-  không sửa). Dịch vụ copyleft (ONLYOFFICE AGPL-3.0, tùy chọn) chạy riêng qua HTTP, không liên kết vào mã.
+  toàn bộ thư viện dùng trong dự án (MIT/BSD/Apache/MPL/PSF/OFL; LGPL-3.0 (psycopg, liên kết động, không sửa)). Dịch vụ copyleft (ONLYOFFICE AGPL-3.0, tùy chọn) chạy riêng qua HTTP, không liên kết vào mã.
 - Bản toàn văn: [LICENSE](LICENSE) (và [LICENSES/Apache-2.0.txt](LICENSES/Apache-2.0.txt) theo chuẩn
   [REUSE](https://reuse.software/)). Mỗi tệp mã mang header `SPDX-License-Identifier`; tệp không ghi chú được
   khai báo trong [REUSE.toml](REUSE.toml). Kiểm bằng `reuse lint`.
@@ -336,8 +339,8 @@ Mã nguồn do dự án tự viết phát hành theo **Apache License 2.0** (SPD
 - Cài đặt/biên dịch từ mã nguồn: [BUILD.md](BUILD.md) (`make venv deps build test`, `make install PREFIX=...`).
 - Lịch sử phiên bản: [CHANGELOG.md](CHANGELOG.md); bản hiện tại là **V3.1 (3.1.0)**. V3 khác V2 thế nào:
   [docs/V3_CHANGES.md](docs/V3_CHANGES.md); V2 khác V1: [docs/V2_CHANGES.md](docs/V2_CHANGES.md).
-- Báo lỗi / đề xuất (bug tracker): <https://github.com/Dking2007/DXOS_V2/issues>.
-- Bản phát hành (`.tar.gz` kèm `SHA256SUMS`): <https://github.com/Dking2007/DXOS_V2/releases>. Cách đóng góp: [CONTRIBUTING.md](CONTRIBUTING.md),
+- Báo lỗi / đề xuất (bug tracker): <https://github.com/Dking2007/DXOS_Desktiny/issues>.
+- Bản phát hành: <https://github.com/Dking2007/DXOS_Desktiny/releases>. Bản phân phối chính thức là `dxos-X.Y.Z.tar.gz` kèm `SHA256SUMS`; mục "Source code (zip)" do GitHub tự thêm, không phải bản phân phối. Cách đóng góp: [CONTRIBUTING.md](CONTRIBUTING.md),
   [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), bảo mật: [SECURITY.md](SECURITY.md).
 - Tự rà soát tiêu chí PoF OLP PMNM 2026: [SELF_REVIEW.md](SELF_REVIEW.md).
 
@@ -349,7 +352,7 @@ Từng bước đã làm, link và trạng thái nằm ở [docs/contribution-lo
 
 | Việc | Dự án nhận | Link | Trạng thái | Ghi chú |
 |---|---|---|---|---|
-| Bổ sung 2 ghi chú còn thiếu cho mục "Migrating to 26.7.5" của hướng dẫn nâng cấp | Keycloak | Issue [keycloak#53650](https://github.com/keycloak/keycloak/issues/53650); PR [keycloak#54464](https://github.com/keycloak/keycloak/pull/54464) | **Đã gửi 30/10/2026, chờ người bảo trì xét** (chưa merge) | Sửa tài liệu +16 dòng, commit có Signed-off-by. Đã build tài liệu bằng Maven (Java 21) và kiểm đủ 4 ghi chú, liên kết hoạt động. Trạng thái sẽ đổi khi có kết quả; có dùng trợ lý AI soạn thảo, đã được người nộp xem lại |
-| `dx-flowkit`: kiểm tra và chạy thử đồ thị quy trình JSON, không phụ thuộc thư viện ngoài | Gói độc lập tách từ Desktiny ([`packages/flowkit`](packages/flowkit)) | Chưa công bố ngoài kho này | **Chưa công bố** | 67 test đạt; cùng kết quả với mã gốc trên 20.000 ca ngẫu nhiên (bản 0.1.0). Từ 31/10 Core dùng chính gói này thay cho bản sao. Chưa lên PyPI hay kho riêng; chưa kiểm xem đã có gói tương tự |
+| Bổ sung 2 ghi chú còn thiếu cho mục "Migrating to 26.7.5" của hướng dẫn nâng cấp | Keycloak | Issue [keycloak#53650](https://github.com/keycloak/keycloak/issues/53650); PR [keycloak#54464](https://github.com/keycloak/keycloak/pull/54464) | **Đã gửi 29/10/2026, chờ người bảo trì xét** (chưa merge) | Sửa tài liệu +16 dòng, commit có Signed-off-by. Đã build tài liệu bằng Maven (Java 21) và kiểm đủ 4 ghi chú, liên kết hoạt động. Trạng thái sẽ đổi khi có kết quả; có dùng trợ lý AI soạn thảo, đã được người nộp xem lại |
+| `dx-flowkit`: kiểm tra và chạy thử đồ thị quy trình JSON, không phụ thuộc thư viện ngoài | Gói độc lập tách từ Desktiny ([`packages/flowkit`](packages/flowkit)) | Chưa công bố ngoài kho này | **Chưa công bố** | 67 test đạt; cùng kết quả với mã gốc trên 20.000 ca ngẫu nhiên (bản 0.2.0). Từ 31/10 Core dùng chính gói này thay cho bản sao. Chưa lên PyPI hay kho riêng; chưa kiểm xem đã có gói tương tự |
 | Lỗi quyền volume khi nâng RustFS lên image chạy non-root (uid 10001) | RustFS ([#8992](https://github.com/rustfs/rustfs/issues/8992)) | Không gửi | **Đã xem xét, không gửi** | Nhóm tự tái hiện lỗi, nhưng người bảo trì đã xử lý độc lập ngày 29/10/2026 (PR #9056) nên không còn gì để bổ sung. Bản vá `chown` cho compose của Desktiny đã soạn nhưng chưa áp dụng vào kho này |
 | Plugin ONLYOFFICE kiểm tra thể thức văn bản hành chính theo Nghị định 30/2020/NĐ-CP, Phụ lục I (khổ A4, phông, cỡ chữ, màu, Quốc hiệu, Tiêu ngữ) | ONLYOFFICE ([marketplace](https://github.com/ONLYOFFICE/onlyoffice.github.io)); mã trong [`plugins/vn-document-format`](plugins/vn-document-format) | [PR #730](https://github.com/ONLYOFFICE/onlyoffice.github.io/pull/730) | **Đã gửi 30/10/2026, CLA đã ký, chờ người bảo trì xét** | 29 test đạt. Đã chạy trong ONLYOFFICE Document Server 8.3.3 (Docker) trên 2 tệp mẫu: tệp đúng 0 lỗi, tệp sai 6 lỗi và 3 cảnh báo. Bản 8.3.3 không có hàm đọc lề nên chưa kiểm lề ở bản này. Đã có icon, 2 ảnh chụp và CHANGELOG theo hướng dẫn marketplace; checklist và nội dung PR ở [docs/onlyoffice-submission.md](docs/onlyoffice-submission.md). Chưa thử trong Desktop Editors và theme tối; chưa xác nhận marketplace chấp nhận giấy phép Apache-2.0; số liệu chưa đối chiếu Công báo |

@@ -23,8 +23,8 @@ Tại thời điểm ghi: 30/10/2026.
 
 | Việc | Link | Trạng thái |
 |---|---|---|
-| Gói `dx-flowkit` 0.1.0: kiểm tra đồ thị quy trình và mô phỏng không tác dụng phụ, tách từ `dx_core.workflow` | [PR #31](https://github.com/Raphael-Fug/DXOS_V2/pull/31), đã merge vào `main` | Đã merge. Chưa phát hành lên PyPI. `dx_core.workflow` vẫn dùng bản sao riêng |
-| [PR #30](https://github.com/Raphael-Fug/DXOS_V2/pull/30) | Bản đầu của cùng thay đổi, dựa trên nhánh cũ | **Đã được thay thế**: thư mục `packages/flowkit` trên `main` giống hệt nhánh của PR này, và hai commit README của nó đã vào `main` qua các bản commit khác. Nên đóng PR, không cần merge |
+| Gói `dx-flowkit` 0.1.0: kiểm tra đồ thị quy trình và mô phỏng không tác dụng phụ, tách từ `dx_core.workflow` | [PR #31](https://github.com/Dking2007/DXOS_Desktiny/pull/31), đã merge vào `main` | Đã merge. Chưa phát hành lên PyPI. `dx_core.workflow` vẫn dùng bản sao riêng |
+| [PR #30](https://github.com/Dking2007/DXOS_Desktiny/pull/30) | Bản đầu của cùng thay đổi, dựa trên nhánh cũ | **Đã được thay thế**: thư mục `packages/flowkit` trên `main` giống hệt nhánh của PR này, và hai commit README của nó đã vào `main` qua các bản commit khác. Nên đóng PR, không cần merge |
 
 ## Việc đã cân nhắc nhưng không gửi
 
