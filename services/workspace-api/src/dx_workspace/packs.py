@@ -536,9 +536,15 @@ def load_pack(files: dict[str, bytes]) -> Pack:
     return pack
 
 
+def _pack_candidates(module_file: str | Path) -> list[str]:
+    root = Path(module_file).resolve().parents[4]
+    # Mã nguồn: <repo>/packs; bản cài `make install`: <prefix>/share/desktiny/packs
+    return [str(root / "packs"), str(root / "share" / "desktiny" / "packs"), "/app/packs"]
+
+
 def packs_folder(settings) -> Path | None:
     candidates = [settings.packs_dir] if settings.packs_dir else []
-    candidates += [str(Path(__file__).resolve().parents[4] / "packs"), "/app/packs"]
+    candidates += _pack_candidates(__file__)
     for candidate in candidates:
         if candidate and Path(candidate).is_dir():
             return Path(candidate)
