@@ -36,7 +36,7 @@ Mã: `apps/workspace-web`, `services/workspace-api`. Workspace chỉ gọi Core 
 | P, quy trình | Hồ sơ `/cases`, duyệt `/approvals`, thiết kế quy trình và tự động hóa `/processes`; chạy trên workflow của Core | Tạo hồ sơ ở `/cases`, đăng nhập `manager`, duyệt hoặc trả lại ở `/approvals`; xem lịch sử bước trong trang hồ sơ | Luồng gửi, trả lại, duyệt kiểm bằng pytest; E2E trình duyệt mới phủ một phần (`docs/acceptance.md`). |
 | D, dữ liệu, báo cáo | Kho tài liệu `/drive` (soạn thảo ONLYOFFICE khi bật profile `office`), tìm kiếm `/search`, báo cáo `/reports` | <http://localhost:8080/reports> sau khi seed; <http://localhost:8080/search> | ONLYOFFICE là tùy chọn, bật riêng. |
 | I, trí tuệ (AI) | 19 tính năng, **mặc định tắt**, tắt thì không hiện nút (`ai_core.py` `FEATURES`, `assistant.py`); AI chỉ đề xuất, chỉ nhận dữ liệu người dùng được xem. Xem [ai-features.md](ai-features.md) | Đăng nhập quản trị: <http://localhost:8080/assistant> › Tính năng AI, mọi công tắc đang tắt | Phải tự khai dịch vụ AI (khóa API hoặc Ollama). Mới thử thật với Ollama; **chưa** thử Claude, OpenAI, Gemini. |
-| Mở rộng | Plugin ([plugins.md](plugins.md)): iframe sandbox, lời gọi ký HMAC, token theo phạm vi. Gói mở rộng `.zip` ([packs.md](packs.md)); kho gói: <https://github.com/Dking2007/Desktiny_expansion_pack> (chưa kiểm được địa chỉ này từ máy viết tài liệu) | <http://localhost:8080/plugins> và <http://localhost:8080/packs>: cài thử một `.zip`, đọc phần xem trước | Plugin kết nối chạy ở máy chủ riêng do người cài lo. |
+| Mở rộng | Plugin ([plugins.md](plugins.md)): iframe sandbox, lời gọi ký HMAC, token theo phạm vi. Gói mở rộng `.zip` ([packs.md](packs.md)); kho gói: <https://github.com/Dking2007/Desktiny_expansion_pack> | <http://localhost:8080/plugins> và <http://localhost:8080/packs>: cài thử một `.zip`, đọc phần xem trước | Plugin kết nối chạy ở máy chủ riêng do người cài lo. |
 
 ## 3. Bốn nguyên tắc kỹ thuật
 
@@ -54,5 +54,5 @@ Mã: `apps/workspace-web`, `services/workspace-api`. Workspace chỉ gọi Core 
 - MFA và quét mã độc ClamAV (nguyên tắc iv).
 - GitOps triển khai tự động, mTLS giữa dịch vụ, lineage giữa bộ dữ liệu, chỉ số chất lượng dữ liệu.
 
-Các test (`make test`) chưa được chạy khi viết tài liệu này (máy viết chưa có pytest); đường dẫn mã và route đã đối chiếu
-với nguồn và `contracts/core.openapi.json` (phiên bản 3.1.0).
+Kiểm ngày 27/11/2026 trên `main` (`c4ccb9f`): `pytest` 356 passed, 1 skipped (test PostgreSQL cần `DX_TEST_POSTGRES_URL`).
+Đường dẫn mã và route đã đối chiếu với nguồn và `contracts/core.openapi.json` (phiên bản 3.1.0).
