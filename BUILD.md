@@ -67,7 +67,7 @@ trước khi chạy backend; image Docker `api.Dockerfile` đã cài sẵn.
 
 ```bash
 make lint test                # ruff, eslint, vue-tsc, pytest, vitest
-pipx install reuse && make reuse    # giấy phép từng tệp (REUSE)
+pipx install 'reuse[charset-normalizer]' && make reuse    # giấy phép từng tệp (REUSE); thay thế: `apt install file`
 make licenses                 # cập nhật THIRD_PARTY.md từ lockfile
 ```
 
@@ -90,6 +90,9 @@ make dist                     # dist/dxos-<phiên bản>.tar.gz + dist/SHA256SUM
 | `bootstrap.py` từ chối ghi đè | `.env` đã tồn tại; xóa `.env` và `infra/identity/generated/` **và** volume nếu muốn tạo lại |
 | `npm ci` lệch lockfile | Dùng Node 22 + npm 10; không chạy `npm install` rồi commit lockfile mới tùy ý |
 
-> Ghi chú trung thực: cách B (`make venv deps`, `build`, `test`, `install`, `desktiny-migrate`, `uvicorn`) đã được chạy từng
-> dòng trong container `ubuntu:24.04` sạch ngày 27/10/2026. Cách A (`make up`, toàn bộ nền tảng với SSO) chưa được chạy thử
-> trong lần này. Mục [SELF_REVIEW.md](SELF_REVIEW.md) ghi rõ phần đã kiểm và chưa kiểm.
+> Ghi chú trung thực: lần kiểm gần nhất ngày 27/11/2026, trong container `ubuntu:24.04` sạch, clone nhánh `main` tại commit
+> `c4ccb9f`, chạy theo cách B. Đã qua: `make venv deps`, `build`, `test` (pytest thoát mã 0, vitest 182/182), `lint`, kiểm tra
+> tiêu đề SPDX, `THIRD_PARTY.md`, `audit_repo`, `make dist` kèm checksum, `make install PREFIX=`, xóa mã nguồn rồi chạy
+> `desktiny-migrate core`, và `/health/live` trả 200. Riêng `make reuse`: `pipx install reuse` trơn báo lỗi
+> `NoEncodingModuleError`; cài `reuse[charset-normalizer]` thì `reuse lint` đạt 483/483 tệp. Chưa chạy: `make up` từ tag
+> (cách A), ScanCode, ONLYOFFICE, sao lưu/khôi phục. Mục [SELF_REVIEW.md](SELF_REVIEW.md) ghi rõ phần đã kiểm và chưa kiểm.
