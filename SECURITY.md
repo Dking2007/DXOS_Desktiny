@@ -8,7 +8,7 @@ Compose trong repo là cấu hình **dev**, không phải production (xem [docs/
 ## Báo lỗ hổng
 
 Vui lòng **không** mở issue công khai. Dùng *Security → Report a vulnerability* (GitHub private advisory)
-của repo `Raphael-Fug/DXOS_V2`, hoặc email người duy trì: nduy34540@gmail.com. Hãy nêu phiên bản, các bước tái hiện
+của repo `Dking2007/DXOS_Desktiny`, hoặc email người duy trì: nduy34540@gmail.com. Hãy nêu phiên bản, các bước tái hiện
 và ảnh hưởng. Chúng tôi phản hồi trong vòng 7 ngày và công bố bản vá cùng ghi nhận người báo (nếu bạn đồng ý).
 
 ## Không commit bí mật

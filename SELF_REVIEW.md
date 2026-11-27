@@ -53,10 +53,10 @@ Nguồn đã đối chiếu ngày 21/11/2026: [Thể lệ](https://vfossa.vn/tin
 |---|---|---|
 | 1. Quản lý mã nguồn (5) | không web viewer, không truy cập mở, không thực sự dùng | Kho công khai trên GitHub; lịch sử commit của ba thành viên; PR #30–#39 |
 | 2. Giấy phép OSI (10) | thiếu giấy phép trong từng tệp; không tương thích; thiếu thông báo mục đích; thiếu toàn văn | Apache-2.0; header SPDX trong mọi tệp mã (`add_spdx_headers --check`); [LICENSE](LICENSE), [LICENSES/](LICENSES/); README mục Giấy phép nêu lý do và tính tương thích |
-| 3. Release (5) | không có; không theo phiên bản; định dạng không mở | [Releases](https://github.com/Dking2007/DXOS_V2/releases) `v0.2.0`–`v3.0.0`, gói `.tar.gz` kèm `SHA256SUMS` (gói zip do GitHub tự thêm, không phải bản phân phối) |
+| 3. Release (5) | không có; không theo phiên bản; định dạng không mở | [Releases](https://github.com/Dking2007/DXOS_Desktiny/releases) `v0.2.0`–`v3.0.0`, gói `.tar.gz` kèm `SHA256SUMS` (gói zip do GitHub tự thêm, không phải bản phân phối) |
 | 4. Biên dịch từ mã nguồn (10) | thiếu hướng dẫn; sửa tay header; không cấu hình được; công cụ đóng; không chạy ngoài thư mục nguồn | [BUILD.md](BUILD.md): `make venv deps build test`, cấu hình qua biến môi trường/`.env`, `make install PREFIX=` rồi chạy từ bản đã cài (mục 3) |
 | 5. Thư viện, gói đính kèm (10) | không dùng thư viện hệ thống; đính kèm gói dự án khác; sửa mã gói đính kèm | [THIRD_PARTY.md](THIRD_PARTY.md); phụ thuộc lấy qua npm/PyPI/image chính thức; không có `vendor/` hay mã bên thứ ba trong Git (mục 2) |
-| 6. Tài liệu, giao tiếp (10) | thiếu bug tracker; thiếu changelog; thiếu README | [Issues](https://github.com/Dking2007/DXOS_V2/issues); [CHANGELOG.md](CHANGELOG.md); [README.md](README.md), [docs/installation.md](docs/installation.md) |
+| 6. Tài liệu, giao tiếp (10) | thiếu bug tracker; thiếu changelog; thiếu README | [Issues](https://github.com/Dking2007/DXOS_Desktiny/issues); [CHANGELOG.md](CHANGELOG.md); [README.md](README.md), [docs/installation.md](docs/installation.md) |
 
 ### 5.2 Yêu cầu bắt buộc của đề
 
