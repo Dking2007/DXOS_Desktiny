@@ -95,7 +95,13 @@ docker compose --env-file .env -f infra/compose/compose.yaml --profile workspace
 
 # 3. Nạp dữ liệu demo (hai phòng Hành chính / Kỹ thuật)
 python scripts/seed.py --confirm-demo
+
+# 4. (Tùy chọn) Nạp nội dung minh họa: hồ sơ, công việc, bảng tin, chat, tài liệu
+python scripts/seed_demo.py --confirm-demo
 ```
+
+`seed_demo.py` đăng nhập bằng các tài khoản demo và gọi API công khai; chạy lại không tạo trùng
+(mục demo có tiền tố `[Demo]`). Dùng `--base-url` nếu địa chỉ khác `PUBLIC_BASE_URL` trong `.env`.
 
 `bootstrap.py` **từ chối chạy lại** nếu `.env` hoặc `infra/identity/generated/` đã tồn
 tại — đây là chủ ý, để không xóa secret của deployment đang dùng. Muốn làm lại từ đầu

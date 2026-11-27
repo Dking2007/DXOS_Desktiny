@@ -59,6 +59,7 @@ Nếu cần cổng khác, chạy bootstrap ngay từ đầu với
 ```bash
 docker compose --env-file .env -f infra/compose/compose.yaml --profile workspace up --build -d
 python scripts/seed.py --confirm-demo
+python scripts/seed_demo.py --confirm-demo   # nội dung minh họa (tùy chọn)
 ```
 
 - Workspace: <http://localhost:8080/>
