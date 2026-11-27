@@ -90,8 +90,8 @@ const dirty = computed(
     uploads.value.length > 0 ||
     Object.values(values.value).some((value) => value !== '' && value != null),
 )
-function close() {
-  if (!busy.value && confirmDiscard(dirty.value)) emit('close')
+async function close() {
+  if (!busy.value && await confirmDiscard(dirty.value)) emit('close')
 }
 async function send() {
   if (busy.value || blocked.value) return

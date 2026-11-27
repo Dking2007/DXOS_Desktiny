@@ -3,6 +3,7 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref, useId } from 'vue'
 import { X } from 'lucide-vue-next'
+import { confirmDialog } from '../confirm'
 const props = defineProps<{
   title: string
   wide?: boolean
@@ -20,7 +21,7 @@ async function requestClose() {
   if (closing) return
   closing = true
   try {
-    if (props.dirty && !window.confirm(DISCARD_QUESTION)) return
+    if (props.dirty && !(await confirmDialog({ message: DISCARD_QUESTION, confirmLabel: 'Bỏ thay đổi', danger: true }))) return
     if (props.beforeClose && !(await props.beforeClose())) return
     emit('close')
   } finally {

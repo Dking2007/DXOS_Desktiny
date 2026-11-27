@@ -31,6 +31,7 @@ import { roleLabel } from './ui/labels'
 import { isCollapsed, sidebarPrefs, toggleLabel, toggleSidebar } from './ui/sidebar'
 import { confirmLeaveAll, LOGOUT_QUESTION, resetLeaveConsent } from './ui/unsaved'
 import AvatarPhoto from './components/AvatarPhoto.vue'
+import ConfirmHost from '@dx/web-shared/components/ConfirmHost.vue'
 import AppToaster from './components/shell/AppToaster.vue'
 import BackToTop from './components/shell/BackToTop.vue'
 import CommandPalette from './components/shell/CommandPalette.vue'
@@ -109,7 +110,7 @@ const initials = computed(
       .toUpperCase() ?? '',
 )
 async function logout() {
-  if (loggingOut.value || !confirmLeaveAll(LOGOUT_QUESTION)) return
+  if (loggingOut.value || !(await confirmLeaveAll(LOGOUT_QUESTION))) return
   loggingOut.value = true
   sessionError.value = ''
   try {
@@ -287,4 +288,5 @@ function toggleSidebarCollapsed() {
     <AiBusy />
   </div>
   <AppToaster />
+  <ConfirmHost />
 </template>

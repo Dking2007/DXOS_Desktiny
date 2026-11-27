@@ -142,8 +142,8 @@ const createDirty = computed(
 const createBlocked = computed(() =>
   !title.value.trim() ? 'Nhập tên hồ sơ trước.' : !selectedForm.value ? 'Chọn quy trình trước.' : '',
 )
-function closeCreate() {
-  if (!busy.value && confirmDiscard(createDirty.value)) {
+async function closeCreate() {
+  if (!busy.value && await confirmDiscard(createDirty.value)) {
     showCreate.value = false
     if (route.query.create) router.replace('/cases')
   }

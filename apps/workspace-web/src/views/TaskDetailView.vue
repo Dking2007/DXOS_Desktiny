@@ -188,8 +188,8 @@ const pendingDirty = computed(
     !!assignTarget.value ||
     (pending.value === 'submit' && result.value !== (task.value?.result ?? '')),
 )
-function closePending() {
-  if (!busy.value && confirmDiscard(pendingDirty.value)) pending.value = null
+async function closePending() {
+  if (!busy.value && await confirmDiscard(pendingDirty.value)) pending.value = null
 }
 /** Why the dialog's confirm button cannot go through yet, checked before the server says so. */
 const pendingBlocked = computed(() => {
@@ -274,8 +274,8 @@ async function toggle(index: number) {
 const dueBlocked = computed(() =>
   dueEdit.value && reasonMissing(true, dueEdit.value.reason) ? 'Nêu lý do đổi hạn.' : '',
 )
-function closeDue() {
-  if (!busy.value && confirmDiscard(!!dueEdit.value?.reason.trim())) dueEdit.value = null
+async function closeDue() {
+  if (!busy.value && await confirmDiscard(!!dueEdit.value?.reason.trim())) dueEdit.value = null
 }
 async function changeDue() {
   if (!task.value || !dueEdit.value || dueBlocked.value) return

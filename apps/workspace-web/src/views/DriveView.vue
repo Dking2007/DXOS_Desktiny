@@ -68,6 +68,7 @@ import FilePreview from '../components/FilePreview.vue'
 import DocumentAiDialog from '../ai/DocumentAiDialog.vue'
 import DraftDocumentDialog from '../ai/DraftDocumentDialog.vue'
 import { useAi } from '../ai/useAi'
+import { confirmDialog } from '@dx/web-shared/confirm.ts'
 const queryClient = useQueryClient()
 const session = useSession()
 /** Sharing and trashing belong to the owner only; the API refuses them for collaborators too. */
@@ -580,7 +581,7 @@ async function download(item: DriveFile) {
 }
 async function restore(version: FileVersion) {
   if (!selected.value) return
-  if (!window.confirm(`Khôi phục phiên bản ${version.version_no}? Nội dung hiện tại được giữ lại thành một phiên bản cũ.`)) return
+  if (!(await confirmDialog({ message: `Khôi phục phiên bản ${version.version_no}? Nội dung hiện tại được giữ lại thành một phiên bản cũ.`, confirmLabel: 'Khôi phục', danger: true }))) return
   await perform(() =>
     api.request(`/drive/files/${selected.value!.id}/restore`, {
       method: 'POST',
