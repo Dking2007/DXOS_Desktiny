@@ -10,6 +10,7 @@ path = [
   "LICENSE",
   "NOTICE",
   "README.md",
+  "README_EN.md",
   "BUILD.md",
   "CHANGELOG.md",
   "CONTRIBUTING.md",
