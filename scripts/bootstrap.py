@@ -133,18 +133,19 @@ def create_files(base_url: str, scheme: str = "http") -> list[Path]:
         # ${COOKIE_SECURE:-false} for this to reach the containers.
         "COOKIE_SECURE": "true" if scheme == "https" else "false",
     }
+    # (tài khoản, tên người, chức danh, vai trò, phòng) — chức danh nằm riêng, không thay tên.
     fixtures = [
-        ("director", "Ban giám đốc", "director", "administration"),
-        ("manager", "Lãnh đạo phòng Hành chính", "manager", "administration"),
-        ("staff", "Nhân viên Hành chính", "staff", "administration"),
-        ("manager-b", "Lãnh đạo phòng Kỹ thuật", "manager", "engineering"),
-        ("staff-b", "Nhân viên Kỹ thuật", "staff", "engineering"),
-        ("technical-admin", "Quản trị kỹ thuật", "technical_admin", None),
+        ("director", "Nguyễn Minh Quân", "Giám đốc", "director", "administration"),
+        ("manager", "Trần Thu Hà", "Trưởng phòng Hành chính", "manager", "administration"),
+        ("staff", "Lê Hoàng Nam", "Chuyên viên Hành chính", "staff", "administration"),
+        ("manager-b", "Phạm Quốc Bảo", "Trưởng phòng Kỹ thuật", "manager", "engineering"),
+        ("staff-b", "Võ Ngọc Anh", "Kỹ sư", "staff", "engineering"),
+        ("technical-admin", "Đặng Văn Khoa", "Quản trị kỹ thuật", "technical_admin", None),
     ]
     users = []
     credentials = []
     keycloak_users = []
-    for username, display_name, role, department in fixtures:
+    for username, display_name, job_title, role, department in fixtures:
         subject = str(uuid.uuid4())
         password = secret()
         users.append(
@@ -152,6 +153,7 @@ def create_files(base_url: str, scheme: str = "http") -> list[Path]:
                 "subject": subject,
                 "username": username,
                 "display_name": display_name,
+                "job_title": job_title,
                 "role": role,
                 "department": department,
             }

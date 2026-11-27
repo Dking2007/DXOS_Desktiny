@@ -40,9 +40,6 @@ const today = new Intl.DateTimeFormat('vi-VN', {
   month: 'long',
   year: 'numeric',
 }).format(new Date())
-const firstName = computed(
-  () => session.user?.display_name.split(' ').slice(-1)[0] ?? '',
-)
 const overview = useOverview()
 const ai = useAi()
 // A sector pack may choose which home blocks show; on the right they follow its order.
@@ -151,7 +148,7 @@ const summary = computed(() => {
 <template>
   <section class="welcome-section">
     <div>
-      <h1>Chào {{ firstName }}!</h1>
+      <h1>Chào {{ session.user?.display_name }}!</h1>
       <p>{{ summary }}</p>
     </div>
     <div class="date-block"><CalendarDays :size="16" />{{ today }}</div>
