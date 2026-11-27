@@ -4,15 +4,59 @@ Cảm ơn bạn đã quan tâm. Tài liệu này mô tả cách báo lỗi, đ�
 
 ## Quy trình
 
-1. Tìm hoặc tạo **issue** (mẫu bug / tính năng) trước khi làm; nhận việc bằng cách tự gán (assign).
-2. Tạo nhánh từ `main`: `feat/<mô-tả>`, `fix/<mô-tả>`, `docs/<mô-tả>`.
-3. Commit nhỏ, theo [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `fix:`, `docs:`, `chore:`.
-   Tham chiếu issue: `Fixes #12`. **Dùng tài khoản và email của chính bạn** để lịch sử phản ánh đúng người làm.
+Mỗi thay đổi đi qua cùng một vòng đời:
+
+1. **Issue**: tìm hoặc tạo issue (mẫu bug / tính năng), gắn **label** và **milestone**, tự gán (assign) mình làm.
+2. **Nhánh** tạo từ `main`: `feat/<số-issue>-<mô-tả>`, `fix/<số-issue>-<mô-tả>` hoặc `docs/<số-issue>-<mô-tả>`.
+3. **Commit** nhỏ, theo [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `fix:`, `docs:`, `chore:`.
+   **Dùng tài khoản và email của chính bạn** để lịch sử phản ánh đúng người làm.
    Trước commit đầu tiên: `git config user.name "Tên của bạn"` và `git config user.email "email-gắn-với-tài-khoản-GitHub"`
    (đừng để git dùng tên mặc định như `unknown`). Kiểm tra: `git log --format="%an <%ae>" -3`. Nếu cùng một người xuất hiện
    dưới nhiều tên, thêm một dòng vào [.mailmap](.mailmap).
-4. Cập nhật [CHANGELOG.md](CHANGELOG.md) mục `[Unreleased]` trong **cùng PR** với thay đổi.
-5. Mở Pull Request; CI phải xanh (lint, test, build, `compliance`). Cần ít nhất một người duyệt.
+4. **Pull Request** có `Fixes #<số-issue>` trong mô tả, điền checklist của [mẫu PR](.github/pull_request_template.md), và
+   cập nhật [CHANGELOG.md](CHANGELOG.md) mục `[Unreleased]` trong **cùng PR**.
+5. **Duyệt**: CI xanh (lint, test, build, `compliance`) và ít nhất **một người khác** duyệt; không tự duyệt PR của mình.
+6. **Merge** vào `main` rồi **xóa nhánh**.
+7. Khi xong một phạm vi (milestone), làm **phát hành** theo mục dưới.
+
+## Phát hành
+
+Chỉ làm khi phạm vi của milestone đã xong. Mọi bước dưới đây chạy ở thư mục gốc kho.
+
+1. Tạo nhánh `release/x.y.z` từ `main` và đặt số phiên bản mới ở **mọi** chỗ sau (hiện là `3.1.0`):
+   - `package.json`
+   - `apps/core-admin/package.json`, `apps/shared/package.json`, `apps/workspace-web/package.json`; trong hai tệp
+     `apps/core-admin` và `apps/workspace-web` còn phải sửa phụ thuộc `"@dx/web-shared"`
+   - `package-lock.json`: không sửa tay, chạy `npm install --package-lock-only`
+   - `packages/platform-kit/pyproject.toml`
+   - `services/core-api/pyproject.toml` và `services/workspace-api/pyproject.toml`; trong cả hai còn phải sửa
+     `dx-platform-kit==x.y.z`
+   - `version=` trong `services/core-api/src/dx_core/main.py` và `services/workspace-api/src/dx_workspace/main.py`
+     (đây là phiên bản hiện trong OpenAPI)
+2. Sinh lại hợp đồng API và kiểu TypeScript: `python scripts/export_contracts.py` (ghi `contracts/*.openapi.json`),
+   rồi `npm run generate:api`.
+3. Chuyển mục `[Unreleased]` của [CHANGELOG.md](CHANGELOG.md) thành `## [x.y.z] - ngày`; workflow phát hành lấy ghi chú
+   từ chính mục này.
+4. Chạy `make check` (lint và test) phải xanh, mở PR `release/x.y.z`, duyệt và merge vào `main`.
+5. Gắn tag `vx.y.z` trên `main` rồi đẩy tag. Workflow [release.yml](.github/workflows/release.yml) tự tạo Release kèm
+   `dxos-x.y.z.tar.gz` và `SHA256SUMS`.
+6. Kiểm bản phát hành: tải hai tệp vào cùng thư mục và chạy `sha256sum -c SHA256SUMS`, phải báo `OK`.
+
+### Quy tắc đánh số (SemVer)
+
+| Thay đổi | Tăng |
+|---|---|
+| Sửa lỗi, không đổi hành vi công khai | PATCH (`x.y.Z`) |
+| Tính năng mới tương thích ngược | MINOR (`x.Y.0`) |
+| Phá vỡ tương thích: bỏ API hoặc cột, đổi định dạng dữ liệu | MAJOR (`X.0.0`) |
+
+Phiên bản kế tiếp là **3.2.0**. Không bao giờ gắn lại (re-tag) hay xóa một tag đã đẩy, và không bao giờ lùi số phiên bản;
+nếu bản phát hành có lỗi thì sửa và phát hành số mới.
+
+Các gói Python tách riêng giữ số phiên bản **riêng**, không đi theo số của nền tảng: `dx-flowkit` (`packages/flowkit`,
+hiện 0.2.0), `desktiny-plugin` (`packages/desktiny-plugin`, hiện 0.3.0), `dx-piivn` (`packages/pii-vn`, hiện 0.1.0).
+Chỉ tăng khi chính gói đó đổi; nếu `dx-flowkit` đổi số thì sửa cả ràng buộc `dx-flowkit==` trong
+`services/core-api/pyproject.toml` và `services/workspace-api/pyproject.toml`.
 
 ## Môi trường và kiểm tra cục bộ
 
