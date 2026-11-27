@@ -391,7 +391,7 @@ const previewLinks = computed(() =>
             <div class="pack-assets">
               <div v-for="role in ['logo', 'favicon'] as const" :key="role" class="pack-asset">
                 <span class="pack-asset-box"
-                  ><img v-if="assetUrls[role]" :src="assetUrls[role]!" alt="" /><ImagePlus v-else :size="20"
+                  ><img v-if="assetUrls[role]" :src="assetUrls[role]!" alt="" width="52" height="52" /><ImagePlus v-else :size="20"
                 /></span>
                 <div>
                   <strong>{{ role === 'logo' ? 'Logo' : 'Biểu tượng tab (favicon)' }}</strong>

@@ -137,7 +137,7 @@ function toggleSidebarCollapsed() {
       <div class="sidebar-head">
         <RouterLink to="/home" class="brand" aria-label="Trang chủ"
           ><span class="brand-mark" :class="{ 'has-logo': !!brand.logo }" aria-hidden="true"
-            ><img v-if="brand.logo" :src="brand.logo" alt="" /><template v-else>{{
+            ><img v-if="brand.logo" :src="brand.logo" alt="" width="28" height="28" /><template v-else>{{
               brand.name.charAt(0)
             }}</template></span
           ><span class="brand-text"
