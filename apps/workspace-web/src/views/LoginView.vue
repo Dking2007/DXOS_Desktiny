@@ -528,7 +528,9 @@ const SPECKS = [
 .entry-title {
   margin: calc(var(--u) * 2.2) 0 0;
   font-size: clamp(21px, min(4.1vw, calc(var(--u) * 5.6)), 56px);
-  line-height: 1.22;
+  line-height: 1.35;
+  /* background-clip: text paints only inside the box; stacked marks (Ử, Ệ) need room. */
+  padding-block: 0.18em 0.08em;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.01em;
