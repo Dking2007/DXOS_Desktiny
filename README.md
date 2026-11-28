@@ -41,7 +41,7 @@ nhãn. Bật ONLYOFFICE, đổi cổng hay chỉ chạy Core: xem [Cài đặt](
 
 | Việc cần làm | Desktiny có |
 |---|---|
-| Giao việc và theo dõi tới khi xong | Giao cho người hoặc đơn vị; việc con, checklist; trả lại, báo vướng, đổi hạn đều cần lý do và ghi lịch sử. Xem dạng danh sách, Kanban, nhóm theo hạn; trang chủ là *Việc cần làm hôm nay* |
+| Giao việc và theo dõi tới khi xong | Giao cho người hoặc đơn vị; việc con, checklist; trả lại, báo vướng, đổi hạn đều cần lý do và ghi lịch sử. Xem dạng giấy (mỗi việc một tờ) hoặc danh sách; trang chủ là *Việc cần làm hôm nay* |
 | Trình và duyệt hồ sơ | Biểu mẫu có trường ẩn/hiện theo điều kiện; duyệt, trả lại, từ chối, xin ý kiến song song; ủy quyền phê duyệt có thời hạn; thu hồi hồ sơ khi chưa ai quyết định; tab *Quy trình* cho biết hồ sơ đang chờ ai |
 | Tự thiết kế quy trình, không viết mã | Trình thiết kế dạng canvas kéo thả: điều kiện, chờ, thông báo, tạo việc, webhook, bước duyệt. Chạy thử với dữ liệu mẫu, xem lại từng lượt chạy trên canvas; hồ sơ đi theo phiên bản quy trình đã phát hành |
 | Quản lý tài liệu | Kho tài liệu có thư mục, chia sẻ kế thừa theo thư mục, phiên bản, nhãn, sao chép; xem PDF, ảnh, video ngay trong ứng dụng; mở tệp Office bằng ONLYOFFICE (tùy chọn) |
