@@ -1310,7 +1310,9 @@ def build_router(app):
         """Take a submitted dossier back before anyone has decided on it.
 
         The submission snapshot stays in history; pending approval tasks are closed here at
-        once so nobody can decide on a dossier its owner has pulled back.
+        once so nobody can decide on a dossier its owner has pulled back. A dossier whose flow
+        stopped without a result (a failed step) may be taken back even after decisions, so it
+        is never stuck "đang xử lý" with nothing left to do.
         """
         user = context(db, actor)
         value = db.scalar(
@@ -1331,16 +1333,18 @@ def build_router(app):
             )
         )
         tasks = list(db.scalars(select(m.ApprovalTask).where(m.ApprovalTask.submission_id == submission.id)))
-        if any(task.decision for task in tasks):
+        stuck = submission.state == "configuration_error"
+        if not stuck and any(task.decision for task in tasks):
             raise AppError(409, "case_already_decided", "Đã có người duyệt ra quyết định; không thể thu hồi.")
         for task in tasks:
-            task.state, task.revision = "cancelled", task.revision + 1
+            if task.state == "pending" or not stuck:
+                task.state, task.revision = "cancelled", task.revision + 1
         submission.state = "withdrawn"
         cas(db, m.Case, case_id, body.expected_revision, {"status": "draft", "updated_at": m.utcnow()})
         # Cancelling the Core run happens in the worker; a run not started yet is never started.
         enqueue(db, "case.withdraw", submission.id)
-        audit(db, user, "case.withdrawn", case_id, {"submission_id": submission.id, "reason": body.reason})
-        for task in tasks:
+        audit(db, user, "case.withdrawn", case_id, {"submission_id": submission.id, "reason": body.reason, "stuck": stuck})
+        for task in (t for t in tasks if t.state == "cancelled"):
             notify(
                 db, task.assignee_id, "withdrawn:" + task.id, "Hồ sơ đã được thu hồi: " + value.title, case_id
             )

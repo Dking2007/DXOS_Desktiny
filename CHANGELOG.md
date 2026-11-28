@@ -89,6 +89,9 @@ duy nhất là luồng đăng nhập OIDC.
   (3e8aa00).
 
 ### Fixed
+- Hồ sơ không còn kẹt ở "Đang xử lý" khi một nhánh quy trình hết bước mà không có bước Kết thúc (ví dụ kết thúc bằng "Gửi thông
+  báo"): hồ sơ nhận quyết định cuối cùng trên đường đi (duyệt, trả lại, từ chối), không có quyết định nào thì là đã duyệt;
+  diễn tập quy trình báo cùng kết quả. Hồ sơ đã kẹt vì một bước lỗi thì người tạo thu hồi được (B1).
 - Tiêu đề màn đăng nhập không còn bị cắt dấu tiếng Việt (Ử, Ệ…).
 - Thanh trên cùng không tràn ngang ở 390 px; tên tổ chức và đường dẫn trang không bị rút khi còn chỗ.
 - Canvas quy trình mở vừa khung, tên bước hai dòng, nhãn nhánh dễ đọc, gọn trên điện thoại.
