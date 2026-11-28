@@ -46,6 +46,7 @@ nhãn. Bật ONLYOFFICE, đổi cổng hay chỉ chạy Core: xem [Cài đặt](
 | Tự thiết kế quy trình, không viết mã | Trình thiết kế dạng canvas kéo thả: điều kiện, chờ, thông báo, tạo việc, webhook, bước duyệt. Chạy thử với dữ liệu mẫu, xem lại từng lượt chạy trên canvas; hồ sơ đi theo phiên bản quy trình đã phát hành |
 | Quản lý tài liệu | Kho tài liệu có thư mục, chia sẻ kế thừa theo thư mục, phiên bản, nhãn, sao chép; xem PDF, ảnh, video ngay trong ứng dụng; mở tệp Office bằng ONLYOFFICE (tùy chọn) |
 | Trao đổi, tìm và báo cáo | Nhắn tin riêng, nhóm, kênh phòng ban kèm ảnh, video, tệp; bảng tin toàn tổ chức hoặc phòng ban; tìm kiếm chung gõ không dấu vẫn ra ("bao cao" tìm thấy "Báo cáo") và chỉ trả kết quả người tìm được xem; báo cáo việc quá hạn, hồ sơ theo trạng thái, xuất CSV |
+| An toàn và vận hành | Đăng nhập một lần qua Keycloak; tài khoản demo `lanh-dao-mfa` bắt buộc mã TOTP ở lần đăng nhập đầu. Quét mã độc tệp tải lên bằng ClamAV (tùy chọn, mặc định tắt). Cảnh báo dữ liệu cá nhân (CCCD, số điện thoại, e-mail…) trong tệp và xem bản đã che. Sao lưu, khôi phục bằng `scripts/backup.py`, `restore.py` (diễn tập 28/11/2026: 3,9 s và 6,2 s ở quy mô demo) |
 | Trợ giúp bằng AI (tùy chọn, mặc định tắt) | Trợ lý trả lời từ kho kiến thức do quản trị nhập; 19 tính năng AI bật riêng từng cái (đọc tài liệu điền sẵn biểu mẫu, tóm tắt hồ sơ, soạn văn bản theo Nghị định 30/2020, tìm theo ý nghĩa…). AI chỉ đề xuất, không tự trình, duyệt hay gửi đi. Cần dịch vụ AI do tổ chức tự cấu hình |
 
 <p>
@@ -77,6 +78,8 @@ bản gồm một [gói giao diện](docs/packs.md) (từ ngữ, màu, quy trìn
 | **Một cửa cấp xã** | Bộ phận một cửa của UBND cấp xã: thủ tục hộ tịch, chứng thực, hòa giải | Sổ văn bản, Ký số, Tiếp nhận trực tuyến, Tính hạn, Đọc giấy tờ |
 | **Nhân sự doanh nghiệp** | Bộ phận nhân sự: quy trình đơn từ, quy chế cho trợ lý | Chấm công GPS, Tiền lương và KPI, Nhắc hạn hồ sơ |
 | **Văn thư – điều hành** | Văn thư, văn phòng: văn bản đến, văn bản đi, nộp lưu | Sổ văn bản đến; dùng chung Sổ văn bản, Ký số, Tính hạn |
+| **Vận hành – giám sát thiết bị** | Thiết bị gửi số đo qua HTTP; vượt ngưỡng thì luồng tạo hồ sơ sự cố, giao người phụ trách | Cảm biến thiết bị |
+| **Quản trị dữ liệu** (minh họa) | Hồ sơ đã kết thúc chép ra tệp JSONL theo tháng, nối chuỗi sha256, che dữ liệu cá nhân, truy về hồ sơ gốc; đánh dấu tháng cần chuyển kho lạnh | Lưu trữ lịch sử |
 
 Đây là bản mẫu: tên cơ quan là tên giả, thời hạn và mức tiền chỉ để minh họa, ký số là mô phỏng. **Tương thích:**
 bản mở rộng 1.1.0 cần Desktiny **3.1.0** trở lên.
@@ -155,7 +158,12 @@ Test doubles kiểm được logic nhưng không thay nghiệm thu khóa Postgre
 - **Chưa có chữ ký số có giá trị pháp lý.** Quyền phê duyệt và nhật ký kiểm toán không thay chữ ký số; plugin Ký số
   trong bản mở rộng Một cửa là mô phỏng.
 - **Chưa có ứng dụng di động native**; trên điện thoại dùng bản web.
-- **Chưa quét antivirus/mã độc** tệp tải lên; hiện chỉ kiểm định dạng, chữ ký nội dung và giới hạn kích thước.
+- **Quét mã độc là tùy chọn**, mặc định tắt (profile `security`, biến `CLAMAV_HOST`); khi bật, lỗi quét thì từ chối
+  tệp. Chỉ quét lúc tải lên, tệp đã lưu không được quét lại khi có chữ ký mới.
+- **MFA mới bắt buộc cho một tài khoản demo** (`lanh-dao-mfa`); các tài khoản demo khác không có yếu tố thứ hai để seed
+  và e2e chạy được. Production cần bật MFA cho vai trò lãnh đạo, quản trị (xem [docs/security.md](docs/security.md)).
+- **Cảm biến** chỉ nhận số đo qua HTTP, chưa có MQTT, OPC UA hay cơ sở dữ liệu chuỗi thời gian; **lưu trữ lịch sử** là
+  tệp JSONL minh họa, không phải data lake.
 - **AI cần dịch vụ bên ngoài** (Claude, OpenAI, Gemini, DeepSeek) hoặc máy chủ AI riêng (Ollama, vLLM) do tổ chức
   cấu hình. Đã kiểm bằng dịch vụ giả và một lần chạy thật với Ollama (31/10/2026); chưa thử với Claude, OpenAI,
   Gemini thật.
