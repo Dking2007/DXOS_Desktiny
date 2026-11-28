@@ -523,7 +523,9 @@ export interface paths {
          * @description Take a submitted dossier back before anyone has decided on it.
          *
          *     The submission snapshot stays in history; pending approval tasks are closed here at
-         *     once so nobody can decide on a dossier its owner has pulled back.
+         *     once so nobody can decide on a dossier its owner has pulled back. A dossier whose flow
+         *     stopped without a result (a failed step) may be taken back even after decisions, so it
+         *     is never stuck "đang xử lý" with nothing left to do.
          */
         post: operations["withdraw_case_workspace_v1_cases__case_id__withdraw_post"];
         delete?: never;
