@@ -38,6 +38,48 @@ job lỗi, API không được khởi động thành công giả.
   không rotate dữ liệu đã lưu. Không xóa volume để sửa lỗi production.
 - Seed không tìm subject: chỉ seed từ `demo-users.json` đi cùng realm đã import.
 
+## Sao lưu và khôi phục
+
+Hai script chuẩn (Python stdlib, chạy trên Windows/Linux, cần Docker Compose; không in secret):
+
+```bash
+# Sao lưu: 3 DB (pg_dump -Fc) + volume object storage (tar.gz) + manifest.json (kích thước, SHA-256)
+python scripts/backup.py --project dxos-main --env-file .env --out /duong/dan/ngoai/repo
+
+# Khôi phục vào project đích đã chạy sẵn postgres + object-storage (cùng mật khẩu .env)
+docker compose -p dx-restore --env-file .env -f infra/compose/compose.yaml --profile core up -d --no-deps postgres object-storage
+python scripts/restore.py <thu-muc-backup> --project dx-restore --env-file .env --confirm
+```
+
+`restore.py` kiểm SHA-256 trước, từ chối chạy thiếu `--confirm`, từ chối nếu DB đích đã có bảng (trừ `--force`,
+dùng `pg_restore --clean`), và không dùng `--no-owner` (xem lỗi 31/10 bên dưới).
+
+**Có phạm vi:** `dx_core`, `dx_workspace`, `dx_identity` (gồm realm/user Keycloak đã lưu trong DB) và toàn bộ object
+storage (RustFS). **Chưa phạm vi:** `.env` và khóa mã hóa (backup tách biệt, có kiểm soát truy cập), dữ liệu
+ONLYOFFICE, broker (cache), realm JSON sinh từ bootstrap, image/source. Tar volume khi hệ thống đang ghi không phải
+snapshot nhất quán giữa DB và object; muốn RPO chặt thì dừng ghi trong lúc sao lưu.
+
+### Diễn tập đo 28/11/2026 (Docker Desktop 29.9 trên Windows 11, máy phát triển 20 luồng CPU, PostgreSQL 17.5)
+
+Nguồn: stack đang chạy `dxos-main` (chỉ đọc, không dừng); đích: project tạm `dxos-restore-test` chỉ gồm
+`postgres` và `object-storage`, đã `down -v` sau khi đối chiếu.
+
+| Mục | Kết quả |
+|---|---|
+| Backup | 3,9 giây (dx_core 82.561 B, dx_workspace 747.531 B, dx_identity 217.920 B, objects.tar.gz 10.831 B) |
+| Restore (gồm kiểm SHA-256, dừng/khởi động lại object-storage) | 6,2 giây |
+| Đối chiếu số dòng | khớp: records 10, audit_logs 65, storage_files 7, human_tasks 9, resources 17 (Core); cases 10, tasks 7, users 6, audit_logs 134, drive_files 7 (Workspace); user_entity 9, client 17 (Identity) |
+| Object | 23 tệp / 179.381 B ở nguồn; mọi tệp dữ liệu giống hệt về đường dẫn và kích thước ở đích (đích có thêm 1 tệp khóa 0 B do RustFS tự tạo khi chạy) |
+| Từ chối an toàn | thiếu `--confirm` bị chặn; DB đích có 23 bảng bị chặn khi không có `--force` |
+
+Giải thích số: dữ liệu demo rất nhỏ nên thời gian ngắn; RTO thực tế sẽ tăng theo kích thước dữ liệu và chưa gồm
+thời gian dựng hạ tầng, nạp `.env`, khởi động API/gateway. Chưa đo: đăng nhập SSO trên môi trường đã khôi phục,
+tải tệp qua API, workflow đang chờ.
+
+**RPO khuyến nghị:** sao lưu mỗi ngày (cron/Task Scheduler gọi `backup.py`), tức mất tối đa tới 24 giờ dữ liệu;
+giảm xuống theo nhu cầu vì một lần backup chỉ mất vài giây ở quy mô này. **RTO đã đo:** 6,2 giây cho bước khôi phục
+dữ liệu ở quy mô demo; hãy đo lại trên dữ liệu thật của bạn trước khi cam kết.
+
 ## Backup
 
 Chưa có cam kết RPO/RTO. Đặt lịch chỉ sau khi restore đã thử và đo. Tối thiểu backup:
