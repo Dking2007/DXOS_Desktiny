@@ -312,6 +312,10 @@ time {
     width: 36px;
     height: 36px;
   }
+  /* Without this the five buttons on the right outgrow a 390px bar and logout is cut off. */
+  .topbar .page-help {
+    display: none;
+  }
   .topbar-title,
   .topbar > :first-child {
     min-width: 0;
