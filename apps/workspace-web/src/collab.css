@@ -261,7 +261,9 @@
   font-size: 0.75rem;
 }
 .topbar-search {
-  flex: 1;
+  /* The breadcrumb keeps its natural width; the search takes what is left, up to 420px. */
+  flex: 1 1 0;
+  min-width: 160px;
   max-width: 420px;
   display: flex;
   align-items: center;

@@ -669,6 +669,7 @@ kbd {
   }
   .topbar-search {
     flex: none;
+    min-width: 0;
     width: 40px;
     padding: 0;
     justify-content: center;

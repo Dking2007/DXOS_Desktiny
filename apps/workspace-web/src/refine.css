@@ -852,6 +852,7 @@ a.user-profile:focus-visible {
 }
 /* Larger text never wraps the top bar onto two lines; long names end in an ellipsis instead. */
 .topbar-location {
+  flex: 0 1 auto;
   min-width: 0;
   white-space: nowrap;
 }

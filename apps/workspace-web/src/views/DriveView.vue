@@ -677,7 +677,7 @@ function clearUpload() {
           :title="owns(item) ? item.name : `${item.name} · được chia sẻ bởi ${ownerName(item)}`"
           @click="enter(item)"
         >
-          <FolderClosed :size="23" /><span>{{ item.name }}</span
+          <FolderClosed :size="23" /><span :title="item.name">{{ item.name }}</span
           ><ChevronRight :size="14" class="folder-open-arrow" aria-hidden="true" />
         </button>
         <div class="folder-tools">
