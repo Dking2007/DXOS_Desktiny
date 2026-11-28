@@ -6,6 +6,22 @@ không có Release nên ghi ngày commit `f089bfb`. Mỗi mục trỏ tới comm
 đổi vào `main` qua pull request. Bản có nhiều thay đổi để chi tiết riêng trong `docs/changes/`.
 So sánh V1 → V2: [docs/V2_CHANGES.md](docs/V2_CHANGES.md); V2 → V3: [docs/V3_CHANGES.md](docs/V3_CHANGES.md).
 
+### Ghi chú về đánh số phiên bản (ghi bổ sung ngày 28/11/2026)
+
+Đối chiếu lại các tag đã phát hành với SemVer bằng cách so hợp đồng API giữa từng cặp tag. Các tag đã phát hành
+giữ nguyên, vì SemVer không cho sửa một phiên bản đã phát hành; các sai lệch dưới đây chỉ được ghi lại.
+- `0.2.2` thêm 17 thao tác API Workspace (tính năng mới tương thích) nhưng chỉ tăng số cuối. Theo SemVer, đúng ra
+  phải là `0.3.0`.
+- Tag `v0.2.0` và `v0.2.1` gắn lên mã có `package.json` vẫn ghi `0.1.0`, nên gói nguồn của hai bản này tự báo số
+  0.1.0. Từ `v0.2.2` thì số trong mã khớp với tag.
+- `0.2.2` → `3.0.0` xóa 15 thao tác API và cột `cases.assignee_id`, nên tăng số chính là đúng. Việc bỏ qua 1.x, 2.x
+  để khớp tên gọi V3 được giải thích ở [docs/V3_CHANGES.md](docs/V3_CHANGES.md).
+- `3.0.0` → `3.1.0` không đổi API công khai, chỉ thêm tính năng (plugin `.zip` qua route sẵn có), nên tăng số giữa
+  là đúng. Bản kế tiếp `3.2.0` cũng chỉ thêm tính năng.
+
+Từ bản kế tiếp, workflow phát hành chạy `scripts/check_version.py` để chặn ba lỗi trên: số phiên bản lệch giữa các
+tệp, tag không khớp với mã hoặc CHANGELOG, và tăng số không đủ so với thay đổi API.
+
 ## [Unreleased]
 
 Nâng cấp trải nghiệm người dùng của Workspace (PR #40, nhánh `feat/ui-ux-nang-cap`; đã vào `main`, chưa gắn tag):
