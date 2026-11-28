@@ -89,6 +89,8 @@ duy nhất là luồng đăng nhập OIDC.
   (3e8aa00).
 
 ### Fixed
+- `desktiny-plugin check` (và bước đóng gói dùng nó) kiểm cả độ dài tiêu đề, mô tả và cấu trúc ô cấu hình (`settings_schema`,
+  `config_schema`, `parameters`) như Desktiny, nên không còn manifest qua bước kiểm mà bị từ chối khi cài.
 - Tiêu đề màn đăng nhập không còn bị cắt dấu tiếng Việt (Ử, Ệ…).
 - Thanh trên cùng không tràn ngang ở 390 px; tên tổ chức và đường dẫn trang không bị rút khi còn chỗ.
 - Canvas quy trình mở vừa khung, tên bước hai dòng, nhãn nhánh dễ đọc, gọn trên điện thoại.
