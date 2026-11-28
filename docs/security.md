@@ -80,3 +80,18 @@ bằng SQL bị phát hiện. Chuỗi không chống được người ghi lại
 hash; muốn chống điều đó phải lưu `head` ở nơi quản trị DB không sửa được (chưa làm).
 Audit của Workspace và các dòng Core ghi trước `core_0003` chưa có chuỗi.
 Không log Authorization/cookie/secret hoặc toàn bộ nội dung tài liệu.
+
+## Cảnh báo dữ liệu cá nhân trong tệp
+
+Khi xem trước một tệp trong Kho tài liệu, Workspace gọi `GET
+/workspace/v1/drive/files/{id}/pii` (thêm `?redacted=true` để lấy văn bản đã che). Route
+dùng cùng quyền đọc tệp như tải về, đếm số CCCD, CMND, điện thoại, tài khoản, mã số thuế
+và e-mail bằng `dx-piivn`, rồi hiện một cảnh báo không chặn kèm nút "Xem bản đã che".
+Giá trị tìm thấy không được ghi log hay lưu; chỉ số lượng và bản đã che được trả về.
+
+Giới hạn: đây là gợi ý, không phải DLP. Chỉ đọc được chữ trong PDF có lớp văn bản, Word,
+Excel, PowerPoint và văn bản thuần (ảnh và bản scan không được kiểm tra); mỗi trang bị cắt
+ở 6.000 ký tự và tối đa 60 trang; tệp trên 20 MB bỏ qua. CCCD chỉ được kiểm tra cấu trúc,
+không có chữ số kiểm tra. Danh sách mã tỉnh trong `dx-piivn` chưa đối chiếu với văn bản
+chính thức, nên có thể bỏ sót hoặc báo thừa; số tài khoản và mã số thuế chỉ nhận khi có
+từ khoá đứng trước.
