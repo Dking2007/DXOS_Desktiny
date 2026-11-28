@@ -64,6 +64,9 @@ duy nhất là luồng đăng nhập OIDC.
 - Hiệu năng: canvas không tuần tự hóa sơ đồ trong lúc kéo bước và không vẽ lại cả trang theo từng khung thu phóng
   (c5d4bb9); nhắn tin và bảng tin chỉ vẽ lại dòng/bài thay đổi khi gõ phím (0c682f3); bộ định dạng ngày/dung lượng
   dùng lại thay vì tạo mới mỗi dòng; danh mục ít đổi không tải lại mỗi lần quay lại cửa sổ (9bf7477, c5d4bb9).
+- Bộ chọn người có tìm kiếm thay ô chọn thường ở "Chuyển cho", cấu hình bước quy trình (người nhận, giao cho, đơn vị
+  nhận, chuyển cấp) và thiết kế biểu mẫu (4e38e30); chặn tạo biểu mẫu khi bước "người cụ thể" chưa chọn người
+  (3e8aa00).
 
 ### Fixed
 - Tiêu đề màn đăng nhập không còn bị cắt dấu tiếng Việt (Ử, Ệ…).
