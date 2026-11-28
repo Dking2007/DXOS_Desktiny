@@ -57,6 +57,18 @@ class DeploymentContractTests(unittest.TestCase):
         with patch.dict(os.environ, self.services[service]["environment"], clear=True):
             return cls(_env_file=None)
 
+    def test_exactly_one_demo_account_requires_totp(self):
+        required = {
+            user["username"]: user.get("requiredActions")
+            for user in self.realm["users"]
+            if not user["username"].startswith("service-account-")
+        }
+        self.assertEqual(required.pop("lanh-dao-mfa"), ["CONFIGURE_TOTP"])
+        self.assertFalse(any(required.values()))
+        credentials = (self.bootstrap.GENERATED / "demo-credentials.txt").read_text(encoding="utf-8")
+        mfa_line = next(line for line in credentials.splitlines() if line.startswith("lanh-dao-mfa:"))
+        self.assertIn("TOTP", mfa_line)
+
     def test_bff_and_service_claim_contracts(self):
         clients = {client["clientId"]: client for client in self.realm["clients"]}
         for service, cls, client_id, audience, prefix in (
