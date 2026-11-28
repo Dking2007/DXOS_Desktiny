@@ -208,8 +208,8 @@ const initial = snapshot()
 const savedOnce = ref(false)
 const dirty = computed(() => !savedOnce.value && snapshot() !== initial)
 const { confirmDiscard } = useUnsavedGuard(dirty)
-function close() {
-  if (confirmDiscard()) emit('close')
+async function close() {
+  if (await confirmDiscard()) emit('close')
 }
 
 const uploading = ref<'' | 'logo' | 'favicon' | 'background'>('')

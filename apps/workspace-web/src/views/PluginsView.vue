@@ -26,6 +26,7 @@ import { errorText, formatDate } from '@dx/web-shared/api.ts'
 import StatePanel from '@dx/web-shared/components/StatePanel.vue'
 import ModalDialog from '@dx/web-shared/components/ModalDialog.vue'
 import { toast } from '../ui/toast'
+import { confirmDialog } from '@dx/web-shared/confirm.ts'
 
 interface Labelled {
   key: string
@@ -330,13 +331,13 @@ async function act(row: PluginRow, path: 'enabled' | 'rotate', body: Record<stri
   if (busy.value) return
   if (
     path === 'rotate' &&
-    !window.confirm(`Đổi khoá của “${row.name}”? Khoá và token cũ hết hiệu lực ngay; máy chủ plugin cần cập nhật khoá mới.`)
+    !(await confirmDialog({ message: `Đổi khoá của “${row.name}”? Khoá và token cũ hết hiệu lực ngay; máy chủ plugin cần cập nhật khoá mới.`, confirmLabel: 'Đổi khoá', danger: true }))
   )
     return
   if (
     path === 'enabled' &&
     body.enabled === false &&
-    !window.confirm(`Tắt “${row.name}”? Mọi token của plugin hết hiệu lực, khung giao diện và bước quy trình tạm dừng.`)
+    !(await confirmDialog({ message: `Tắt “${row.name}”? Mọi token của plugin hết hiệu lực, khung giao diện và bước quy trình tạm dừng.`, confirmLabel: 'Tắt plugin', danger: true }))
   )
     return
   busy.value = true

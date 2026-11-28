@@ -11,6 +11,7 @@ import { api } from '../api'
 import { toast } from '../ui/toast'
 import { confirmDiscard } from '../ui/unsaved'
 import { GATEWAY_ICONS, GATEWAY_PROTOCOLS, gatewayEndpoint, PROVIDER_LOGOS } from './logos'
+import { confirmDialog } from '@dx/web-shared/confirm.ts'
 
 const props = defineProps<{
   providers: AssistantProvider[]
@@ -111,8 +112,8 @@ async function fetchModels() {
     loadingModels.value = false
   }
 }
-function close() {
-  if (!busy.value && confirmDiscard(state() !== opened.value)) dialog.value = null
+async function close() {
+  if (!busy.value && await confirmDiscard(state() !== opened.value)) dialog.value = null
 }
 const canSave = computed(
   () =>
@@ -202,7 +203,7 @@ async function activate(item: AssistantProvider) {
 async function remove(item: AssistantProvider) {
   if (rowBusy.value) return
   const warning = item.active ? ' Đây là dịch vụ đang dùng: trợ lý sẽ ngừng trả lời cho tới khi chọn dịch vụ khác.' : ''
-  if (!window.confirm(`Xóa dịch vụ “${item.name}” và khóa API đã lưu?${warning}`)) return
+  if (!(await confirmDialog({ message: `Xóa dịch vụ “${item.name}” và khóa API đã lưu?${warning}`, confirmLabel: 'Xóa dịch vụ', danger: true }))) return
   rowBusy.value = `${item.id}:remove`
   try {
     await api.request(`/assistant/providers/${item.id}`, { method: 'DELETE' })

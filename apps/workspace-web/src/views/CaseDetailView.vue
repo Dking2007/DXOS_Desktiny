@@ -154,8 +154,8 @@ const evidenceBlocked = computed(() =>
         ? 'Dán câu trích từ tài liệu.'
         : '',
 )
-function cancelEvidence() {
-  if (busy.value || !askDiscard(!!evidenceQuote.value.trim() || !!evidenceValue.value.trim())) return
+async function cancelEvidence() {
+  if (busy.value || !(await askDiscard(!!evidenceQuote.value.trim() || !!evidenceValue.value.trim()))) return
   manualEvidence.value = false
   evidenceField.value = ''
   evidenceFile.value = ''
@@ -357,8 +357,8 @@ const CLOSING: Record<Closing, { title: string; text: string; button: string; do
   },
 }
 const closingReason = ref('')
-function dismissClosing() {
-  if (!busy.value && askDiscard(!!closingReason.value.trim())) closing.value = null
+async function dismissClosing() {
+  if (!busy.value && await askDiscard(!!closingReason.value.trim())) closing.value = null
 }
 async function closeCase() {
   const value = detail.data.value
@@ -510,8 +510,8 @@ function startEdit() {
   editing.value = true
   tab.value = 'info'
 }
-function stopEdit() {
-  if (confirmDiscard()) editing.value = false
+async function stopEdit() {
+  if (await confirmDiscard()) editing.value = false
 }
 async function refresh() {
   await queryClient.invalidateQueries({ queryKey: ['case', id] })
@@ -565,9 +565,9 @@ const confirmBlocked = computed(() => {
     return 'Chưa lấy được danh sách người nhận. Thử lại trước khi trình.'
   return ''
 })
-function dismissConfirmation() {
+async function dismissConfirmation() {
   const typed = !!reason.value.trim() || Object.values(corrections.value).some((value) => value !== '' && value != null)
-  if (!busy.value && askDiscard(typed)) confirmation.value = null
+  if (!busy.value && await askDiscard(typed)) confirmation.value = null
 }
 function changedCorrections() {
   const values: Record<string, unknown> = {}
@@ -585,7 +585,7 @@ const DONE = {
   return: 'Đã trả hồ sơ cho người tạo',
   withdraw: 'Đã thu hồi hồ sơ về bản nháp',
 }
-async function confirm() {
+async function submitConfirmation() {
   if (!detail.data.value || busy.value || confirmBlocked.value) return
   busy.value = true
   error.value = null
@@ -1383,7 +1383,7 @@ function moveTab(step: number) {
     ><div v-if="error" class="notice error error-inline" role="alert">
       {{ errorText(error) }}
     </div>
-    <form @submit.prevent="confirm">
+    <form @submit.prevent="submitConfirmation">
       <div class="stack">
         <p>
           <strong>{{ detail.data.value?.title }}</strong>

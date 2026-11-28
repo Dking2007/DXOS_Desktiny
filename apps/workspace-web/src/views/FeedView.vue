@@ -18,6 +18,7 @@ import PostComposer from '../feed/PostComposer.vue'
 import { relativeTime } from '../feed/text'
 import { scrollBehavior } from '../ui/preferences'
 import '../feed/feed.css'
+import { confirmDialog } from '@dx/web-shared/confirm.ts'
 
 const queryClient = useQueryClient()
 const session = useSession()
@@ -122,8 +123,8 @@ function togglePin(post: Post) {
     post.pinned_at ? 'Đã bỏ ghim' : 'Đã ghim bài lên đầu bảng tin',
   )
 }
-function remove(post: Post) {
-  if (window.confirm('Xóa bài viết này? Bình luận và cảm xúc cũng bị xóa.'))
+async function remove(post: Post) {
+  if (await confirmDialog({ message: 'Xóa bài viết này? Bình luận và cảm xúc cũng bị xóa.', confirmLabel: 'Xóa bài viết', danger: true }))
     return act(() => api.request(`/posts/${post.id}`, { method: 'DELETE' }), 'Đã xóa bài')
 }
 
@@ -150,7 +151,7 @@ function comment(post: Post, text: string) {
   })
 }
 async function removeComment(post: Post, item: PostComment) {
-  if (!window.confirm('Xóa bình luận này?')) return
+  if (!(await confirmDialog({ message: 'Xóa bình luận này?', confirmLabel: 'Xóa bình luận', danger: true }))) return
   await act(async () => {
     await api.request(`/post-comments/${item.id}`, { method: 'DELETE' })
     await loadComments(post)

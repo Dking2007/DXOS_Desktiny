@@ -127,12 +127,12 @@ function openConnection() {
   error.value = null
   connectionForm.value = { ...BLANK_CONNECTION }
 }
-function closeConnection() {
+async function closeConnection() {
   const value = connectionForm.value
   const typed =
     !!value &&
     (!!value.name.trim() || value.base_url !== BLANK_CONNECTION.base_url || !!value.secret)
-  if (busy.value || !confirmDiscard(typed)) return
+  if (busy.value || !(await confirmDiscard(typed))) return
   connectionForm.value = null
   error.value = null
 }
