@@ -102,6 +102,10 @@ duy nhất là luồng đăng nhập OIDC.
 - Tiêu đề màn đăng nhập không còn bị cắt dấu tiếng Việt (Ử, Ệ…).
 - Thanh trên cùng không tràn ngang ở 390 px; tên tổ chức và đường dẫn trang không bị rút khi còn chỗ.
 - Canvas quy trình mở vừa khung, tên bước hai dòng, nhãn nhánh dễ đọc, gọn trên điện thoại.
+- Điện thoại 360 px không còn cuộn ngang: nhóm nút thanh trên cùng không bị ép nhỏ hơn các nút (nút "Đăng xuất" lòi
+  ra 4 px khi tên trang dài), cột Bảng tin không giãn theo nội dung rộng nhất (tràn 112 px). Canvas quy trình trên
+  điện thoại mở ở cỡ đọc được (75%) từ bước kích hoạt thay vì thu cả luồng còn 20%; luồng ngắn vẫn hiện trọn và
+  "Vừa màn hình" vẫn cho xem toàn cảnh. Dòng trạng thái luồng không còn ép câu thành cột một chữ chiếm nửa màn hình.
 - Hộp thoại đặt tiêu điểm vào ô nhập đầu tiên; hướng dẫn làm quen chỉ hiện một lần; sửa lỗi tiếp cận bàn phím và nhãn.
 - Giao việc có tên rất dài không còn lỗi 500; nhãn mức ưu tiên không xuống dòng.
 - Người được giao gửi được hồ sơ do luồng tự động tạo (trước đây lỗi 404).
