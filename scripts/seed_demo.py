@@ -15,6 +15,7 @@ import http.cookiejar
 import json
 import re
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -282,7 +283,7 @@ def seed_cases(users: dict[str, Session], form_id: str) -> int:
         if outcome == "":
             continue
         manager = users["manager-b" if owner == "staff-b" else "manager"]
-        task = next(t for t in manager.items("/approval-tasks?limit=200") if t["case_id"] == case["id"])
+        task = wait_for_task(manager, case["id"])
         manager.call(
             "POST",
             f"/approval-tasks/{task['id']}/decisions",
@@ -293,6 +294,16 @@ def seed_cases(users: dict[str, Session], form_id: str) -> int:
             },
         )
     return made
+
+
+def wait_for_task(manager: Session, case_id: str, seconds: int = 30) -> dict:
+    """The approval task appears once the worker has processed the submission, which is asynchronous."""
+    for _ in range(seconds):
+        task = next((t for t in manager.items("/approval-tasks?limit=200") if t["case_id"] == case_id), None)
+        if task:
+            return task
+        time.sleep(1)
+    raise SystemExit(f"Không thấy việc duyệt của hồ sơ {case_id} sau {seconds} giây.")
 
 
 def seed_tasks(users: dict[str, Session]) -> int:
