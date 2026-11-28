@@ -73,10 +73,29 @@ cần egress firewall và policy riêng cho Document Server.
 JSON Schema validation không thay luật nghiệp vụ. Không eval Python/JavaScript hoặc
 SQL tùy ý từ graph/form. File không được dùng tên gốc làm object key/path. Rich text
 không thuộc phạm vi đợt đầu; tránh render nội dung không tin cậy với `v-html`.
-Kiểm định dạng file/giới hạn giải nén không phải quét malware; hiện chưa tích hợp
-antivirus hoặc sandbox scan. Audit của Core có chuỗi băm SHA-256 (`GET
+Kiểm định dạng file/giới hạn giải nén không phải quét malware. Quét mã độc là tùy chọn,
+xem mục "Quét mã độc (ClamAV)" bên dưới; sandbox scan chưa có. Audit của Core có chuỗi băm SHA-256 (`GET
 /core/v1/audit-logs/verify`) và trigger chặn sửa/xóa trên PostgreSQL: sửa trực tiếp
 bằng SQL bị phát hiện. Chuỗi không chống được người ghi lại toàn bộ bảng rồi tính lại mọi
 hash; muốn chống điều đó phải lưu `head` ở nơi quản trị DB không sửa được (chưa làm).
 Audit của Workspace và các dòng Core ghi trước `core_0003` chưa có chuỗi.
 Không log Authorization/cookie/secret hoặc toàn bộ nội dung tài liệu.
+
+## Quét mã độc (ClamAV)
+
+Tùy chọn, mặc định TẮT. Bật bằng profile `security` (chạy `clamav/clamav`, container riêng)
+và đặt `CLAMAV_HOST=clamav` trong `.env` (`CLAMAV_PORT` mặc định 3310 nếu dùng Core ngoài Compose):
+
+```bash
+docker compose --env-file .env -f infra/compose/compose.yaml --profile workspace --profile security up -d
+```
+
+Core quét từng tệp (upload và phiên bản mới) sau bước kiểm nội dung, trước khi ghi vào kho.
+Phát hiện mã độc trả 422 `malware_detected` và ghi audit `file.malware_detected`.
+**Lỗi quét = từ chối**: không kết nối được, hết thời gian hoặc trả lời lạ đều trả 503
+`scan_unavailable`, tệp không được lưu. Vì vậy khi đã đặt `CLAMAV_HOST`, upload phụ thuộc
+vào ClamAV; clamd phải đặt `StreamMaxLength` lớn hơn `MAX_UPLOAD_BYTES` (compose đặt 64M).
+
+Tài nguyên: clamd nạp toàn bộ cơ sở dữ liệu chữ ký, cần khoảng 1–1.5 GB RAM và vài phút
+cập nhật chữ ký lần đầu (xem số đo trong báo cáo kiểm thử). Chỉ quét lúc tải lên; tệp đã
+lưu không được quét lại khi chữ ký mới ra.
