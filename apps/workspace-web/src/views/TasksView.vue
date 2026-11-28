@@ -119,7 +119,7 @@ const items = computed(() => tasks.data.value?.items ?? [])
 const statuses: { status: TaskStatus; label: string }[] = [
   { status: 'assigned', label: 'Chờ tiếp nhận' },
   { status: 'accepted', label: 'Đã tiếp nhận' },
-  { status: 'in_progress', label: 'Đang làm' },
+  { status: 'in_progress', label: 'Đang thực hiện' },
   { status: 'blocked', label: 'Vướng mắc' },
   { status: 'returned', label: 'Bị trả lại' },
   { status: 'submitted', label: 'Chờ nghiệm thu' },
