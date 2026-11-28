@@ -85,6 +85,8 @@ duy nhất là luồng đăng nhập OIDC.
 - Giao việc có tên rất dài không còn lỗi 500; nhãn mức ưu tiên không xuống dòng.
 - Người được giao gửi được hồ sơ do luồng tự động tạo (trước đây lỗi 404).
 - Danh sách Cần phê duyệt tự làm mới; lịch sử hồ sơ hiện "Quyết định: Duyệt/Trả lại/Từ chối" thay mã `case.decision`.
+- Bản cài bằng `make install` không nạp được gói giao diện dựng sẵn: mã tìm ở `$PREFIX/packs` trong khi gói được
+  chép vào `$PREFIX/share/desktiny/packs`. `.env.example` thêm `DATABASE_URL` và `PACKS_DIR` (tuỳ chọn) cho bản cài.
 - Đăng nhập để form Keycloak quá 5 phút trả JSON `oidc_state_invalid`: state đăng nhập nay sống 30 phút, callback
   lỗi chuyển về trang đăng nhập kèm thông báo (f3be40b).
 - Nút thu gọn thanh bên không có tác dụng ở trang thiết kế quy trình (9bf7477).
