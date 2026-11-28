@@ -140,7 +140,7 @@ function toggleSidebarCollapsed() {
             ><img v-if="brand.logo" :src="brand.logo" alt="" /><template v-else>{{
               brand.name.charAt(0)
             }}</template></span
-          ><span class="brand-text"
+          ><span class="brand-text" :title="[brand.name, brand.org].filter(Boolean).join(' · ')"
             ><span>{{ brand.name }}</span><small v-if="brand.org">{{ brand.org }}</small></span
           ></RouterLink
         >
@@ -218,8 +218,8 @@ function toggleSidebarCollapsed() {
             @click="sidebar = true"
           >
             <Menu :size="21" aria-hidden="true" /></button
-          ><span class="topbar-crumb">Không gian nội bộ</span><span class="topbar-divider" aria-hidden="true">/</span
-          ><strong>{{ term(String(route.meta.title ?? '')) }}</strong><PageHelp />
+          ><span class="topbar-crumb" title="Không gian nội bộ">Không gian nội bộ</span><span class="topbar-divider" aria-hidden="true">/</span
+          ><strong :title="term(String(route.meta.title ?? ''))">{{ term(String(route.meta.title ?? '')) }}</strong><PageHelp />
         </div>
         <button
           class="topbar-search"
