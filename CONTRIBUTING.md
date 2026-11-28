@@ -37,10 +37,12 @@ Chỉ làm khi phạm vi của milestone đã xong. Mọi bước dưới đây 
    rồi `npm run generate:api`.
 3. Chuyển mục `[Unreleased]` của [CHANGELOG.md](CHANGELOG.md) thành `## [x.y.z] - ngày`; workflow phát hành lấy ghi chú
    từ chính mục này.
-4. Chạy `make check` (lint và test) phải xanh, mở PR `release/x.y.z`, duyệt và merge vào `main`.
-5. Gắn tag `vx.y.z` trên `main` rồi đẩy tag. Workflow [release.yml](.github/workflows/release.yml) tự tạo Release kèm
-   `dxos-x.y.z.tar.gz` và `SHA256SUMS`.
-6. Kiểm bản phát hành: tải hai tệp vào cùng thư mục và chạy `sha256sum -c SHA256SUMS`, phải báo `OK`.
+4. Chạy `python scripts/check_version.py --tag vx.y.z --since v<bản trước>`: mọi tệp khai cùng một số, CHANGELOG có
+   mục của bản này, loại tăng số đủ so với thay đổi API. Workflow phát hành cũng chạy lệnh này và dừng nếu sai.
+5. Chạy `make check` (lint và test) phải xanh, mở PR `release/x.y.z`, duyệt và merge vào `main`.
+6. Gắn tag `vx.y.z` trên `main` rồi đẩy tag. Workflow [release.yml](.github/workflows/release.yml) tự tạo Release kèm
+   `dxos-x.y.z.tar.gz`, SBOM (`sbom-*.cdx.json`) và `SHA256SUMS`.
+7. Kiểm bản phát hành: tải các tệp vào cùng thư mục và chạy `sha256sum -c SHA256SUMS`, phải báo `OK` cho từng tệp.
 
 ### Quy tắc đánh số (SemVer)
 
@@ -49,6 +51,11 @@ Chỉ làm khi phạm vi của milestone đã xong. Mọi bước dưới đây 
 | Sửa lỗi, không đổi hành vi công khai | PATCH (`x.y.Z`) |
 | Tính năng mới tương thích ngược | MINOR (`x.Y.0`) |
 | Phá vỡ tương thích: bỏ API hoặc cột, đổi định dạng dữ liệu | MAJOR (`X.0.0`) |
+
+"API công khai" gồm ba hợp đồng trong `contracts/`, định dạng gói `desktiny-pack/1`, `desktiny-plugin/1` và `/2`,
+và dữ liệu đã lưu (migration). Xóa thao tác, bỏ thuộc tính hoặc thêm trường bắt buộc mới vào hợp đồng là phá tương
+thích. Tăng MAJOR thì MINOR và PATCH về 0; tăng MINOR thì PATCH về 0. Chỉ đặt tag dạng `vX.Y.Z` cho bản phát hành;
+mốc sao lưu dùng nhánh, không dùng tag.
 
 Phiên bản kế tiếp là **3.2.0**. Không bao giờ gắn lại (re-tag) hay xóa một tag đã đẩy, và không bao giờ lùi số phiên bản;
 nếu bản phát hành có lỗi thì sửa và phát hành số mới.
