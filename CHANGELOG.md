@@ -63,7 +63,7 @@ duy nhất là luồng đăng nhập OIDC.
 - Icon điều hướng có màu theo module, tương phản ≥ 3:1 ở cả nền sáng và tối (9bf7477); nút "Lên đầu trang" (9bf7477).
 
 ### Changed
-- Trang đăng nhập mặc định kiểu `flat`; khung, vệt sáng thuộc gói giao diện chọn `framed`.
+- Trang đăng nhập mặc định lại có khung (`framed`), thiết kế lại: viền đôi sáng dần về góc, góc bạc có viên đá, dấu thoi giữa cạnh, một vệt sáng chạy chậm quanh viền; tiêu đề mặc định chỉ xuống dòng giữa các cụm từ nên điện thoại 360 px không còn chữ "TỬ", "DUYỆT" đứng một mình. Gói giao diện vẫn chọn được `flat` hoặc `image`.
 - Tài khoản demo mới có tên người và chức danh riêng; lời chào dùng đầy đủ họ tên.
 - Hộp xác nhận trong ứng dụng thay hộp `confirm()` của trình duyệt.
 - **Core không có giao diện khi chạy riêng** (đúng yêu cầu Core headless của đề thi): công cụ quản trị kỹ thuật
