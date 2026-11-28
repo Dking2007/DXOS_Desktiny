@@ -142,7 +142,9 @@ const tasks = useQuery({
     api.request<Page<ApprovalTask>>(
       `/approval-tasks${queryString({ cursor: cursor.value })}`,
     ),
-  refetchInterval: 20_000,
+  // Same cadence as chat: a case just submitted shows up within seconds, and coming back to the tab refreshes at once.
+  refetchInterval: 8_000,
+  refetchOnWindowFocus: 'always',
 })
 /** The deadline the process set for this step has passed. */
 function stepLate(task: { due_at?: string | null; state?: string; status?: string }) {
