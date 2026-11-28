@@ -357,6 +357,9 @@ kbd {
   border-bottom: 1px solid var(--border);
   color: var(--muted);
 }
+.palette-input:focus-within {
+  border-bottom-color: var(--focus);
+}
 .palette-input input {
   flex: 1;
   min-height: 30px;
@@ -538,7 +541,11 @@ kbd {
     0 0 0 3px #4cc3cc,
     0 0 0 9999px #0d1f3080;
   pointer-events: none;
-  transition: all 0.25s ease;
+  transition:
+    top 0.25s ease,
+    left 0.25s ease,
+    width 0.25s ease,
+    height 0.25s ease;
 }
 .tour-card {
   position: fixed;

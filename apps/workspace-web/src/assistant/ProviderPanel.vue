@@ -239,7 +239,7 @@ async function remove(item: AssistantProvider) {
     <div class="provider-list">
       <article v-for="item in providers" :key="item.id" class="provider-card" :class="{ active: item.active }">
         <span class="provider-logo" :class="{ gateway: GATEWAY_ICONS[item.kind] }" aria-hidden="true"
-          ><img v-if="PROVIDER_LOGOS[item.kind]" :src="PROVIDER_LOGOS[item.kind]" alt="" /><component
+          ><img v-if="PROVIDER_LOGOS[item.kind]" :src="PROVIDER_LOGOS[item.kind]" alt="" width="26" height="26" /><component
             :is="GATEWAY_ICONS[item.kind]"
             v-else
             :size="22"
@@ -321,7 +321,7 @@ async function remove(item: AssistantProvider) {
             :class="{ active: kind === item.kind }"
             @click="pickKind(item.kind)"
           >
-            <span class="provider-logo" aria-hidden="true"><img :src="PROVIDER_LOGOS[item.kind]" alt="" /></span>{{ item.label }}
+            <span class="provider-logo" aria-hidden="true"><img :src="PROVIDER_LOGOS[item.kind]" alt="" width="22" height="22" /></span>{{ item.label }}
           </button>
         </div>
         <span class="section-label">Máy chủ AI tự cài trong cơ quan</span>
@@ -335,7 +335,7 @@ async function remove(item: AssistantProvider) {
             :class="{ active: kind === item.kind }"
             @click="pickKind(item.kind)"
           >
-            <span class="provider-logo" aria-hidden="true"><img :src="PROVIDER_LOGOS[item.kind]" alt="" /></span
+            <span class="provider-logo" aria-hidden="true"><img :src="PROVIDER_LOGOS[item.kind]" alt="" width="22" height="22" /></span
             ><span class="kind-text"><strong>{{ item.label }}</strong><small>Không cần khóa API</small></span>
           </button>
         </div>
