@@ -200,12 +200,13 @@ Chạy API local mà không có PostgreSQL/Keycloak/S3 thì các route cần SSO
 
 ## Tài khoản demo và luồng đầu tiên
 
-Bootstrap tạo 8 identity trong Keycloak và 4 OIDC client. Đăng nhập các tài khoản này
+Bootstrap tạo 9 identity trong Keycloak và 4 OIDC client. Đăng nhập các tài khoản này
 (tên không phải mật khẩu — mật khẩu ngẫu nhiên nằm trong file credential):
 
 | Tài khoản | Vai trò | Phòng |
 |---|---|---|
 | `director` | Ban giám đốc | administration |
+| `lanh-dao-mfa` | Ban giám đốc (Phó giám đốc) | administration — bắt buộc cài TOTP ở lần đăng nhập đầu |
 | `manager` | Lãnh đạo phòng | administration |
 | `staff` | Nhân viên | administration |
 | `manager-b` | Lãnh đạo phòng | engineering |

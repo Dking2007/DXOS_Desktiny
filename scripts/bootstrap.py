@@ -17,6 +17,7 @@ from urllib.parse import urlsplit
 ROOT = Path(__file__).resolve().parents[1]
 GENERATED = ROOT / "infra" / "identity" / "generated"
 LOCAL_HOSTS = {"localhost", "127.0.0.1"}
+MFA_USERNAME = "lanh-dao-mfa"
 
 
 def secret() -> str:
@@ -136,6 +137,8 @@ def create_files(base_url: str, scheme: str = "http") -> list[Path]:
     # (tài khoản, tên người, chức danh, vai trò, phòng) — chức danh nằm riêng, không thay tên.
     fixtures = [
         ("director", "Nguyễn Minh Quân", "Giám đốc", "director", "administration"),
+        # Tài khoản duy nhất bị bắt cấu hình TOTP; seed và e2e không đăng nhập bằng nó.
+        ("lanh-dao-mfa", "Hoàng Thị Mai", "Phó giám đốc", "director", "administration"),
         ("manager", "Trần Thu Hà", "Trưởng phòng Hành chính", "manager", "administration"),
         ("staff", "Lê Hoàng Nam", "Chuyên viên Hành chính", "staff", "administration"),
         ("manager-b", "Phạm Quốc Bảo", "Trưởng phòng Kỹ thuật", "manager", "engineering"),
@@ -158,9 +161,13 @@ def create_files(base_url: str, scheme: str = "http") -> list[Path]:
                 "department": department,
             }
         )
-        credentials.append(f"{username}: {password}")
+        mfa = username == MFA_USERNAME
+        credentials.append(
+            f"{username}: {password}" + ("  (bắt buộc cài TOTP ở lần đăng nhập đầu)" if mfa else "")
+        )
         keycloak_users.append(
             {
+                **({"requiredActions": ["CONFIGURE_TOTP"]} if mfa else {}),
                 "id": subject,
                 "username": username,
                 "enabled": True,

@@ -11,6 +11,20 @@ credential riêng từng môi trường, network/egress policy, tài nguyên CPU
 có mã hóa, kiểm tra dependency/image và threat model. Không đưa Compose dev lên
 Internet rồi coi là hardening đầy đủ.
 
+## Xác thực hai lớp (MFA)
+
+Bootstrap đặt required action `CONFIGURE_TOTP` cho đúng một tài khoản demo,
+`lanh-dao-mfa` (Phó giám đốc, vai trò `director`). Lần đăng nhập đầu Keycloak bắt quét
+mã QR bằng ứng dụng TOTP (6 chữ số, 30 giây — mặc định của Keycloak). Các tài khoản
+khác, kể cả `director` mà seed và e2e dùng, không bị bắt MFA để tự động hóa không vỡ.
+Chỉ áp dụng cho cài đặt mới; realm đã import không đổi.
+
+Bật OTP cho người khác: Keycloak admin console, realm `dx`, Users, chọn người dùng,
+thêm required action "Configure OTP". Muốn bắt mọi người dùng: Authentication,
+Required actions, bật "Set as default action" cho "Configure OTP" (chỉ ảnh hưởng người
+mới), hoặc thêm điều kiện OTP vào browser flow. Production: bắt MFA cho vai trò lãnh
+đạo và quản trị, lưu mã khôi phục, và không dùng tài khoản demo.
+
 ## Secret và bootstrap
 
 `python scripts/bootstrap.py` dùng CSPRNG cho mật khẩu/client secret/session/Office
