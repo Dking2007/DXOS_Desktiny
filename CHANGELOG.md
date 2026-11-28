@@ -89,6 +89,9 @@ duy nhất là luồng đăng nhập OIDC.
   (3e8aa00).
 
 ### Fixed
+- Khung plugin co lại vừa nội dung: SDK khung đo chiều cao phần thân trang thay cho `scrollHeight` của `<html>` (giá trị này
+  không bao giờ nhỏ hơn khung, nên khung chỉ giãn mà không co). Trạng thái công việc thống nhất "Đang thực hiện" (thanh
+  tiến trình và bộ lọc trước ghi "Đang làm").
 - Hồ sơ không còn kẹt ở "Đang xử lý" khi một nhánh quy trình hết bước mà không có bước Kết thúc (ví dụ kết thúc bằng "Gửi thông
   báo"): hồ sơ nhận quyết định cuối cùng trên đường đi (duyệt, trả lại, từ chối), không có quyết định nào thì là đã duyệt;
   diễn tập quy trình báo cùng kết quả. Hồ sơ đã kẹt vì một bước lỗi thì người tạo thu hồi được (B1).
