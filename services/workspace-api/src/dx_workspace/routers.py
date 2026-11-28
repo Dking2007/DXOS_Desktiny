@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 from typing import Literal
 
+from dx_piivn import find_pii, redact
 from dx_platform.auth import Actor
 from dx_platform.errors import AppError
 from fastapi import APIRouter, Depends, File, Header, Query, Request, Response, UploadFile
@@ -12,7 +13,7 @@ from fastapi import Form as MultipartForm
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from . import ai_core, ai_index, process_versions, processes
+from . import ai_core, ai_index, ai_text, process_versions, processes
 from . import models as m
 from . import schemas as s
 from .automations import owner_of, subject_of
@@ -747,6 +748,33 @@ def build_router(app):
         value = get_file(db, user, file_id)
         _, version = core(actor).file_version(value.core_file_id)
         result = core(actor).post(f"/storage/versions/{version['id']}/download-tickets", {})
+        return result
+
+    @router.get("/drive/files/{file_id}/pii", tags=["drive"])
+    def pii_check(
+        file_id: str,
+        redacted: bool = False,
+        db: Session = Depends(db_dep),
+        actor: Actor = Depends(actor_dep),
+    ):
+        """Counts of personal identifiers in a file's text; the masked text only when asked for."""
+        user = context(db, actor)
+        value = get_file(db, user, file_id)
+        if ai_text.kind_of(value.name, value.mime) in {"image", "other"}:  # no text layer: skip the download
+            return {"readable": False, "counts": {}, "total": 0}
+        data, _ = ai_core.file_bytes(core(actor), value)
+        document = ai_text.read(value.name, value.mime, data)
+        counts: dict[str, int] = {}
+        masked = []
+        for part in document.pages:
+            found = find_pii(part.text)
+            for item in found:
+                counts[item.kind] = counts.get(item.kind, 0) + 1
+            if redacted:
+                masked.append(redact(part.text, found))
+        result = {"readable": document.has_text, "counts": counts, "total": sum(counts.values())}
+        if redacted:
+            result["redacted_text"] = "\n\n".join(masked)
         return result
 
     @router.get("/drive/files/{file_id}/shares", tags=["drive"])

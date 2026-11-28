@@ -1167,6 +1167,7 @@ function clearUpload() {
     v-if="preview"
     :key="preview.id"
     :name="preview.name"
+    :file-id="preview.id"
     :source="() => previewSource(preview!)"
     :download="() => download(preview!)"
     @close="preview = null"

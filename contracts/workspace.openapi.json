@@ -1234,6 +1234,57 @@
         }
       }
     },
+    "/workspace/v1/drive/files/{file_id}/pii": {
+      "get": {
+        "tags": [
+          "drive"
+        ],
+        "summary": "Pii Check",
+        "description": "Counts of personal identifiers in a file's text; the masked text only when asked for.",
+        "operationId": "pii_check_workspace_v1_drive_files__file_id__pii_get",
+        "parameters": [
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "File Id"
+            }
+          },
+          {
+            "name": "redacted",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Redacted"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/workspace/v1/drive/files/{file_id}/shares": {
       "get": {
         "tags": [

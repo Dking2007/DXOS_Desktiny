@@ -345,6 +345,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspace/v1/drive/files/{file_id}/pii": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Pii Check
+         * @description Counts of personal identifiers in a file's text; the masked text only when asked for.
+         */
+        get: operations["pii_check_workspace_v1_drive_files__file_id__pii_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspace/v1/drive/files/{file_id}/shares": {
         parameters: {
             query?: never;
@@ -5619,6 +5639,39 @@ export interface operations {
     download_workspace_v1_drive_files__file_id__download_post: {
         parameters: {
             query?: never;
+            header?: never;
+            path: {
+                file_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pii_check_workspace_v1_drive_files__file_id__pii_get: {
+        parameters: {
+            query?: {
+                redacted?: boolean;
+            };
             header?: never;
             path: {
                 file_id: string;
