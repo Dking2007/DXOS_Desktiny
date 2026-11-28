@@ -30,6 +30,12 @@ tìm kiếm, rà soát nút bấm và khoảng cách. Không đổi API, không 
 duy nhất là luồng đăng nhập OIDC.
 
 ### Added
+- `scripts/seed_demo.py`: nạp hồ sơ, công việc, bảng tin, trò chuyện và tài liệu minh họa qua API công khai; chạy lại không tạo trùng.
+- Quét mã độc tệp tải lên bằng ClamAV (tùy chọn: profile `security`, biến `CLAMAV_HOST`); lỗi quét thì từ chối tệp, phát hiện thì ghi audit.
+- Cảnh báo dữ liệu cá nhân (CCCD, số điện thoại, e-mail…) khi xem trước tệp và xem bản đã che (`GET /drive/files/{id}/pii`, dùng `dx-piivn`).
+- `scripts/backup.py`, `scripts/restore.py`: sao lưu và khôi phục ba cơ sở dữ liệu và kho tệp, kèm manifest SHA-256; số đo diễn tập trong `docs/operations.md`.
+- Tài khoản demo `lanh-dao-mfa` bắt buộc cài TOTP ở lần đăng nhập đầu (chỉ cài mới).
+- `scripts/check_version.py`: workflow phát hành kiểm số phiên bản theo SemVer; Release đính kèm SBOM CycloneDX.
 - **Cài đặt cá nhân** (`/preferences`, mọi người dùng; 9bf7477): giao diện sáng/tối/theo máy, mật độ hiển thị, thu
   gọn thanh bên, cỡ chữ 90–125% (toàn bộ cỡ chữ đổi sang `rem`), phông chữ, giãn dòng, giảm chuyển động, tăng tương
   phản, luôn hiện viền focus, gạch chân liên kết, định dạng ngày (dd/mm/yyyy hoặc yyyy-mm-dd), giờ 24h/12h, ngày đầu
@@ -45,6 +51,9 @@ duy nhất là luồng đăng nhập OIDC.
 - Icon điều hướng có màu theo module, tương phản ≥ 3:1 ở cả nền sáng và tối (9bf7477); nút "Lên đầu trang" (9bf7477).
 
 ### Changed
+- Trang đăng nhập mặc định kiểu `flat`; khung, vệt sáng thuộc gói giao diện chọn `framed`.
+- Tài khoản demo mới có tên người và chức danh riêng; lời chào dùng đầy đủ họ tên.
+- Hộp xác nhận trong ứng dụng thay hộp `confirm()` của trình duyệt.
 - Chuẩn hóa khoảng cách theo token (`--space-*`, `--gap-icon`, `--field-gap`, `--control-h`): nút, tab, ô nhập,
   cảnh báo, bảng, hộp thoại không còn dính nhau; viền focus rõ khi dùng bàn phím (9bf7477).
 - Rà soát nút bấm trên các màn hình (fd29309, 0c682f3): chống gửi trùng, trạng thái "Đang …", nút bị khóa có lý do,
@@ -57,6 +66,13 @@ duy nhất là luồng đăng nhập OIDC.
   dùng lại thay vì tạo mới mỗi dòng; danh mục ít đổi không tải lại mỗi lần quay lại cửa sổ (9bf7477, c5d4bb9).
 
 ### Fixed
+- Tiêu đề màn đăng nhập không còn bị cắt dấu tiếng Việt (Ử, Ệ…).
+- Thanh trên cùng không tràn ngang ở 390 px; tên tổ chức và đường dẫn trang không bị rút khi còn chỗ.
+- Canvas quy trình mở vừa khung, tên bước hai dòng, nhãn nhánh dễ đọc, gọn trên điện thoại.
+- Hộp thoại đặt tiêu điểm vào ô nhập đầu tiên; hướng dẫn làm quen chỉ hiện một lần; sửa lỗi tiếp cận bàn phím và nhãn.
+- Giao việc có tên rất dài không còn lỗi 500; nhãn mức ưu tiên không xuống dòng.
+- Người được giao gửi được hồ sơ do luồng tự động tạo (trước đây lỗi 404).
+- Danh sách Cần phê duyệt tự làm mới; lịch sử hồ sơ hiện "Quyết định: Duyệt/Trả lại/Từ chối" thay mã `case.decision`.
 - Đăng nhập để form Keycloak quá 5 phút trả JSON `oidc_state_invalid`: state đăng nhập nay sống 30 phút, callback
   lỗi chuyển về trang đăng nhập kèm thông báo (f3be40b).
 - Nút thu gọn thanh bên không có tác dụng ở trang thiết kế quy trình (9bf7477).
