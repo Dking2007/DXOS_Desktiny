@@ -113,8 +113,11 @@ mã nguồn và cài bằng `make`: [BUILD.md](BUILD.md).
 - **ONLYOFFICE:** đổi `ONLYOFFICE_ENABLED=true` trong `.env`, rồi chạy
   `docker compose --env-file .env -f infra/compose/compose.yaml --profile workspace --profile office up -d`.
   Chờ Document Server sẵn sàng rồi mở tài liệu từ Kho tài liệu. Khi chưa bật, editor không hoạt động.
-- **Chỉ Core:** `docker compose --env-file .env -f infra/compose/compose.yaml --profile core up --build -d`, rồi
-  mở `/console/`. Client `core-example` dùng namespace `equipment`, secret `CORE_EXAMPLE_CLIENT_SECRET` trong `.env`.
+- **Chỉ Core:** `docker compose --env-file .env -f infra/compose/compose.yaml --profile core up --build -d`. Core
+  **không có giao diện**: gateway chỉ phục vụ API `/core/v1/` (tài liệu ở `/core/v1/docs`) và `/identity/`; `/` và
+  `/console/` trả 404. Thử Core bằng [`examples/core-client`](examples/core-client): client `core-example` dùng
+  namespace `equipment`, secret `CORE_EXAMPLE_CLIENT_SECRET` trong `.env`. Muốn có công cụ quản trị kỹ thuật Core
+  admin (client riêng của Core API, Tầng 2) thì thêm `--profile console`.
 
 </details>
 
