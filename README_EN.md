@@ -52,7 +52,7 @@ creates labelled synthetic data. To enable ONLYOFFICE, change the port or run on
 
 <p>
   <img src="docs/images/trang-chu.png" alt="Desktiny home page" width="49%">
-  <img src="docs/images/ho-so.png" alt="Case screen" width="49%">
+  <img src="docs/images/ho-so.png" alt="Case list in folder view, one cover per case with its number, status, due date and current handler" width="49%">
 </p>
 <p>
   <img src="docs/images/quy-trinh-canvas.png" alt="Canvas workflow designer" width="49%">
@@ -84,7 +84,9 @@ repository).
 These are samples: agency names are fictitious, deadlines and amounts are illustrative only, and digital signing is
 simulated. **Compatibility:** expansion pack 1.1.0 requires Desktiny **3.1.0** or later.
 
-<img src="docs/images/ban-mo-rong.png" alt="An expansion installed in Desktiny" width="70%">
+<img src="docs/images/ban-mo-rong.png" alt="The Appearance packs page on a fresh install: the default pack in use and the packs available to install" width="70%">
+
+*Admin › Appearance packs on a fresh install, before any expansion is added: this is where an expansion's `.zip` pack is uploaded; its plugins are installed under Admin › Plugins.*
 
 ## Architecture
 

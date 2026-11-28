@@ -51,7 +51,7 @@ nhãn. Bật ONLYOFFICE, đổi cổng hay chỉ chạy Core: xem [Cài đặt](
 
 <p>
   <img src="docs/images/trang-chu.png" alt="Trang chủ Desktiny" width="49%">
-  <img src="docs/images/ho-so.png" alt="Màn hình hồ sơ" width="49%">
+  <img src="docs/images/ho-so.png" alt="Danh sách hồ sơ dạng tập, mỗi hồ sơ một bìa có số, trạng thái, hạn và người đang xử lý" width="49%">
 </p>
 <p>
   <img src="docs/images/quy-trinh-canvas.png" alt="Trình thiết kế quy trình dạng canvas" width="49%">
@@ -84,7 +84,9 @@ bản gồm một [gói giao diện](docs/packs.md) (từ ngữ, màu, quy trìn
 Đây là bản mẫu: tên cơ quan là tên giả, thời hạn và mức tiền chỉ để minh họa, ký số là mô phỏng. **Tương thích:**
 bản mở rộng 1.1.0 cần Desktiny **3.1.0** trở lên.
 
-<img src="docs/images/ban-mo-rong.png" alt="Bản mở rộng cài vào Desktiny" width="70%">
+<img src="docs/images/ban-mo-rong.png" alt="Trang Gói giao diện trên bản cài mới: gói mặc định đang dùng và các gói có sẵn để cài" width="70%">
+
+*Trang Quản trị › Gói giao diện trên bản cài mới, trước khi cài bản mở rộng: nơi tải lên gói `.zip` của bản mở rộng; plugin đi kèm cài ở Quản trị › Plugin.*
 
 ## Kiến trúc
 
