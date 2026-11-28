@@ -1553,6 +1553,42 @@
         }
       }
     },
+    "/workspace/v1/forms/{form_id}": {
+      "delete": {
+        "tags": [
+          "forms"
+        ],
+        "summary": "Delete Form",
+        "description": "Remove a form nobody needs any more.\n\nA form a process still uses, or one a sector pack installed, is refused with the reason: change the\nprocess's form or remove the pack instead. A form dossiers were filed on is archived, not deleted, so\nthose dossiers stay readable; it no longer appears when creating a dossier or a process.",
+        "operationId": "delete_form_workspace_v1_forms__form_id__delete",
+        "parameters": [
+          {
+            "name": "form_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Form Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/workspace/v1/cases": {
       "get": {
         "tags": [

@@ -891,6 +891,43 @@ def build_router(app):
         db.commit()
         return serial(value)
 
+    @router.delete("/forms/{form_id}", tags=["forms"], status_code=204)
+    def delete_form(form_id: str, db: Session = Depends(db_dep), actor: Actor = Depends(actor_dep)):
+        """Remove a form nobody needs any more.
+
+        A form a process still uses, or one a sector pack installed, is refused with the reason: change the
+        process's form or remove the pack instead. A form dossiers were filed on is archived, not deleted, so
+        those dossiers stay readable; it no longer appears when creating a dossier or a process.
+        """
+        from .packs import drop_form
+
+        user = context(db, actor)
+        require(db, user, "forms.manage")
+        value = db.get(m.Form, form_id)
+        if not value or value.state != "published":
+            raise AppError(404, "form_not_found", "Không tìm thấy biểu mẫu.")
+        rules = list(db.scalars(select(m.AutomationRule.name).where(m.AutomationRule.form_id == form_id).limit(5)))
+        if rules:
+            raise AppError(
+                409,
+                "form_in_use",
+                "Biểu mẫu đang dùng cho quy trình: " + ", ".join(f"“{name}”" for name in rules)
+                + ". Đổi biểu mẫu hoặc xóa quy trình trước.",
+            )
+        for pack in db.scalars(select(m.InstalledPack)):
+            if form_id in ((pack.created or {}).get("forms") or {}).values():
+                raise AppError(
+                    409, "form_from_pack", f"Biểu mẫu thuộc gói “{pack.name}”; gỡ gói ở Quản trị › Gói giao diện để xóa."
+                )
+        name = value.name
+        if drop_form(db, form_id):
+            audit(db, user, "form.deleted", form_id, {"name": name})
+        else:
+            value.state = "archived"
+            audit(db, user, "form.archived", form_id, {"name": name})
+        db.commit()
+        return Response(status_code=204)
+
     def make_form(db, actor, user, body: s.FormCreate, key: str) -> m.Form:
         """A published form with its Core schema; the caller commits. Shared with sector packs."""
         for step in body.approval_steps:

@@ -89,6 +89,8 @@ duy nhất là luồng đăng nhập OIDC.
   (3e8aa00).
 
 ### Fixed
+- Xóa được biểu mẫu không còn dùng (B7): nút "Xóa biểu mẫu" cạnh ô chọn biểu mẫu khi tạo luồng, `DELETE /forms/{id}`. Biểu mẫu
+  đã có hồ sơ thì được lưu trữ (hồ sơ vẫn xem được); biểu mẫu quy trình còn dùng hoặc do gói cài thì bị từ chối kèm lý do.
 - Hồ sơ không còn kẹt ở "Đang xử lý" khi một nhánh quy trình hết bước mà không có bước Kết thúc (ví dụ kết thúc bằng "Gửi thông
   báo"): hồ sơ nhận quyết định cuối cùng trên đường đi (duyệt, trả lại, từ chối), không có quyết định nào thì là đã duyệt;
   diễn tập quy trình báo cùng kết quả. Hồ sơ đã kẹt vì một bước lỗi thì người tạo thu hồi được (B1).
