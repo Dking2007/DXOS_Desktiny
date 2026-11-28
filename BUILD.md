@@ -22,7 +22,7 @@ Danh sách đầy đủ và giấy phép: [THIRD_PARTY.md](THIRD_PARTY.md).
 ## 2. Cách A — Docker Compose (toàn bộ nền tảng, có SSO)
 
 ```bash
-git clone https://github.com/Raphael-Fug/DXOS_V2.git && cd DXOS_V2
+git clone https://github.com/Dking2007/DXOS_Desktiny.git && cd DXOS_Desktiny
 make up                       # bootstrap .env, build image, khởi động, nạp dữ liệu demo
 # cổng khác: make up BASE_URL=http://localhost:8090
 ```
@@ -33,7 +33,7 @@ Mở http://localhost:8080/ . Tài khoản demo ngẫu nhiên nằm ở
 ## 3. Cách B — Biên dịch trực tiếp (không Docker)
 
 ```bash
-git clone https://github.com/Raphael-Fug/DXOS_V2.git && cd DXOS_V2
+git clone https://github.com/Dking2007/DXOS_Desktiny.git && cd DXOS_Desktiny
 make venv deps PYTHON=python3.13   # môi trường ảo Python 3.13 + npm ci (Ubuntu 24.04: python3 mặc định là 3.12)
 make build                    # biên dịch frontend → apps/*/dist
 make test                     # pytest + vitest
