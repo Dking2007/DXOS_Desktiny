@@ -219,3 +219,13 @@ export function makeRoom(
   }
   return { at, moved }
 }
+
+/** Opening or "fit" shows the whole flow, never magnified past 100% and not so small that names are unreadable. */
+export const FIT_VIEW = {
+  padding: 0.08,
+  // On a phone the whole flow still has to be visible, even if it is small; pinch to zoom in.
+  get minZoom() {
+    return window.innerWidth < 640 ? 0.2 : 0.5
+  },
+  maxZoom: 1,
+}

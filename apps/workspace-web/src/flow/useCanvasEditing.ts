@@ -7,7 +7,7 @@ import { copyNodes, parseClip, pasteClip, serializeClip } from './clipboard'
 import type { FlowClip, PasteResult } from './clipboard'
 import { heldWhile } from './held'
 import { UndoHistory } from './history'
-import { alignBoxes, autoLayout } from './layout'
+import { FIT_VIEW, alignBoxes, autoLayout } from './layout'
 import type { AlignMode, Point } from './layout'
 import { outputs, toApi, toCanvas } from './nodes'
 import type { ApiGraph, FlowNodeData, NodeKind } from './nodes'
@@ -311,7 +311,7 @@ export function useCanvasEditing(o: CanvasEditingOptions) {
     )
     o.beforeChange?.()
     move(positions)
-    void nextTick(() => flow.fitView({ padding: 0.2, maxZoom: 1, duration: 300 }))
+    void nextTick(() => flow.fitView({ ...FIT_VIEW, duration: 300 }))
     o.notify('Đã sắp xếp lại các bước.', true)
   }
 
