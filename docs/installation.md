@@ -158,6 +158,12 @@ Profile `office` **không** tự thêm Workspace — luôn đi kèm `--profile w
 Khi `ONLYOFFICE_ENABLED=false`, editor **không hoạt động** — repo không có mock lưu tài
 liệu để thay thế. Đây là chủ ý: không hiển thị lưu thành công giả.
 
+### A5b. Bật quét mã độc ClamAV (tùy chọn)
+
+Cần khoảng 1–1.5 GB RAM và vài phút tải chữ ký lần đầu. Đặt `CLAMAV_HOST=clamav` trong
+`.env`, rồi thêm `--profile security` vào lệnh `up -d`. Từ lúc đó mọi upload bị từ chối
+nếu ClamAV không trả lời; chi tiết ở [security.md](security.md).
+
 ### A6. Chỉ chạy Core độc lập
 
 ```bash
