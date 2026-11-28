@@ -36,6 +36,10 @@ onMounted(async () => {
   previous = document.activeElement
   await nextTick()
   dialog.value?.showModal()
+  // showModal() focuses the first focusable element, which is the close button; prefer the first field.
+  dialog.value
+    ?.querySelector<HTMLElement>('.modal-body :is(input, select, textarea):not([disabled], [type="hidden"])')
+    ?.focus()
 })
 onBeforeUnmount(() => {
   if (previous instanceof HTMLElement) previous.focus()
@@ -56,7 +60,6 @@ onBeforeUnmount(() => {
   >
     <header class="modal-header">
       <div>
-        <span class="eyebrow">Desktiny</span>
         <h2 :id="titleId">{{ title }}</h2>
       </div>
       <button
