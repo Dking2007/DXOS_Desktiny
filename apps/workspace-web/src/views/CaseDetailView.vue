@@ -72,6 +72,7 @@ import StepAnswerDialog from '../components/StepAnswerDialog.vue'
 import { toast } from '../ui/toast'
 import { isOfficeFile, previewKind } from '../ui/preview'
 import { initialsOf } from '../ui/people'
+import { caseEventLabel } from '../ui/audit'
 import FilePreview from '../components/FilePreview.vue'
 import type { StepFile } from '../flow/ProcessCanvas.vue'
 import { confirmDiscard as askDiscard, useUnsavedGuard } from '../ui/unsaved'
@@ -657,21 +658,7 @@ function openStepFile(file: StepFile, submissionId: string | null) {
   preview.value = { fileId: file.id, name: file.name, submissionId: submissionId ?? undefined }
 }
 function eventLabel(event: HistoryEvent) {
-  const actions: Record<string, string> = {
-    'case.created': 'Đã tạo hồ sơ',
-    'case.updated': 'Đã cập nhật bản nháp',
-    'case.submitted': 'Đã trình duyệt',
-    'case.withdrawn': 'Người tạo đã thu hồi hồ sơ',
-    'case.approved': 'Hồ sơ được phê duyệt',
-    'case.returned': 'Hồ sơ được trả lại',
-    'case.rejected': 'Hồ sơ bị từ chối',
-    'approval.decided': 'Đã ghi nhận quyết định',
-    'case.workflow_started': 'Đã bắt đầu quy trình xử lý',
-    'plugin.write.comment': 'Ý kiến',
-    'plugin.write.fields': 'Cập nhật trường của hồ sơ',
-    'plugin.write.attach': 'Gắn tài liệu vào hồ sơ',
-  }
-  return actions[event.action] || event.action
+  return caseEventLabel(event.action, event.detail)
 }
 // A plugin writes as itself ("plugin:<id>"), or as the viewer of its frame; history says which.
 function eventActor(event: HistoryEvent) {
