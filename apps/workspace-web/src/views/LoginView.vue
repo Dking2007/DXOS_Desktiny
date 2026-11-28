@@ -1,7 +1,8 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <!-- SPDX-FileCopyrightText: 2026 Desktiny contributors -->
-<!-- The entrance: a framed title card on a deep blue ground that always fits one screen, one way in
-     through the organisation's SSO. Everything moves gently and stays still for reduced motion. -->
+<!-- The entrance: a title card that always fits one screen, one way in through the organisation's SSO.
+     Without a sector pack it is plain ("flat"); the frame, light and specks belong to a pack's "framed" style
+     and stay still for reduced motion. -->
 <script setup lang="ts">
 import { ChevronRight, Loader2, TriangleAlert } from 'lucide-vue-next'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
@@ -11,7 +12,7 @@ import { appearance, brand } from '../ui/appearance'
 const route = useRoute()
 // The sector pack in force may name the organisation, change the titles and the ground.
 const entry = computed(() => appearance.value?.login ?? {})
-const style = computed(() => entry.value.style ?? 'framed')
+const style = computed(() => entry.value.style ?? 'flat')
 const effects = computed(() => entry.value.effects !== false)
 // The pack's ground colours, as CSS variables the styles below read; the photo is tinted with them.
 const ground = computed(() => {
@@ -756,8 +757,11 @@ const SPECKS = [
     width: 64px;
     height: 64px;
   }
-  .entry-org {
-    letter-spacing: 0.3em;
+  /* Tighter tracking so a phrase wraps by words instead of leaving one word alone. */
+  .entry-org,
+  .entry-kicker {
+    letter-spacing: 0.18em;
+    text-indent: 0.18em;
     gap: 12px;
   }
   .entry-title {
@@ -765,22 +769,28 @@ const SPECKS = [
     line-height: 1.35;
   }
   .entry-code {
-    letter-spacing: 0.24em;
+    letter-spacing: 0.1em;
+    text-indent: 0.1em;
+    text-wrap: balance;
   }
   .entry-button {
     gap: 12px;
     padding: 0 22px 0 26px;
   }
   /* Long organisation names wrap instead of being cut by the frame. */
-  .entry-org {
+  .entry-org,
+  .entry-kicker {
     max-width: 100%;
   }
-  .entry-org span {
+  .entry-org span,
+  .entry-kicker span {
     min-width: 0;
     overflow-wrap: anywhere;
   }
   .entry-org::before,
-  .entry-org::after {
+  .entry-org::after,
+  .entry-kicker::before,
+  .entry-kicker::after {
     flex: none;
   }
 }
