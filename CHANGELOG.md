@@ -45,6 +45,9 @@ duy nhất là luồng đăng nhập OIDC.
 - **Công việc dạng giấy** (kiểu xem mặc định, lựa chọn được nhớ trên trình duyệt): mỗi việc là một tờ giấy kẻ dòng
   có băng dính màu theo mức ưu tiên, góc gấp, mô tả ngắn, nhãn, tiến độ checklist, người nhận và hạn; dấu mộc
   "Quá hạn", "Trả lại", "Hoàn tất", "Đã hủy". Tờ giấy nghiêng nhẹ, nhấc lên khi rê chuột (đứng thẳng khi giảm chuyển động).
+- **Bảng tin** làm mới giao diện: dải chào theo buổi kèm ngày và số bài mới hôm nay; thanh lọc dạng kính mờ dính dưới
+  thanh trên cùng; thẻ bài bo tròn, bóng mềm, avatar có viền màu, nút thao tác dạng viên; ảnh đơn nằm trên nền mờ của
+  chính nó thay cho khung đen; thông báo chính thức ở cột phải xếp theo dòng thời gian.
 - **Cài đặt cá nhân** (`/preferences`, mọi người dùng; 9bf7477): giao diện sáng/tối/theo máy, mật độ hiển thị, thu
   gọn thanh bên, cỡ chữ 90–125% (toàn bộ cỡ chữ đổi sang `rem`), phông chữ, giãn dòng, giảm chuyển động, tăng tương
   phản, luôn hiện viền focus, gạch chân liên kết, định dạng ngày (dd/mm/yyyy hoặc yyyy-mm-dd), giờ 24h/12h, ngày đầu
