@@ -39,6 +39,9 @@ duy nhất là luồng đăng nhập OIDC.
 - **Trình soạn thảo ONLYOFFICE toàn màn hình**: nút "Toàn màn hình" trên trang chỉnh sửa tài liệu che cả cửa sổ (ẩn thanh
   bên, đầu trang) và bật chế độ toàn màn hình của trình duyệt; "Thu nhỏ" hoặc Esc để quay lại, không tải lại tài liệu.
 - **Kho tài liệu** mặc định xem dạng lưới; lựa chọn danh sách/lưới của từng người được nhớ trên trình duyệt.
+- **Hoạt động của công việc** vẽ thành sơ đồ quy trình (cùng kiểu trình thiết kế quy trình): mỗi bước là một nút có
+  icon, người làm và giờ, nối bằng mũi tên theo màu trạng thái; cập nhật phụ nét đứt. Nút "Phóng to" mở sơ đồ ngang,
+  tự xuống hàng theo bề rộng, kéo và thu phóng được.
 - **Cài đặt cá nhân** (`/preferences`, mọi người dùng; 9bf7477): giao diện sáng/tối/theo máy, mật độ hiển thị, thu
   gọn thanh bên, cỡ chữ 90–125% (toàn bộ cỡ chữ đổi sang `rem`), phông chữ, giãn dòng, giảm chuyển động, tăng tương
   phản, luôn hiện viền focus, gạch chân liên kết, định dạng ngày (dd/mm/yyyy hoặc yyyy-mm-dd), giờ 24h/12h, ngày đầu
